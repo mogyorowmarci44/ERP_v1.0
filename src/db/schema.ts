@@ -370,3 +370,12 @@ export const payments = pgTable(
   },
   (t) => [index("payments_invoice").on(t.invoiceId)],
 );
+
+/** Tagi kölcsön befizetések lejárata (a tételek maguk a főkönyvben, a 4791-es számlán vannak). */
+export const memberLoanTerms = pgTable("member_loan_terms", {
+  entryId: integer("entry_id").primaryKey().references(() => journalEntries.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  dueDate: date("due_date").notNull(),
+  note: text("note"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

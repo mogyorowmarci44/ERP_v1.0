@@ -24,3 +24,7 @@ export function isDate(s: unknown): s is string {
 export function fmtDate(d: string | null | undefined): string {
   return d ? d.replaceAll("-", ".") + "." : "";
 }
+
+export function addDaysIso(d: string, days: number): string {
+  return new Date(Date.parse(d + "T00:00:00Z") + days * 86400000).toISOString().slice(0, 10);
+}

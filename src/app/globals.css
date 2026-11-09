@@ -307,3 +307,21 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .sk-label, .sk-value { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
 .sk-label { font-size: 13px; font-weight: 600; fill: var(--ink); }
 .sk-value { font-size: 12px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- Pénzeszköz-figyelő ---------- */
+.money-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; }
+.money-card { display: grid; gap: 8px; }
+.money-card .head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.money-card .bal { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.money-card .meta { font-size: 12.5px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+.ml-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ml-zero { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 3; }
+.ml-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.ml-neg { fill: var(--neg); stroke: var(--surface); stroke-width: 2; }
+.ml-hit { fill: transparent; }
+.ml-hit:hover { fill: color-mix(in srgb, var(--accent) 8%, transparent); }
+.ml-axis { font-size: 11px; fill: var(--muted); }
+.ml-last { font-size: 12px; font-weight: 600; fill: var(--ink); font-variant-numeric: tabular-nums; }
+.ml-last.neg { fill: var(--neg); }
+.badge.overdue { background: color-mix(in srgb, var(--neg) 12%, transparent); color: var(--neg); border-color: transparent; }
+.badge.soon { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); border-color: transparent; }

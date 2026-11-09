@@ -44,7 +44,7 @@ export default async function JournalPage({ params, searchParams }: { params: Pr
                 <td></td><td></td><td></td>
                 <td>
                   {e.sourceType === "invoice" || e.sourceType === "payment" ? <Link href={`/c/${cid}/invoices/${e.sourceId}`}>számla</Link> : null}
-                  {e.sourceType === "manual" && !e.reversedById && role !== "viewer" && (
+                  {(e.sourceType === "manual" || e.sourceType === "member_loan") && !e.reversedById && role !== "viewer" && (
                     <form action={reverseEntryAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="entryId" value={e.id} /><button className="danger">Sztornó</button></form>
                   )}
                 </td>

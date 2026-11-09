@@ -29,6 +29,7 @@ export type ImportBundle = {
   vehicles: Array<{ key: string; make: string; model: string; plate?: string | null; vin?: string | null; vatTreatment?: "margin" | "normal";
     purchaseDate?: string | null; purchasePrice?: number | null; note?: string }>;
   documents: BundleDoc[];
+  memberLoanTerms?: Array<{ date: string; amount: number; partner: string; dueDate: string; ref?: string | null; note?: string | null }>;
   log?: string[][];
 };
 
@@ -105,6 +106,7 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
     const saleByVehicle = new Map<string, number>();
     const salesByPartner = new Map<number, number[]>();
     const cogsRefs: Array<{ vehicle: string; amount: number }> = [];
+    const loanEntries: Array<{ entryId: number; date: string; amount: number; partnerId: number | null; used?: boolean }> = [];
 
     for (const d of bundle.documents) {
       try {
@@ -175,7 +177,11 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
             .filter((l) => Math.abs(l.debit) > 0.004 || Math.abs(l.credit) > 0.004)
             .map((l) => ({ accountId: accId(l.account), debit: round2(l.debit), credit: round2(l.credit), partnerId: partnerId(l.partner), vehicleId: vehicleId(l.vehicle) }));
           if (lines.length < 2) continue;
-          await manualEntry(companyId, { journalCode: d.journal, date: d.date, description: `${d.description}${d.ref ? ` [${d.ref}]` : ""}`.slice(0, 500), lines }, userId, tx);
+          const loanAcc = accRows.find((a) => a.code === "4791")?.id;
+          const isLoan = loanAcc !== undefined && lines.some((l) => l.accountId === loanAcc);
+          const e = await manualEntry(companyId, { journalCode: d.journal, date: d.date, description: `${d.description}${d.ref ? ` [${d.ref}]` : ""}`.slice(0, 500), lines, sourceType: isLoan ? "member_loan" : "manual" }, userId, tx);
+          const loanCredit = lines.find((l) => l.accountId === loanAcc && l.credit > 0);
+          if (loanCredit) loanEntries.push({ entryId: e.id, date: d.date, amount: loanCredit.credit, partnerId: loanCredit.partnerId ?? null });
           count("vegyes tétel");
         } else if (d.kind === "sale_entry") {
           const pid = partnerId(d.partner);
@@ -221,6 +227,21 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
       } catch (e) {
         throw new Error(`Import hiba (${"src" in d ? d.src : ""} ${"number" in d ? d.number : "ref" in d ? d.ref : ""}): ${e instanceof Error ? e.message : e}`);
       }
+    }
+
+    // Tagi kölcsön lejáratok: a befizetési tételhez dátum + összeg + tag alapján
+    for (const t of bundle.memberLoanTerms ?? []) {
+      const pid = partnerId(t.partner);
+      const days = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86400000;
+      const cands = loanEntries
+        .filter((x) => !x.used && Math.abs(x.amount - t.amount) < 1 && (!pid || x.partnerId === pid) && days(x.date, t.date) <= 7)
+        .sort((a, b) => days(a.date, t.date) - days(b.date, t.date));
+      const e = cands[0];
+      if (e && e.date !== t.date) report.warnings.push(`Tagi kölcsön ${t.ref ?? ""} ${t.amount} Ft: a nyilvántartás ${t.date}, a napló ${e.date} dátumot ír – a napló szerinti tételhez rendelve`);
+      if (!e) { report.warnings.push(`Tagi kölcsön lejárat nem párosítható: ${t.date} ${t.amount} Ft (${t.ref ?? "bizonylatszám nélkül"})`); continue; }
+      e.used = true;
+      await tx.insert(schema.memberLoanTerms).values({ entryId: e.entryId, companyId, dueDate: t.dueDate, note: t.note ?? null });
+      count("tagi kölcsön lejárat");
     }
 
     // ELÁBÉ összevetés: a forrás számított ELÁBÉ-ja vs. az app könyv szerinti értéke

@@ -18,6 +18,8 @@ import {
   Palette,
   Settings,
   Upload,
+  Wallet,
+  HandCoins,
 } from "lucide-react";
 import { requireCompany } from "@/lib/auth";
 import { logoutAction } from "@/app/auth-actions";
@@ -56,6 +58,10 @@ export default async function CompanyLayout({ children, params }: { children: Re
         <NavLink href={`${b}/invoices/new?dir=out`} exact><FilePlus2 />Új vevőszámla</NavLink>
         <NavLink href={`${b}/invoices/new?dir=in`} exact><FilePlus2 />Új szállítói számla</NavLink>
         <NavLink href={`${b}/journal/new`} exact><BookPlus />Vegyes / bank tétel</NavLink>
+
+        <div className="group">Pénzügy</div>
+        <NavLink href={`${b}/money`}><Wallet />Pénztár és bank</NavLink>
+        <NavLink href={`${b}/member-loans`}><HandCoins />Tagi kölcsön</NavLink>
 
         <div className="group">Kimutatások</div>
         <NavLink href={`${b}/reports/statements`}><ChartNoAxesCombined />P&amp;L, cash-flow, mérleg</NavLink>

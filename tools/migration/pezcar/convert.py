@@ -375,6 +375,18 @@ if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "stats":
     for l in log: print(" ", l)
 
 
+def member_loan_terms():
+    """Tagi kölcsön lejáratok a 2026-os nyilvántartásból (a 2025-ös sorokat is tartalmazza)."""
+    out = []
+    for r in list(csv.reader(open("/home/claude/pezcar-csv/2026/Tagi_Kölcsön_Nyilvántartás.csv")))[1:]:
+        r += [""] * 12
+        if "befizetés" not in r[2]: continue
+        due = r[7] if re.fullmatch(r"\d{4}-\d{2}-\d{2}", r[7]) else r[5] if re.fullmatch(r"\d{4}-\d{2}-\d{2}", r[5]) else None
+        if not due: continue
+        note = "; ".join(x for x in (r[7], r[8], r[9]) if x and not re.fullmatch(r"[-\dIN/A]*|\d{4}-\d{2}-\d{2}|Készpénz|Átutalás|Bank|TKV?-\d{4}-\d{3}", x))
+        out.append({"date": r[0], "amount": num(r[3]), "partner": r[4].strip(), "dueDate": due, "ref": r[1] or None, "note": None})  # a forrás megjegyzés-oszlopai elcsúsztak
+    return out
+
 def build_bundle():
     vs, partners, docs, log = convert()
     def vout(v):
@@ -404,6 +416,7 @@ def build_bundle():
         "partners": sorted(partners.values(), key=lambda p: p["name"]),
         "vehicles": [vout(v) for v in vs.values()],
         "documents": docs,
+        "memberLoanTerms": member_loan_terms(),
         "log": [list(l) for l in log],
     }
 

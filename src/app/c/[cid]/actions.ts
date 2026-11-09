@@ -24,6 +24,7 @@ import { getMnbRate, storeRates, fetchMnbRates } from "@/lib/fx-service";
 import { addDays } from "@/lib/fx";
 import { PRESETS, isHex } from "@/lib/themes";
 import { importBundle, type ImportBundle, type ImportReport } from "@/lib/importer";
+import { recordMemberLoan, setLoanDueDate } from "@/lib/member-loans";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
@@ -206,7 +207,7 @@ export async function reverseEntryAction(fd: FormData) {
   await runOrRedirect(`/c/${cid}/journal`, async () => {
     const entryId = Number(fd.get("entryId"));
     const [e] = await db.select().from(schema.journalEntries).where(and(eq(schema.journalEntries.id, entryId), eq(schema.journalEntries.companyId, cid)));
-    if (e?.sourceType !== "manual") throw new Error("Számlából / rendezésből származó tételt a számlánál lehet sztornózni.");
+    if (e?.sourceType !== "manual" && e?.sourceType !== "member_loan") throw new Error("Számlából / rendezésből származó tételt a számlánál lehet sztornózni.");
     await db.transaction((tx) => reverseEntry(tx, cid, entryId, str(fd, "date") || today(), user.id));
     return `/c/${cid}/journal?ok=${encodeURIComponent("Tétel sztornózva.")}`;
   });
@@ -350,4 +351,43 @@ export async function importBundleAction(cid: number, json: string): Promise<{ e
   } catch (e) {
     return { error: errMsg(e) };
   }
+}
+
+// --- Tagi kölcsön -------------------------------------------------------------------
+
+export async function memberLoanAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/member-loans`, async () => {
+    const kind = str(fd, "kind") === "repayment" ? "repayment" : "loan";
+    const date = str(fd, "date");
+    if (!isDate(date)) throw new Error("Hibás dátum.");
+    await recordMemberLoan(
+      cid,
+      {
+        partnerId: Number(fd.get("partnerId")),
+        kind,
+        date,
+        amount: parseNumber(fd.get("amount")),
+        moneyAccountId: Number(fd.get("moneyAccountId")),
+        amountFx: parseNumber(fd.get("amountFx")) || null,
+        dueDate: kind === "loan" ? str(fd, "dueDate") : null,
+        note: optStr(fd, "note"),
+      },
+      user.id,
+    );
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/member-loans?ok=${encodeURIComponent(kind === "loan" ? "Befizetés könyvelve." : "Visszafizetés könyvelve.")}`;
+  });
+}
+
+export async function extendLoanAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/member-loans`, async () => {
+    const due = str(fd, "dueDate");
+    if (!isDate(due)) throw new Error("Hibás lejárat.");
+    await setLoanDueDate(cid, Number(fd.get("entryId")), due, optStr(fd, "note"));
+    return `/c/${cid}/member-loans?ok=${encodeURIComponent("Lejárat módosítva.")}`;
+  });
 }
