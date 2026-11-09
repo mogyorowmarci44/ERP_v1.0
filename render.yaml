@@ -3,7 +3,7 @@ services:
     name: mm-erp
     runtime: node
     region: frankfurt
-    plan: starter
+    plan: free
     buildCommand: npm ci && npm run build
     startCommand: npm run db:migrate && npm start
     healthCheckPath: /api/health
