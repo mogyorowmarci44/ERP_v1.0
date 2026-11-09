@@ -286,3 +286,24 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   table, .card { box-shadow: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ---------- Sankey ---------- */
+:root, .shell {
+  --sk-rev: var(--accent);
+  --sk-cost: #7d8796;
+  --sk-profit: #1a7f4b;
+  --sk-loss: #c0362c;
+}
+[data-mode="dark"] {
+  --sk-cost: #5a6577;
+  --sk-profit: #2aa57d;
+  --sk-loss: #e5534b;
+}
+.sankey { padding: 16px 18px 10px; }
+.sankey .sk-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-weight: 600; margin-bottom: 6px; }
+.sk-link { opacity: 0.32; transition: opacity 0.15s; }
+.sk-link:hover { opacity: 0.6; }
+.sk-node { stroke: var(--surface); stroke-width: 1; }
+.sk-label, .sk-value { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.sk-label { font-size: 13px; font-weight: 600; fill: var(--ink); }
+.sk-value { font-size: 12px; fill: var(--muted); font-variant-numeric: tabular-nums; }

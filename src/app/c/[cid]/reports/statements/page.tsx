@@ -5,8 +5,10 @@ import { buckets, buildPnl, buildCashFlow, buildBalanceSheet, GRAN_LABEL, MAX_CO
 import { fmtHuf } from "@/lib/money";
 import { isDate, today, fmtDate } from "@/lib/dates";
 import { addDays } from "@/lib/fx";
+import { Sankey, sankeyModel } from "@/components/Sankey";
+import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 
-const TYPES = { pnl: "Eredménykimutatás (P&L)", cf: "Cash-flow", bs: "Mérleg" } as const;
+const TYPES = { pnl: "Eredménykimutatás (P&L)", sankey: "Eredmény-Sankey", cf: "Cash-flow", bs: "Mérleg" } as const;
 type T = keyof typeof TYPES;
 
 /** Alapértelmezett időtartam a bontáshoz. */
@@ -52,7 +54,7 @@ export default async function StatementsPage({ params, searchParams }: { params:
   const cid = Number((await params).cid);
   const sp = await searchParams;
   const { company } = await requireCompany(cid);
-  const type: T = sp.type === "cf" || sp.type === "bs" ? sp.type : "pnl";
+  const type: T = sp.type === "cf" || sp.type === "bs" || sp.type === "sankey" ? sp.type : "pnl";
   const gran: Granularity = (["day", "week", "month", "quarter"] as const).find((g) => g === sp.gran) ?? "month";
   const t = today();
   const [dFrom, dTo] = defaultRange(gran, t);
@@ -65,8 +67,11 @@ export default async function StatementsPage({ params, searchParams }: { params:
   if (!tooMany && cols.length) {
     const rows = await dailyRows(cid, to);
     statement =
-      type === "pnl" ? buildPnl(rows, cols) : type === "cf" ? buildCashFlow(rows, cols) : buildBalanceSheet(rows, cols, company.fiscalYearStartMonth, from);
+      type === "pnl" || type === "sankey" ? buildPnl(rows, cols) : type === "cf" ? buildCashFlow(rows, cols) : buildBalanceSheet(rows, cols, company.fiscalYearStartMonth, from);
   }
+  // Sankey: egy kiválasztott időszak vagy a teljes tartomány
+  const period = sp.period && cols.some((c) => c.key === sp.period) ? sp.period : "total";
+  const periodIdx = period === "total" ? "total" : cols.findIndex((c) => c.key === period);
 
   const base = `/c/${cid}/reports/statements`;
   // Típus- vagy bontásváltáskor az alapértelmezett időtartam (kivéve, ha a felhasználó állította)
@@ -74,6 +79,7 @@ export default async function StatementsPage({ params, searchParams }: { params:
     const q = new URLSearchParams({ type: o.type ?? type, gran: o.gran ?? gran });
     if (!o.gran && sp.from) q.set("from", from);
     if (!o.gran && sp.to) q.set("to", to);
+    if (!o.gran && sp.period) q.set("period", sp.period);
     return `${base}?${q}`;
   };
 
@@ -109,9 +115,39 @@ export default async function StatementsPage({ params, searchParams }: { params:
       {statement && !statement.checkOk && (
         <div className="flash error">A kimutatás nem egyezik a főkönyvvel – ellenőrizd a számlatükör besorolását (lásd a kiemelt eltérés sort).</div>
       )}
-      {statement && <StatementTable s={statement} />}
+      {statement && type === "sankey" && (
+        <>
+          <form className="row no-print" style={{ marginBottom: 12 }}>
+            <input type="hidden" name="type" value="sankey" />
+            <input type="hidden" name="gran" value={gran} />
+            <input type="hidden" name="from" value={from} />
+            <input type="hidden" name="to" value={to} />
+            <AutoSubmitSelect
+              name="period"
+              label="Megjelenített időszak"
+              defaultValue={period}
+              options={[{ value: "total", label: `Teljes időszak (${fmtDate(from)} – ${fmtDate(to)})` }, ...cols.map((c) => ({ value: c.key, label: c.label }))]}
+            />
+            <noscript><button style={{ alignSelf: "end" }}>Mutasd</button></noscript>
+          </form>
+          {(() => {
+            const model = sankeyModel(statement, periodIdx as number | "total");
+            const label = period === "total" ? `${fmtDate(from)} – ${fmtDate(to)}` : cols[periodIdx as number].label;
+            return (
+              <>
+                <Sankey model={model} title={`Bevételek felhasználása, ${label}`} />
+                {model.skipped.length > 0 && (
+                  <p className="muted">Negatív egyenlegű sorok, amik a diagramon nem jelennek meg (a táblázatban igen): {model.skipped.join("; ")}.</p>
+                )}
+              </>
+            );
+          })()}
+        </>
+      )}
+      {statement && type !== "sankey" && <StatementTable s={statement} />}
 
       <p className="muted" style={{ marginTop: 14 }}>
+        {type === "sankey" && "A szalagok szélessége arányos az összeggel. Bal oldalon a bevételek, jobbra haladva a ráfordítások és az eredmény. A százalékok az árbevételhez viszonyítanak. A szalag fölé húzva az egérrel megjelenik a pontos összeg."}
         {type === "pnl" && "Összköltség eljárással, az Szt. 1. sz. melléklete szerinti szerkezetben. A költségek az 5. számlaosztályból, az ELÁBÉ a 81-ből számolódik."}
         {type === "bs" && "Az időszakok végi állapot. Az évzárás előtt a tárgyévi eredmény az Adózott eredmény, a korábbi évek le nem zárt eredménye az Eredménytartalék sorban jelenik meg. Az ÁFA-számlák nettó egyenlege követelésként vagy kötelezettségként szerepel."}
         {type === "cf" && "Indirekt módszer: az adózás előtti eredményből indul, a nem pénzmozgással járó tételek és a forgótőke változása után a befektetési és finanszírozási mozgások jönnek. A IV. sor egyezik a 38-as számlák változásával."}
