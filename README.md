@@ -1,0 +1,59 @@
+# MM ERP
+
+Többcéges, kettős könyvviteli ERP használtautó-kereskedéshez és szervizhez – számlafelviteltől az ÁFA analitikán és a gépkocsi készleten át a főkönyvi kivonatig.
+
+**Stack:** Next.js 16 (App Router, Server Actions) · TypeScript · Drizzle ORM · PostgreSQL (Neon) · Render
+
+## Ami már működik (1. mérföldkő – könyvelési mag)
+
+| Terület | Funkció |
+|---|---|
+| Cégek | Több cég egy appban, cégenként külön főkönyv; felhasználók szerepkörrel (tulajdonos / könyvelő / csak olvasás) |
+| Számlatükör | Magyar alap számlatükör betöltése cég létrehozásakor (1–9. számlaosztály, mérleg/EK sor-hozzárendeléssel), bővíthető |
+| ÁFA-kódok | 27/18/5%, **különbözeti (használt cikk)**, AM, TAH, fordított adózás, KBB, KBE, export |
+| Számlák | Vevő- és szállítói számla, piszkozat → könyvelés, devizás számla saját (banki) árfolyamon, sztornó |
+| Különbözeti adózás | Tételes (gépkocsinkénti) árrés: ÁFA = (bruttó eladási ár − beszerzési ár) × 27/127, negatív árrésnél 0 |
+| Gépkocsi készlet | Egyedi nyilvántartás; beszerzés + fényezés/javítás a 261-re aktiválva, eladáskor automatikus ELÁBÉ (T 814 / K 261), fedezet gépkocsinként |
+| Pénzügyi rendezés | Bank/pénztár kiegyenlítés, részfizetés, realizált árfolyam-különbözet (976/876) |
+| Főkönyv | Napló (VE, SZ, BA, PE, VN), vegyes tételek, piros storno, időszakzárás |
+| Riportok | Főkönyvi kivonat (analitikus / szintenként), számlakarton, nyitott tételek, ÁFA analitika (összesítő + különbözeti tételes) |
+
+## Ütemterv
+
+1. ~~Könyvelési mag~~ ✅
+2. ÁFA bevallás (2665A sorok), NAV Online Számla lekérdezés / egyeztetés
+3. Bankkivonat import, pénztár bizonylatok
+4. Tárgyi eszköz nyilvántartás + értékcsökkenés
+5. Mérleg és eredménykimutatás (2000. évi C. tv.), évzárás / évnyitás
+6. Exportok (Excel/PDF), elemzések, dashboard
+
+## Helyi fejlesztés
+
+```bash
+npm install
+cp .env.example .env.local      # DATABASE_URL + SESSION_SECRET
+npm run db:migrate
+npm run dev                     # http://localhost:3000 → első indításkor /setup
+```
+
+Tesztek: `npm test` (kontírozási logika) és `npm run db:seed-demo` (teljes gépkocsi-életút egy valódi adatbázison, egyensúly- és ÁFA-ellenőrzéssel — **csak teszt adatbázison futtasd**, demó céget hoz létre).
+
+Séma módosítás: `src/db/schema.ts` szerkesztése → `npm run db:generate` → a generált SQL a `drizzle/` mappába kerül, deploykor automatikusan lefut.
+
+## Telepítés (Neon + Render)
+
+1. **Neon:** új projekt (régió: Frankfurt) → *Connection details* → **Pooled** connection string.
+2. **Render:** *New → Blueprint* → ezt a repót választva a `render.yaml` alapján létrejön a `mm-erp` web service.
+3. Render-en a `DATABASE_URL` env változóba másold be a Neon pooled URL-t (`?sslmode=require`). A `SESSION_SECRET`-et a Render generálja.
+4. Deploy: indításkor lefutnak a migrációk, majd `/setup` oldalon létrehozod az admin felhasználót, a főoldalon pedig a cégeket.
+
+Minden `main`-re pusholt commit automatikusan deployol.
+
+## Könyvelési elvek
+
+- Könyvelt tétel nem módosítható – javítás piros stornóval (ugyanazon oldal, negatív összeg), így a forgalom nem duzzad.
+- Minden tétel egyensúlyát az adatbázisba írás előtt ellenőrizzük; lezárt hónapba nem lehet könyvelni.
+- Devizás tételek a számlán megadott (banki) árfolyamon; a kiegyenlítéskori eltérés realizált árfolyam-különbözet.
+- A gépkocsi könyv szerinti értéke a 261-es számla gépkocsihoz rendelt tételeiből adódik. A különbözeti ÁFA alapja csak a beszerzési ár (a javítás ÁFÁ-ja levonható, nem része az alapnak) – a gépkocsin kézzel felülírható.
+
+> A könyvelési szabályokat egyeztesd a könyvelőddel – különösen az EU-s gépkocsi beszerzéseknél (különbözeti vs. KBB), és a devizás számlák ÁFA-árfolyamánál.
