@@ -13,7 +13,9 @@ type Acc = { code: string; name: string; type: string; currency?: string; report
 type BundleLine = { description: string; unitPrice: number; vatCode: string; account: string; vehicle?: string | null };
 type BundleDoc =
   | { kind: "invoice"; src: string; direction: "in" | "out"; partner: string; number: string; date: string; paymentMethod: string;
-      lines: BundleLine[]; payments: Array<{ date: string; account: string; amount: number | "open" }>; declaredVat?: number; vehicle?: string | null }
+      lines: BundleLine[]; payments: Array<{ date: string; account: string; amount: number | "open"; moneyHuf?: number }>; declaredVat?: number; vehicle?: string | null;
+      /** Opcionális: teljesítés / határidő / időszakos / deviza (alapból HUF, teljesítés = kelte). Devizánál MNB árfolyam, hacsak nincs exchangeRate+rateManual. */
+      fulfillmentDate?: string; dueDate?: string | null; periodic?: boolean; currency?: string; exchangeRate?: number; rateManual?: boolean; note?: string }
   | { kind: "entry"; src: string; journal: string; date: string; ref: string; description: string;
       lines: Array<{ account: string; debit: number; credit: number; partner?: string | null; vehicle?: string | null }> }
   | { kind: "sale_entry"; src: string; journal: string; date: string; ref: string; partner: string; description: string; gross: number; vat: number; cogs: number; cogsAccount: string }
@@ -134,12 +136,14 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
             partnerId: pid,
             invoiceNumber: number,
             issueDate: d.date,
-            fulfillmentDate: d.date,
-            dueDate: null,
+            fulfillmentDate: d.fulfillmentDate ?? d.date,
+            dueDate: d.dueDate ?? null,
             paymentMethod: d.paymentMethod,
-            currency: "HUF",
-            exchangeRate: 1,
-            note: `Migrálva: ${d.src}`,
+            currency: d.currency ?? "HUF",
+            exchangeRate: d.exchangeRate ?? 1,
+            rateManual: !!d.rateManual,
+            periodic: !!d.periodic,
+            note: d.note ? `${d.note} (${d.src})` : `Migrálva: ${d.src}`,
             lines: d.lines.map((l, i) => ({
               description: l.description || "-",
               quantity: 1,
@@ -168,7 +172,7 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
             const amount = p.amount === "open" || (last && Math.abs(open.openFx - p.amount) <= 2) ? open.openFx : Math.min(p.amount, open.openFx);
             if (p.amount !== "open" && p.amount - open.openFx > 0.5) report.warnings.push(`${d.src} ${number}: a kifizetés (${p.amount}) több a nyitott összegnél (${open.openFx}) – a nyitottig rendezve`);
             if (amount > 0.004) {
-              await payInvoice(companyId, id, { date: p.date, moneyAccountId: accId(p.account), amountFx: round2(amount) }, userId, tx);
+              await payInvoice(companyId, id, { date: p.date, moneyAccountId: accId(p.account), amountFx: round2(amount), moneyHuf: p.moneyHuf }, userId, tx);
               count("kiegyenlítés");
             }
           }
