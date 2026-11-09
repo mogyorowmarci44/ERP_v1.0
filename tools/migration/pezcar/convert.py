@@ -170,6 +170,13 @@ def convert():
             partners[name] = {"key": name, "name": name, "isPrivatePerson": bool(private) and name not in BANK_PARTNERS | TAX_PARTNERS | {"PezCar Kft", "Ismeretlen partner", "Tárgyi eszköz leírás"}}
         return name
 
+    purchase_paid = {}
+    for py in (2025, 2026):
+        for r in journal(py).itertuples():
+            if r.pat == "TK" and r.td == "281" and r.kd in MONEY and re.search(r"vásárolt autó|vétel", r.memo, re.I):
+                vk = find(r.doc, r.car, r.memo)
+                if vk: purchase_paid[vk] = purchase_paid.get(vk, 0) + r.net
+
     for year in (2025, 2026):
         j = journal(year)
         rows = []
@@ -205,6 +212,9 @@ def convert():
                 cost_acc = "529"
                 log.append(("ÁTSOROLVA", src, r.doc, f"Gépkocsihoz nem köthető készlet-ráfordítás ({r.memo}, {r.car}) → 529 költség"))
             pdate = pay.date
+            if pay.kd == "381" and not pay.pay.strip():
+                pay = pay._replace(kd="3841", pay="Bankkártya")
+                log.append(("JAVÍTÁS", src, r.doc, f"Fizetési mód nélküli pénztári kiadás ({r.memo}, {gross_calc:.0f} Ft) – a régi pénztár-munkalap sem vette készpénznek, bankkártyásként könyvelve. Ellenőrizd a kivonaton."))
             if r.td in MONEY:  # visszáru: pénz jön vissza
                 docs.append({"kind": "entry", "src": src, "journal": "BA" if r.td == "3841" else "PE", "date": r.date, "ref": r.doc,
                              "description": f"Visszáru: {r.memo} – {r.partner}", "lines": [
@@ -331,6 +341,9 @@ def convert():
                     continue
                 if x.td == "2811" and x.kd in MONEY:
                     vk = find(x.car, x.memo)
+                    if vk and x.net > 0 and vk in purchase_paid and vs[vk].get("purchasePrice") and purchase_paid[vk] >= vs[vk]["purchasePrice"] - 1:
+                        log.append(("JAVÍTÁS", f"{year}:{x.row}", x.doc, f"Foglaló ({x.net:.0f} Ft, {vs[vk]['label']}) a vételárba beszámítva: a vételárként fizetett {purchase_paid[vk]:.0f} Ft már a teljes ár – a foglaló sornak nincs külön pénzmozgása"))
+                        continue
                     if vk and x.net > 0:
                         pdate = max(vs[vk]["purchaseDate"] or x.date, x.date)
                         deposits.append({"kind": "entry", "src": f"{year}:{x.row}", "journal": "VN", "date": pdate, "ref": x.doc or f"FOGL-{vs[vk]['label']}",
