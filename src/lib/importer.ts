@@ -267,3 +267,46 @@ export function summarizeBundle(b: ImportBundle) {
   const dates = b.documents.map((d) => ("date" in d ? d.date : "")).filter(Boolean).sort();
   return { partners: b.partners.length, vehicles: b.vehicles.length, kinds, from: dates[0], to: dates[dates.length - 1], log: b.log ?? [] };
 }
+
+/** Már importált cégnél: csak a tagi kölcsön lejáratok pótlása a meglévő befizetési tételekhez. */
+export async function importLoanTermsOnly(companyId: number, bundle: ImportBundle) {
+  const terms = bundle.memberLoanTerms ?? [];
+  if (!terms.length) throw new Error("A csomag nem tartalmaz tagi kölcsön lejáratokat.");
+  const [acc] = await db.select().from(schema.accounts).where(and(eq(schema.accounts.companyId, companyId), eq(schema.accounts.code, "4791")));
+  if (!acc) throw new Error("Hiányzik a 4791 Tagi kölcsön számla.");
+  const rows = await db
+    .select({ entryId: schema.journalEntries.id, date: schema.journalEntries.date, credit: schema.journalLines.credit, partner: schema.partners.name, term: schema.memberLoanTerms.entryId })
+    .from(schema.journalLines)
+    .innerJoin(schema.journalEntries, eq(schema.journalEntries.id, schema.journalLines.entryId))
+    .leftJoin(schema.partners, eq(schema.partners.id, schema.journalLines.partnerId))
+    .leftJoin(schema.memberLoanTerms, eq(schema.memberLoanTerms.entryId, schema.journalEntries.id))
+    .where(and(eq(schema.journalLines.accountId, acc.id), sql`${schema.journalLines.credit} > 0`));
+  const used = new Set<number>();
+  let added = 0;
+  const warnings: string[] = [];
+  const days = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86400000;
+  for (const t of terms) {
+    const c = rows
+      .filter((r) => !used.has(r.entryId) && Math.abs(Number(r.credit) - t.amount) < 1 && (!r.partner || r.partner === t.partner) && days(r.date, t.date) <= 7)
+      .sort((a, b) => days(a.date, t.date) - days(b.date, t.date))[0];
+    if (!c) { warnings.push(`Nem párosítható: ${t.date} ${t.amount} Ft`); continue; }
+    used.add(c.entryId);
+    if (c.term) continue; // már van lejárata – nem írjuk felül
+    await db.insert(schema.memberLoanTerms).values({ entryId: c.entryId, companyId, dueDate: t.dueDate, note: t.note ?? null }).onConflictDoNothing();
+    added++;
+  }
+  return { added, warnings };
+}
+
+/** A cég összes könyvelési adatának törlése (számlák, tételek, partnerek, gépkocsik). A cég, a számlatükör és a beállítások maradnak. */
+export async function wipeCompanyData(companyId: number) {
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.payments).where(eq(schema.payments.companyId, companyId));
+    await tx.delete(schema.invoices).where(eq(schema.invoices.companyId, companyId));
+    await tx.delete(schema.memberLoanTerms).where(eq(schema.memberLoanTerms.companyId, companyId));
+    await tx.delete(schema.journalEntries).where(eq(schema.journalEntries.companyId, companyId));
+    await tx.delete(schema.vehicles).where(eq(schema.vehicles.companyId, companyId));
+    await tx.delete(schema.partners).where(eq(schema.partners.companyId, companyId));
+    await tx.delete(schema.periodLocks).where(eq(schema.periodLocks.companyId, companyId));
+  });
+}

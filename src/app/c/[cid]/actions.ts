@@ -23,7 +23,7 @@ import type { DraftLine } from "@/lib/posting";
 import { getMnbRate, storeRates, fetchMnbRates } from "@/lib/fx-service";
 import { addDays } from "@/lib/fx";
 import { PRESETS, isHex } from "@/lib/themes";
-import { importBundle, type ImportBundle, type ImportReport } from "@/lib/importer";
+import { importBundle, importLoanTermsOnly, wipeCompanyData, type ImportBundle, type ImportReport } from "@/lib/importer";
 import { recordMemberLoan, setLoanDueDate } from "@/lib/member-loans";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
@@ -389,5 +389,29 @@ export async function extendLoanAction(fd: FormData) {
     if (!isDate(due)) throw new Error("Hibás lejárat.");
     await setLoanDueDate(cid, Number(fd.get("entryId")), due, optStr(fd, "note"));
     return `/c/${cid}/member-loans?ok=${encodeURIComponent("Lejárat módosítva.")}`;
+  });
+}
+
+export async function importLoanTermsAction(cid: number, json: string): Promise<{ error?: string; added?: number; warnings?: string[] }> {
+  const { role } = await requireCompany(cid, { write: true });
+  if (role !== "owner") return { error: "Ezt csak a cég tulajdonosa teheti meg." };
+  try {
+    const r = await importLoanTermsOnly(cid, JSON.parse(json) as ImportBundle);
+    revalidatePath(`/c/${cid}`, "layout");
+    return r;
+  } catch (e) {
+    return { error: errMsg(e) };
+  }
+}
+
+export async function wipeCompanyAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { role, company } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/import`, async () => {
+    if (role !== "owner") throw new Error("Ezt csak a cég tulajdonosa teheti meg.");
+    if (str(fd, "confirm") !== company.name) throw new Error(`A törléshez pontosan be kell írni a cég nevét: ${company.name}`);
+    await wipeCompanyData(cid);
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/import?ok=${encodeURIComponent("A cég könyvelési adatai törölve. Most újra importálhatsz.")}`;
   });
 }
