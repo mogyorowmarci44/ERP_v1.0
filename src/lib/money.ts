@@ -18,7 +18,8 @@ const fxFmt = new Intl.NumberFormat("hu-HU", { minimumFractionDigits: 2, maximum
 
 export function fmtHuf(x: number | null | undefined): string {
   if (x === null || x === undefined) return "";
-  return hufFmt.format(x);
+  const v = Math.round(x);
+  return hufFmt.format(v === 0 ? 0 : v); // nincs „−0”
 }
 
 export function fmtMoney(x: number | null | undefined, currency = "HUF"): string {
