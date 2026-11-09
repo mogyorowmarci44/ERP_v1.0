@@ -8,7 +8,8 @@
 import { eq, and } from "drizzle-orm";
 import { db, sql, schema } from "../src/db";
 import { createCompany, saveInvoiceDraft, postInvoice, payInvoice, cancelInvoice, accountIdByCode, manualEntry, lockPeriod } from "../src/lib/ledger";
-import { trialBalance, vatAnalytics, vehicleStock, openItems } from "../src/lib/reports";
+import { trialBalance, vatAnalytics, vehicleStock, openItems, dailyRows } from "../src/lib/reports";
+import { buckets, buildPnl, buildBalanceSheet, buildCashFlow } from "../src/lib/statements";
 import { storeRates } from "../src/lib/fx-service";
 import bcrypt from "bcryptjs";
 
@@ -147,6 +148,21 @@ async function main() {
   assert(stock[0].status === "sold" && stock[0].bookValue === 0, "Golf eladva, könyv szerinti érték 0");
   const open = await openItems(id, "in");
   assert(open.length === 1 && open[0].invoiceNumber === "FB-77", "nyitott szállító: csak a fényezés");
+
+  // Kimutatások heti bontásban
+  const daily = await dailyRows(id, "2026-10-31");
+  const wk = buckets("2026-10-01", "2026-10-31", "week");
+  const pnl = buildPnl(daily, wk);
+  const bs = buildBalanceSheet(daily, wk, 1, "2026-10-01");
+  const cf = buildCashFlow(daily, wk);
+  const pr = (k: string) => pnl.rows.find((r) => r.key === k)!;
+  const expectedResult = -tb.filter((r) => /^[589]/.test(r.code)).reduce((s2, r) => s2 + r.periodDebit - r.periodCredit, 0);
+  assert(pnl.checkOk && Math.abs(pr("D").total! - expectedResult) < 1, `P&L adózott eredmény = főkönyvi eredmény (${pr("D").total})`);
+  assert(pr("IV8").total === 2_800_000, "P&L: ELÁBÉ a 814-ből");
+  assert(bs.checkOk, "Mérleg: eszközök = források minden heti oszlopban");
+  const cfIV = cf.rows.find((r) => r.key === "IV")!.total!;
+  const cash = tb.filter((r) => r.code.startsWith("38")).reduce((s2, r) => s2 + r.closingDebit - r.closingCredit, 0);
+  assert(Math.abs(cfIV - cash) < 1 && !cf.rows.find((r) => r.key === "other"), `Cash-flow IV. = pénzeszköz-változás (${cfIV})`);
 
   await lockPeriod(id, 2026, 10, user.id);
   let locked = false;

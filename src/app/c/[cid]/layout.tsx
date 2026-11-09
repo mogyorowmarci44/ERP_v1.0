@@ -1,6 +1,28 @@
 import Link from "next/link";
+import {
+  LayoutDashboard,
+  FileOutput,
+  FileInput,
+  FilePlus2,
+  BookPlus,
+  Users,
+  CarFront,
+  ListTree,
+  Coins,
+  BookOpen,
+  Scale,
+  FileSpreadsheet,
+  Clock,
+  Percent,
+  ChartNoAxesCombined,
+  Palette,
+  Settings,
+} from "lucide-react";
 import { requireCompany } from "@/lib/auth";
 import { logoutAction } from "@/app/auth-actions";
+import { NavLink } from "@/components/NavLink";
+import { CompanyMark } from "@/components/Brand";
+import { normalizeTheme, themeVars } from "@/lib/themes";
 
 export const dynamic = "force-dynamic";
 
@@ -8,33 +30,57 @@ export default async function CompanyLayout({ children, params }: { children: Re
   const { cid } = await params;
   const { company, user } = await requireCompany(Number(cid));
   const b = `/c/${cid}`;
+  const theme = normalizeTheme(company.theme);
   return (
-    <div className="shell">
-      <nav className="side">
-        <div className="brand"><Link href="/" style={{ color: "#fff" }}>MM ERP</Link></div>
-        <div className="company">{company.name}<br />{user.name}</div>
-        <Link href={b}>Áttekintés</Link>
+    <div className="shell" style={themeVars(theme) as React.CSSProperties} data-mode={theme.mode}>
+      <nav className="side" aria-label="Fő navigáció">
+        <div className="identity">
+          <Link href={b} style={{ textDecoration: "none" }}>
+            <CompanyMark id={company.id} name={company.name} logoVersion={company.logoUpdatedAt ? company.logoUpdatedAt.getTime() : null} />
+          </Link>
+          <div>
+            <div className="company-name">{company.name}</div>
+            <Link href="/" className="switch">Másik cég kiválasztása</Link>
+          </div>
+        </div>
+
+        <input type="checkbox" id="navtoggle" className="navtoggle" />
+        <label htmlFor="navtoggle" className="menu-btn">Menü</label>
+        <div className="navlinks">
+        <NavLink href={b} exact><LayoutDashboard />Áttekintés</NavLink>
+
         <div className="group">Bizonylatok</div>
-        <Link href={`${b}/invoices?dir=out`}>Vevőszámlák</Link>
-        <Link href={`${b}/invoices?dir=in`}>Szállítói számlák</Link>
-        <Link href={`${b}/invoices/new?dir=out`}>+ Új vevőszámla</Link>
-        <Link href={`${b}/invoices/new?dir=in`}>+ Új szállítói számla</Link>
-        <Link href={`${b}/journal/new`}>+ Vegyes / bank tétel</Link>
-        <div className="group">Törzsadatok</div>
-        <Link href={`${b}/partners`}>Partnerek</Link>
-        <Link href={`${b}/vehicles`}>Gépkocsi készlet</Link>
-        <Link href={`${b}/accounts`}>Számlatükör</Link>
-        <Link href={`${b}/fx`}>Árfolyamok (MNB)</Link>
+        <NavLink href={`${b}/invoices?dir=out`} exact><FileOutput />Vevőszámlák</NavLink>
+        <NavLink href={`${b}/invoices?dir=in`} exact><FileInput />Szállítói számlák</NavLink>
+        <NavLink href={`${b}/invoices/new?dir=out`} exact><FilePlus2 />Új vevőszámla</NavLink>
+        <NavLink href={`${b}/invoices/new?dir=in`} exact><FilePlus2 />Új szállítói számla</NavLink>
+        <NavLink href={`${b}/journal/new`} exact><BookPlus />Vegyes / bank tétel</NavLink>
+
+        <div className="group">Kimutatások</div>
+        <NavLink href={`${b}/reports/statements`}><ChartNoAxesCombined />P&amp;L, cash-flow, mérleg</NavLink>
+        <NavLink href={`${b}/reports/trial-balance`}><Scale />Főkönyvi kivonat</NavLink>
+        <NavLink href={`${b}/reports/vat`}><Percent />ÁFA analitika</NavLink>
+        <NavLink href={`${b}/reports/open-items`}><Clock />Nyitott tételek</NavLink>
+
         <div className="group">Főkönyv</div>
-        <Link href={`${b}/journal`}>Napló</Link>
-        <Link href={`${b}/reports/trial-balance`}>Főkönyvi kivonat</Link>
-        <Link href={`${b}/reports/ledger`}>Számlakarton</Link>
-        <Link href={`${b}/reports/open-items`}>Nyitott tételek</Link>
-        <div className="group">ÁFA</div>
-        <Link href={`${b}/reports/vat`}>ÁFA analitika</Link>
+        <NavLink href={`${b}/journal`} exact><BookOpen />Napló</NavLink>
+        <NavLink href={`${b}/reports/ledger`}><FileSpreadsheet />Számlakarton</NavLink>
+
+        <div className="group">Törzsadatok</div>
+        <NavLink href={`${b}/vehicles`}><CarFront />Gépkocsi készlet</NavLink>
+        <NavLink href={`${b}/partners`}><Users />Partnerek</NavLink>
+        <NavLink href={`${b}/accounts`}><ListTree />Számlatükör</NavLink>
+        <NavLink href={`${b}/fx`}><Coins />Árfolyamok (MNB)</NavLink>
+
         <div className="group">Rendszer</div>
-        <Link href={`${b}/settings`}>Beállítások</Link>
-        <form action={logoutAction} style={{ padding: "8px 16px" }}><button style={{ width: "100%" }}>Kilépés</button></form>
+        <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
+        <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
+
+        </div>
+        <div className="foot">
+          <span>Bejelentkezve: {user.name}</span>
+          <form action={logoutAction}><button>Kilépés</button></form>
+        </div>
       </nav>
       <main className="main">{children}</main>
     </div>

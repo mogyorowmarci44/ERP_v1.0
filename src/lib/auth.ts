@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
-import { and, eq } from "drizzle-orm";
+import { and, eq, getTableColumns } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 const COOKIE = "mmerp_session";
@@ -64,12 +64,24 @@ export async function requireUser() {
 /** Ellenőrzi, hogy a felhasználó tagja-e a cégnek; visszaadja a céget és a szerepkört. */
 export async function requireCompany(companyId: number, opts: { write?: boolean } = {}) {
   const user = await requireUser();
+  // A logó (base64) nélkül – azt a /api/logo útvonal szolgálja ki
+  const { logoData: _omit, ...companyCols } = getTableColumns(schema.companies);
+  void _omit;
   const [row] = await db
-    .select({ company: schema.companies, role: schema.memberships.role })
+    .select({ company: companyCols, role: schema.memberships.role })
     .from(schema.memberships)
     .innerJoin(schema.companies, eq(schema.companies.id, schema.memberships.companyId))
     .where(and(eq(schema.memberships.userId, user.id), eq(schema.memberships.companyId, companyId)));
   if (!row) redirect("/");
   if (opts.write && row.role === "viewer") throw new Error("Nincs írási jogosultságod ehhez a céghez.");
   return { user, company: row.company, role: row.role };
+}
+
+/** Tagság ellenőrzése átirányítás nélkül (API útvonalakhoz). */
+export async function isMember(userId: number, companyId: number) {
+  const [m] = await db
+    .select()
+    .from(schema.memberships)
+    .where(and(eq(schema.memberships.userId, userId), eq(schema.memberships.companyId, companyId)));
+  return m ?? null;
 }

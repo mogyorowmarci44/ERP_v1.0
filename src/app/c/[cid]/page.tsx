@@ -26,16 +26,19 @@ export default async function Dashboard({ params }: { params: Promise<{ cid: str
 
   return (
     <>
-      <h1>Áttekintés</h1>
+      <div className="topbar">
+        <h1>Áttekintés</h1>
+        <Link className="btn" href={`/c/${cid}/reports/statements?type=pnl&gran=month`}>Havi eredménykimutatás</Link>
+      </div>
       <div className="grid cols-4">
-        <div className="card stat"><div className="label">Pénzeszközök (38)</div><div className="value">{fmtHuf(cash)} Ft</div></div>
-        <div className="card stat"><div className="label">Gépkocsi készlet ({inStock.length} db)</div><div className="value">{fmtHuf(stockValue)} Ft</div></div>
-        <div className="card stat"><div className="label">Nyitott vevők</div><div className="value">{fmtHuf(recvHuf)} Ft</div></div>
-        <div className="card stat"><div className="label">Nyitott szállítók</div><div className="value">{fmtHuf(payHuf)} Ft</div></div>
-        <div className="card stat"><div className="label">Árbevétel + egyéb bevétel (év)</div><div className="value">{fmtHuf(revenue)} Ft</div></div>
-        <div className="card stat"><div className="label">Költség + ráfordítás (év)</div><div className="value">{fmtHuf(costs)} Ft</div></div>
-        <div className="card stat"><div className="label">Eredmény (év, adózás előtt)</div><div className="value">{fmtHuf(revenue - costs)} Ft</div></div>
-        <div className="card stat"><div className="label">ÁFA egyenleg (tárgyhó)</div><div className="value">{fmtHuf(vat.balance)} Ft</div></div>
+        <div className="card stat primary"><div className="label">Pénzeszközök (bank + pénztár)</div><div className="value">{fmtHuf(cash)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Gépkocsi készlet ({inStock.length} db)</div><div className="value">{fmtHuf(stockValue)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Nyitott vevők</div><div className="value">{fmtHuf(recvHuf)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Nyitott szállítók</div><div className="value">{fmtHuf(payHuf)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Árbevétel + egyéb bevétel (év)</div><div className="value">{fmtHuf(revenue)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Költség + ráfordítás (év)</div><div className="value">{fmtHuf(costs)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Eredmény (év, adózás előtt)</div><div className="value">{fmtHuf(revenue - costs)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">ÁFA egyenleg (tárgyhó)</div><div className="value">{fmtHuf(vat.balance)}<small>Ft</small></div></div>
       </div>
       <h2>Készleten lévő gépkocsik</h2>
       <table>

@@ -17,7 +17,9 @@ Többcéges, kettős könyvviteli ERP használtautó-kereskedéshez és szervizh
 | Árfolyamok | MNB hivatalos árfolyam automatikus letöltése, Áfa tv. 80. § / 63. § szerinti árfolyam-nap |
 | Pénzügyi rendezés | Bank/pénztár (forint és deviza) kiegyenlítés, részfizetés, devizaszámla átlagár, realizált árfolyam-különbözet (976/876) |
 | Főkönyv | Napló (VE, SZ, BA, PE, VN), vegyes tételek, piros storno, időszakzárás |
+| Kimutatások | Eredménykimutatás (összköltség), cash-flow (indirekt), mérleg – napi / heti / havi / negyedéves bontásban, főkönyvi egyezőség-ellenőrzéssel |
 | Riportok | Főkönyvi kivonat (analitikus / szintenként), számlakarton, nyitott tételek, ÁFA analitika (összesítő + különbözeti tételes) |
+| Megjelenés | Cégenkénti logó és téma (12 kész téma, köztük sötétek, vagy egyedi színek), mobilbarát felület |
 
 ## Ütemterv
 

@@ -22,6 +22,7 @@ import { isDate, today } from "@/lib/dates";
 import type { DraftLine } from "@/lib/posting";
 import { getMnbRate, storeRates, fetchMnbRates } from "@/lib/fx-service";
 import { addDays } from "@/lib/fx";
+import { PRESETS, isHex } from "@/lib/themes";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
@@ -283,5 +284,54 @@ export async function manualRateAction(fd: FormData) {
     if (!isDate(date) || !/^[A-Z]{3}$/.test(currency) || !(rate > 0)) throw new Error("Dátum, devizanem és pozitív árfolyam kell.");
     await storeRates(db, [{ date, currency, rate }], "manual");
     return `/c/${cid}/fx?ok=${encodeURIComponent("Árfolyam rögzítve.")}`;
+  });
+}
+
+// --- Megjelenés ---------------------------------------------------------------
+
+const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+const LOGO_MAX = 400 * 1024;
+
+export async function saveThemeAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { role } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/appearance`, async () => {
+    if (role !== "owner") throw new Error("A megjelenést csak tulajdonos módosíthatja.");
+    const presetKey = str(fd, "preset");
+    const preset = PRESETS.find((p) => p.preset === presetKey);
+    const theme = preset
+      ? { preset: preset.preset, accent: preset.accent, sidebar: preset.sidebar, mode: preset.mode }
+      : { preset: "custom", accent: str(fd, "accent"), sidebar: str(fd, "sidebar"), mode: (str(fd, "mode") === "dark" ? "dark" : "light") as "light" | "dark" };
+    if (!isHex(theme.accent) || !isHex(theme.sidebar)) throw new Error("Érvénytelen szín.");
+    await db.update(schema.companies).set({ theme }).where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/appearance?ok=${encodeURIComponent(preset ? `Téma alkalmazva: ${preset.name}` : "Egyedi színek mentve.")}`;
+  });
+}
+
+export async function uploadLogoAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { role } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/appearance`, async () => {
+    if (role !== "owner") throw new Error("A logót csak tulajdonos módosíthatja.");
+    const file = fd.get("logo");
+    if (!(file instanceof File) || file.size === 0) throw new Error("Válassz ki egy képfájlt.");
+    if (!LOGO_TYPES.includes(file.type)) throw new Error("Csak PNG, JPG, WebP vagy SVG logó tölthető fel.");
+    if (file.size > LOGO_MAX) throw new Error("A logó legfeljebb 400 KB lehet.");
+    const data = Buffer.from(await file.arrayBuffer()).toString("base64");
+    await db.update(schema.companies).set({ logoData: data, logoMime: file.type, logoUpdatedAt: new Date() }).where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/appearance?ok=${encodeURIComponent("Logó feltöltve.")}`;
+  });
+}
+
+export async function removeLogoAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { role } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/appearance`, async () => {
+    if (role !== "owner") throw new Error("A logót csak tulajdonos módosíthatja.");
+    await db.update(schema.companies).set({ logoData: null, logoMime: null, logoUpdatedAt: null }).where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/appearance?ok=${encodeURIComponent("Logó eltávolítva.")}`;
   });
 }

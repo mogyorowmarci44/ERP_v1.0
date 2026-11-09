@@ -220,3 +220,19 @@ export async function invoicePayments(invoiceId: number) {
     .where(eq(payments.invoiceId, invoiceId))
     .orderBy(asc(payments.date));
 }
+
+/** Napi, számlánkénti forgalmak (T − K) a kimutatásokhoz. */
+export async function dailyRows(companyId: number, to: string) {
+  const rows = await db
+    .select({
+      code: accounts.code,
+      date: journalEntries.date,
+      amount: sql<number>`sum(${journalLines.debit} - ${journalLines.credit})::float8`,
+    })
+    .from(journalLines)
+    .innerJoin(journalEntries, eq(journalEntries.id, journalLines.entryId))
+    .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
+    .where(and(eq(journalLines.companyId, companyId), lte(journalEntries.date, to)))
+    .groupBy(accounts.code, journalEntries.date);
+  return rows.map((r) => ({ code: r.code, date: r.date, amount: Number(r.amount) }));
+}

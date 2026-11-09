@@ -80,6 +80,8 @@ export type CompanySettings = {
   roundingAccount: string; // kerekítési különbözet
 };
 
+export type CompanyTheme = { preset: string; accent: string; sidebar: string; mode: "light" | "dark" };
+
 export const companies = pgTable("companies", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -91,6 +93,12 @@ export const companies = pgTable("companies", {
   fiscalYearStartMonth: integer("fiscal_year_start_month").notNull().default(1),
   vatPeriod: vatPeriodEnum("vat_period").notNull().default("monthly"),
   settings: jsonb("settings").$type<CompanySettings>().notNull(),
+  /** Megjelenés: téma (preset + egyedi színek). */
+  theme: jsonb("theme").$type<CompanyTheme>(),
+  /** Céglogó base64-ben (a Render ingyenes példány fájlrendszere nem tartós). */
+  logoData: text("logo_data"),
+  logoMime: varchar("logo_mime", { length: 40 }),
+  logoUpdatedAt: timestamp("logo_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
