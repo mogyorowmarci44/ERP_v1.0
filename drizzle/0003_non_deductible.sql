@@ -1,0 +1,1 @@
+ALTER TYPE "public"."vat_kind" ADD VALUE 'non_deductible';

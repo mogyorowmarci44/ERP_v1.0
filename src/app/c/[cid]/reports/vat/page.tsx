@@ -5,7 +5,7 @@ import { fmtHuf } from "@/lib/money";
 import { isDate, monthStart, monthEnd, today, fmtDate } from "@/lib/dates";
 
 const kindHu: Record<string, string> = {
-  normal: "normál", margin: "különbözeti", exempt: "adómentes", out_of_scope: "hatályon kívül", reverse_charge: "fordított", eu_acquisition: "KBB", eu_supply: "KBE", export: "export",
+  normal: "normál", margin: "különbözeti", exempt: "adómentes", out_of_scope: "hatályon kívül", reverse_charge: "fordított", eu_acquisition: "KBB", eu_supply: "KBE", export: "export", non_deductible: "nem levonható",
 };
 
 export default async function VatPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {

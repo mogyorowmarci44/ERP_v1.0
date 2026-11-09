@@ -169,7 +169,7 @@ export async function vatAnalytics(companyId: number, from: string, to: string) 
   }
   const all = [...summary.values()];
   const payable = round2(all.filter((s) => s.direction === "out" || ["reverse_charge", "eu_acquisition"].includes(s.vatKind)).reduce((a, s) => a + s.vat, 0));
-  const deductible = round2(all.filter((s) => s.direction === "in").reduce((a, s) => a + s.vat, 0));
+  const deductible = round2(all.filter((s) => s.direction === "in" && s.vatKind !== "non_deductible").reduce((a, s) => a + s.vat, 0));
   return { rows, summary: all, payable, deductible, balance: round2(payable - deductible) };
 }
 

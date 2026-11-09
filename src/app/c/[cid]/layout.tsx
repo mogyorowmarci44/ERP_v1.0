@@ -17,6 +17,7 @@ import {
   ChartNoAxesCombined,
   Palette,
   Settings,
+  Upload,
 } from "lucide-react";
 import { requireCompany } from "@/lib/auth";
 import { logoutAction } from "@/app/auth-actions";
@@ -75,6 +76,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
         <div className="group">Rendszer</div>
         <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
         <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
+        <NavLink href={`${b}/import`}><Upload />Adatimport</NavLink>
 
         </div>
         <div className="foot">

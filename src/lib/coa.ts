@@ -149,11 +149,12 @@ export const DEFAULT_VAT_CODES: Array<{
   code: string;
   name: string;
   rate: number;
-  kind: "normal" | "margin" | "exempt" | "out_of_scope" | "reverse_charge" | "eu_acquisition" | "eu_supply" | "export";
+  kind: "normal" | "margin" | "exempt" | "out_of_scope" | "reverse_charge" | "eu_acquisition" | "eu_supply" | "export" | "non_deductible";
 }> = [
   { code: "27", name: "27% általános", rate: 27, kind: "normal" },
   { code: "18", name: "18% kedvezményes", rate: 18, kind: "normal" },
   { code: "5", name: "5% kedvezményes", rate: 5, kind: "normal" },
+  { code: "27NL", name: "27% – nem levonható (költség része)", rate: 27, kind: "non_deductible" },
   { code: "KÜL27", name: "Különbözeti adózás – használt cikk (27%)", rate: 27, kind: "margin" },
   { code: "AM", name: "Tárgyi adómentes", rate: 0, kind: "exempt" },
   { code: "TAH", name: "Áfa tv. hatályán kívüli", rate: 0, kind: "out_of_scope" },

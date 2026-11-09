@@ -23,6 +23,7 @@ import type { DraftLine } from "@/lib/posting";
 import { getMnbRate, storeRates, fetchMnbRates } from "@/lib/fx-service";
 import { addDays } from "@/lib/fx";
 import { PRESETS, isHex } from "@/lib/themes";
+import { importBundle, type ImportBundle, type ImportReport } from "@/lib/importer";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
@@ -334,4 +335,19 @@ export async function removeLogoAction(fd: FormData) {
     revalidatePath(`/c/${cid}`, "layout");
     return `/c/${cid}/appearance?ok=${encodeURIComponent("Logó eltávolítva.")}`;
   });
+}
+
+// --- Adatimport ------------------------------------------------------------------
+
+export async function importBundleAction(cid: number, json: string): Promise<{ error?: string; report?: ImportReport }> {
+  const { user, role } = await requireCompany(cid, { write: true });
+  if (role !== "owner") return { error: "Importálni csak a cég tulajdonosa tud." };
+  try {
+    const bundle = JSON.parse(json) as ImportBundle;
+    const report = await importBundle(cid, bundle, user.id);
+    revalidatePath(`/c/${cid}`, "layout");
+    return { report };
+  } catch (e) {
+    return { error: errMsg(e) };
+  }
 }

@@ -42,6 +42,7 @@ export const vatKindEnum = pgEnum("vat_kind", [
   "eu_acquisition", // Közösségen belüli termékbeszerzés
   "eu_supply", // Közösségen belüli adómentes termékértékesítés
   "export", // Harmadik országba történő export
+  "non_deductible", // ÁFA-t tartalmazó beszerzés, nem levonható (a költség / készlet része)
 ]);
 
 export const invoiceDirectionEnum = pgEnum("invoice_direction", ["out", "in"]); // out = vevő, in = szállító

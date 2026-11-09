@@ -157,3 +157,24 @@ describe("storno", () => {
     expect(() => assertBalanced(s)).not.toThrow();
   });
 });
+
+describe("nem levonható ÁFA", () => {
+  it("a költség része, nincs 466 sor", () => {
+    const r = buildInvoicePosting(
+      { direction: "in", partnerId: 1, currency: "HUF", fxRate: 1, invoiceNumber: "NL-1",
+        lines: [{ quantity: 1, unitPrice: 10000, vatRate: 27, vatKind: "non_deductible", description: "Alkatrész", accountId: 261, vatCodeId: 9, vehicleId: 3 }] },
+      { ...acc, partnerAccountId: 454 },
+    );
+    expect(sumBy(r.lines, 261)).toBe(12700);
+    expect(r.lines.find((l) => l.accountId === 466)).toBeUndefined();
+    expect(sumBy(r.lines, 454)).toBe(-12700);
+  });
+});
+
+describe("forintos kerekítés", () => {
+  it("HUF számlán a végösszeg egész forint, nem marad fillér nyitva", () => {
+    const a = computeLine({ quantity: 1, unitPrice: 106315, vatRate: 27, vatKind: "normal" }, "out", 1);
+    expect(a.vatHuf).toBe(28705);
+    expect(a.payableFx).toBe(135020);
+  });
+});

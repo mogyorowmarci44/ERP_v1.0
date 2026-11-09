@@ -20,6 +20,11 @@ import { getMnbRate } from "./fx-service";
 const { accounts, companies, memberships, vatCodes, journals, journalEntries, journalLines, invoices, invoiceLines, partners, vehicles, payments, periodLocks } =
   schema;
 
+/** Meglévő tranzakcióban fut, vagy újat nyit (az importálás egyetlen tranzakcióban viszi végig az egészet). */
+function inTx<T>(tx: Tx | undefined, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return tx ? fn(tx) : db.transaction(fn);
+}
+
 // ---------------------------------------------------------------------------
 // Cég
 // ---------------------------------------------------------------------------
@@ -34,8 +39,8 @@ export type NewCompany = {
   fiscalYearStartMonth?: number;
 };
 
-export async function createCompany(userId: number, data: NewCompany) {
-  return db.transaction(async (tx) => {
+export async function createCompany(userId: number, data: NewCompany, outerTx?: Tx) {
+  return inTx(outerTx, async (tx) => {
     const [c] = await tx
       .insert(companies)
       .values({ ...data, settings: DEFAULT_SETTINGS })
@@ -189,26 +194,29 @@ export async function reverseEntry(tx: Tx, companyId: number, entryId: number, d
 
 export async function manualEntry(
   companyId: number,
-  input: { journalCode: string; date: string; description: string; lines: DraftLine[] },
+  input: { journalCode: string; date: string; description: string; lines: DraftLine[]; sourceType?: string },
   userId?: number,
+  outerTx?: Tx,
 ) {
   for (const l of input.lines) {
     if (l.debit < 0 || l.credit < 0) throw new Error("Kézi tételben nem lehet negatív összeg (használd a stornót).");
     if (l.debit !== 0 && l.credit !== 0) throw new Error("Egy sorban vagy Tartozik, vagy Követel összeg legyen.");
   }
-  // Devizás pénzeszköz számlán a devizaösszeg is kötelező (átlagár-nyilvántartás miatt)
-  const ids = [...new Set(input.lines.map((l) => l.accountId))];
-  const accRows = ids.length ? await db.select().from(accounts).where(and(eq(accounts.companyId, companyId), inArray(accounts.id, ids))) : [];
-  const lines = input.lines.map((l) => {
-    const a = accRows.find((x) => x.id === l.accountId);
-    if (a && a.currency !== "HUF") {
-      if (!l.amountFx || !(l.amountFx > 0)) throw new Error(`A(z) ${a.code} devizás számlán a ${a.currency} összeget is meg kell adni.`);
-      const huf = l.debit || l.credit;
-      return { ...l, currency: a.currency, fxRate: Math.round((huf / l.amountFx) * 1e6) / 1e6 };
-    }
-    return { ...l, currency: null, amountFx: null, fxRate: null };
+  return inTx(outerTx, async (tx) => {
+    // Devizás pénzeszköz számlán a devizaösszeg is kötelező (átlagár-nyilvántartás miatt)
+    const ids = [...new Set(input.lines.map((l) => l.accountId))];
+    const accRows = ids.length ? await tx.select().from(accounts).where(and(eq(accounts.companyId, companyId), inArray(accounts.id, ids))) : [];
+    const lines = input.lines.map((l) => {
+      const a = accRows.find((x) => x.id === l.accountId);
+      if (a && a.currency !== "HUF") {
+        if (!l.amountFx || !(l.amountFx > 0)) throw new Error(`A(z) ${a.code} devizás számlán a ${a.currency} összeget is meg kell adni.`);
+        const huf = l.debit || l.credit;
+        return { ...l, currency: a.currency, fxRate: Math.round((huf / l.amountFx) * 1e6) / 1e6 };
+      }
+      return { ...l, currency: null, amountFx: null, fxRate: null };
+    });
+    return postEntry(tx, { companyId, journalCode: input.journalCode, date: input.date, description: input.description, lines, sourceType: input.sourceType ?? "manual", userId });
   });
-  return db.transaction((tx) => postEntry(tx, { companyId, ...input, lines, sourceType: "manual", userId }));
 }
 
 // ---------------------------------------------------------------------------
@@ -357,8 +365,8 @@ export async function resolveInvoiceRate(tx: DbOrTx, input: InvoiceInput, vatKin
 }
 
 /** Számla mentése piszkozatként (új vagy meglévő piszkozat felülírása). */
-export async function saveInvoiceDraft(companyId: number, input: InvoiceInput, invoiceId?: number) {
-  return db.transaction(async (tx) => {
+export async function saveInvoiceDraft(companyId: number, input: InvoiceInput, invoiceId?: number, outerTx?: Tx) {
+  return inTx(outerTx, async (tx) => {
     const { posting, lines, fxRate, rateInfo } = await buildFromInput(tx, companyId, input, false);
     const header = {
       companyId,
@@ -442,8 +450,8 @@ async function loadInvoiceInput(tx: DbOrTx, companyId: number, invoiceId: number
 }
 
 /** Számla könyvelése: főkönyvi tétel, gépkocsi státusz frissítés. */
-export async function postInvoice(companyId: number, invoiceId: number, userId?: number) {
-  return db.transaction(async (tx) => {
+export async function postInvoice(companyId: number, invoiceId: number, userId?: number, outerTx?: Tx) {
+  return inTx(outerTx, async (tx) => {
     await tx.execute(sql`select id from invoices where id = ${invoiceId} for update`);
     const { inv, input } = await loadInvoiceInput(tx, companyId, invoiceId);
     if (inv.status !== "draft") throw new Error("A számla már könyvelve vagy sztornózva van.");
@@ -577,8 +585,8 @@ export type PaymentRequest = {
   note?: string | null;
 };
 
-export async function payInvoice(companyId: number, invoiceId: number, input: PaymentRequest, userId?: number) {
-  return db.transaction(async (tx) => {
+export async function payInvoice(companyId: number, invoiceId: number, input: PaymentRequest, userId?: number, outerTx?: Tx) {
+  return inTx(outerTx, async (tx) => {
     await tx.execute(sql`select id from invoices where id = ${invoiceId} for update`);
     const [inv] = await tx.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
     if (!inv || inv.status !== "posted") throw new Error("Csak könyvelt számla rendezhető.");

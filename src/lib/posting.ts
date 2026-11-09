@@ -14,7 +14,8 @@ export type VatKind =
   | "reverse_charge"
   | "eu_acquisition"
   | "eu_supply"
-  | "export";
+  | "export"
+  | "non_deductible";
 
 export type Direction = "out" | "in";
 
@@ -75,10 +76,15 @@ export function computeLine(input: LineInput, direction: Direction, fxRate: numb
     };
   }
 
-  const netFx = round2(quantity * unitPrice);
-  const vatFx = ZERO_VAT.includes(vatKind) ? 0 : round2((netFx * vatRate) / 100);
+  let netFx = round2(quantity * unitPrice);
+  let vatFx = ZERO_VAT.includes(vatKind) ? 0 : round2((netFx * vatRate) / 100);
   const netHuf = conv(netFx);
   const vatHuf = ZERO_VAT.includes(vatKind) ? 0 : conv(vatFx);
+  if (fxRate === 1) {
+    // Forintos számla: egész forintok, a „deviza” oszlop azonos a forinttal (különben fillérek maradnának nyitva)
+    netFx = netHuf;
+    vatFx = vatHuf;
+  }
   const selfAssessed = SELF_ASSESSED.includes(vatKind);
   return {
     netFx,
@@ -193,6 +199,9 @@ export function buildInvoicePosting(
           out.push({ ...base, vatCodeId: null, accountId: acc.inventoryId, debit: 0, credit: bv, description: `Készletcsökkenés: ${l.description}`, currency: null, amountFx: null, fxRate: null });
         }
       }
+    } else if (l.vatKind === "non_deductible") {
+      // Nem levonható ÁFA: a költség / készlet bekerülési értékének része (Szt. 47. §)
+      out.push({ ...base, accountId: l.accountId, debit: a.netHuf + a.vatHuf, credit: 0, ...fxMeta(round2(a.netFx + a.vatFx)) });
     } else {
       out.push({ ...base, accountId: l.accountId, debit: a.netHuf, credit: 0, ...fxMeta(a.netFx) });
       if (a.vatHuf !== 0) {
