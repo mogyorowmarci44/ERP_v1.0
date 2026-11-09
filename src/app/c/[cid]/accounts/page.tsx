@@ -36,6 +36,7 @@ export default async function AccountsPage({ params, searchParams }: { params: P
               </select>
             </label>
             <label>Beszámoló sor (opc.)<input name="reportLine" placeholder="pl. IV.6" /></label>
+            <label>Devizanem (pénzeszköznél)<input name="currency" defaultValue="HUF" maxLength={3} /></label>
           </>
         )}
         <div style={{ alignSelf: "end" }} className="row">
@@ -44,11 +45,11 @@ export default async function AccountsPage({ params, searchParams }: { params: P
         </div>
       </form>
       <table style={{ marginTop: 16 }}>
-        <thead><tr><th>Szám</th><th>Megnevezés</th><th>Típus</th><th>Beszámoló sor</th><th>Állapot</th><th></th></tr></thead>
+        <thead><tr><th>Szám</th><th>Megnevezés</th><th>Típus</th><th>Beszámoló sor</th><th>Deviza</th><th>Állapot</th><th></th></tr></thead>
         <tbody>
           {list.map((a) => (
             <tr key={a.id} style={a.isPosting ? undefined : { fontWeight: 600, background: "#f9fafb" }}>
-              <td className="mono">{a.code}</td><td>{a.name}</td><td>{typeHu[a.type]}</td><td className="mono">{a.reportLine}</td>
+              <td className="mono">{a.code}</td><td>{a.name}</td><td>{typeHu[a.type]}</td><td className="mono">{a.reportLine}</td><td>{a.currency !== "HUF" ? a.currency : ""}</td>
               <td>{!a.isActive ? "inaktív" : a.isPosting ? "" : "gyűjtő"}</td>
               <td><Link href={`/c/${cid}/accounts?edit=${a.id}`}>szerk.</Link> · <Link href={`/c/${cid}/reports/ledger?account=${a.id}`}>karton</Link></td>
             </tr>

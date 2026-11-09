@@ -1,9 +1,30 @@
 import { describe, it, expect } from "vitest";
 import { computeLine, buildInvoicePosting, buildPaymentPosting, stornoLines, assertBalanced } from "@/lib/posting";
+import { vatRateDate, parseMnbResponse } from "@/lib/fx";
 
 const acc = { partnerAccountId: 311, inputVatId: 466, outputVatId: 467, inventoryId: 261, cogsId: 814 };
 const sumBy = (ls: { accountId: number; debit: number; credit: number }[], id: number) =>
   ls.filter((l) => l.accountId === id).reduce((s, l) => s + l.debit - l.credit, 0);
+
+describe("vatRateDate (Áfa tv. 80. §, 63. §)", () => {
+  const base = { issueDate: "2026-10-20", fulfillmentDate: "2026-10-15", periodic: false };
+  it("általános: teljesítés napja", () => expect(vatRateDate({ ...base, vatKinds: ["normal"] }).date).toBe("2026-10-15"));
+  it("időszakos: számla kelte", () => expect(vatRateDate({ ...base, periodic: true, vatKinds: ["normal"] }).date).toBe("2026-10-20"));
+  it("KBB: számla kelte, ha a köv. hó 15. előtt", () => expect(vatRateDate({ ...base, vatKinds: ["eu_acquisition"] }).date).toBe("2026-10-20"));
+  it("KBB: legkésőbb köv. hó 15.", () =>
+    expect(vatRateDate({ issueDate: "2027-01-20", fulfillmentDate: "2026-12-02", periodic: false, vatKinds: ["eu_acquisition"] }).date).toBe("2027-01-15"));
+});
+
+describe("parseMnbResponse", () => {
+  it("escape-elt SOAP válasz, unit=100 kezelése", () => {
+    const xml = `<soap:Envelope><soap:Body><GetExchangeRatesResponse><GetExchangeRatesResult>&lt;MNBExchangeRates&gt;&lt;Day date="2026-11-06"&gt;&lt;Rate unit="1" curr="EUR"&gt;385,12&lt;/Rate&gt;&lt;Rate unit="100" curr="JPY"&gt;231,45&lt;/Rate&gt;&lt;/Day&gt;&lt;Day date="2026-11-09"&gt;&lt;Rate unit="1" curr="EUR"&gt;386,5&lt;/Rate&gt;&lt;/Day&gt;&lt;/MNBExchangeRates&gt;</GetExchangeRatesResult></GetExchangeRatesResponse></soap:Body></soap:Envelope>`;
+    expect(parseMnbResponse(xml)).toEqual([
+      { date: "2026-11-06", currency: "EUR", rate: 385.12 },
+      { date: "2026-11-06", currency: "JPY", rate: 2.3145 },
+      { date: "2026-11-09", currency: "EUR", rate: 386.5 },
+    ]);
+  });
+});
 
 describe("computeLine", () => {
   it("normál 27% HUF", () => {
@@ -102,10 +123,11 @@ describe("buildInvoicePosting", () => {
 });
 
 describe("buildPaymentPosting", () => {
-  it("EUR szállítói kifizetés magasabb banki árfolyamon → árfolyamveszteség", () => {
+  const acc455 = { partnerAccountId: 455, moneyAccountId: 384, fxGainId: 976, fxLossId: 876 };
+  it("EUR szállító forintszámláról: ténylegesen terhelt Ft vs. MNB könyv szerinti érték → veszteség", () => {
     const r = buildPaymentPosting(
-      { direction: "in", partnerId: 1, invoiceNumber: "X", currency: "EUR", amountFx: 1000, payRate: 405, invoiceRate: 400 },
-      { partnerAccountId: 455, moneyAccountId: 384, fxGainId: 976, fxLossId: 876 },
+      { direction: "in", partnerId: 1, invoiceNumber: "X", currency: "EUR", amountFx: 1000, moneyHuf: 405000, partnerHuf: 400000, invoiceRate: 400 },
+      acc455,
     );
     expect(r.fxDiff).toBe(-5000);
     expect(sumBy(r.lines, 876)).toBe(5000);
@@ -113,13 +135,14 @@ describe("buildPaymentPosting", () => {
     expect(sumBy(r.lines, 384)).toBe(-405000);
   });
 
-  it("vevő befizetés teljes rendezéskor a nyitott HUF egyenleget vezeti ki", () => {
+  it("vevő befizetés devizaszámlára MNB árfolyamon, teljes rendezés nyitott HUF egyenleggel", () => {
     const r = buildPaymentPosting(
-      { direction: "out", partnerId: 1, invoiceNumber: "X", currency: "EUR", amountFx: 100, payRate: 401, invoiceRate: 400, remainingHufIfSettles: 40001 },
-      { partnerAccountId: 316, moneyAccountId: 384, fxGainId: 976, fxLossId: 876 },
+      { direction: "out", partnerId: 1, invoiceNumber: "X", currency: "EUR", amountFx: 100, moneyHuf: 40100, moneyFx: { currency: "EUR", rate: 401 }, partnerHuf: 40001, invoiceRate: 400 },
+      { partnerAccountId: 316, moneyAccountId: 3841, fxGainId: 976, fxLossId: 876 },
     );
     expect(sumBy(r.lines, 316)).toBe(-40001);
     expect(sumBy(r.lines, 976)).toBe(-99);
+    expect(r.lines.find((l) => l.accountId === 3841)?.amountFx).toBe(100);
   });
 });
 

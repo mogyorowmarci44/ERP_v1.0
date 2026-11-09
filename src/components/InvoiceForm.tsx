@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { computeLine, type VatKind } from "@/lib/posting";
 import { fmtHuf, parseNumber } from "@/lib/money";
 import type { AccountOpt, PartnerOpt, VatOpt, VehicleOpt } from "@/lib/options";
-import { saveInvoiceAction } from "@/app/c/[cid]/actions";
+import { saveInvoiceAction, getRateAction } from "@/app/c/[cid]/actions";
+import { vatRateDate } from "@/lib/fx";
+import { fmtDate } from "@/lib/dates";
 
 type Line = { description: string; quantity: string; unitPrice: string; vatCodeId: number; accountId: number; vehicleId: number | null };
 
@@ -18,6 +20,8 @@ export type InvoiceFormInitial = {
   paymentMethod: string;
   currency: string;
   exchangeRate: string;
+  rateManual: boolean;
+  periodic: boolean;
   note: string;
   lines: Line[];
 };
@@ -72,6 +76,28 @@ export function InvoiceForm(props: {
     setLine(i, patch);
   };
 
+  // Áfa tv. 80. § szerinti árfolyam-nap és az aznapi MNB árfolyam automatikus lekérése
+  const kinds = lines.map((l) => vatOf(l.vatCodeId)?.kind ?? "normal");
+  const rd = vatRateDate({ issueDate: h.issueDate, fulfillmentDate: h.fulfillmentDate, periodic: h.periodic, vatKinds: kinds });
+  const [rateMsg, setRateMsg] = useState<string>("");
+  useEffect(() => {
+    if (h.currency === "HUF" || h.rateManual || !rd.date) return;
+    let alive = true;
+    setRateMsg("MNB árfolyam lekérése…");
+    getRateAction(cid, h.currency, rd.date).then((r) => {
+      if (!alive) return;
+      if (r.error || !r.rate) setRateMsg(r.error ?? "Nincs árfolyam");
+      else {
+        setH((x) => ({ ...x, exchangeRate: String(r.rate).replace(".", ",") }));
+        setRateMsg(`MNB ${fmtDate(r.rateDate)} jegyzés`);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [h.currency, h.rateManual, rd.date, cid]);
+
   const fxRate = h.currency === "HUF" ? 1 : parseNumber(h.exchangeRate) || 0;
   const preview = useMemo(() => {
     let net = 0, vat = 0, gross = 0, payable = 0;
@@ -112,6 +138,8 @@ export function InvoiceForm(props: {
             paymentMethod: h.paymentMethod,
             currency: h.currency,
             exchangeRate: fxRate,
+            rateManual: h.rateManual,
+            periodic: h.periodic,
             note: h.note || null,
             lines: lines.map((l) => ({
               description: l.description,
@@ -160,8 +188,19 @@ export function InvoiceForm(props: {
           </select>
         </label>
         {h.currency !== "HUF" && (
-          <label>Árfolyam (Ft / 1 {h.currency})<input className="num" value={h.exchangeRate} onChange={(e) => setH({ ...h, exchangeRate: e.target.value })} placeholder="pl. 395,12" /></label>
+          <label>Árfolyam (Ft / 1 {h.currency})
+            <input className="num" value={h.exchangeRate} readOnly={!h.rateManual} onChange={(e) => setH({ ...h, exchangeRate: e.target.value })} />
+            <span style={{ fontSize: 11 }}>{h.rateManual ? "kézi árfolyam" : rateMsg} · {rd.rule}</span>
+          </label>
         )}
+        {h.currency !== "HUF" && (
+          <label style={{ alignSelf: "end", display: "flex", gap: 6 }} title="Csak ha az MNB nem érhető el, vagy eltérő árfolyamot kell alkalmazni.">
+            <input type="checkbox" checked={h.rateManual} onChange={(e) => setH({ ...h, rateManual: e.target.checked })} /> Kézi árfolyam
+          </label>
+        )}
+        <label style={{ alignSelf: "end", display: "flex", gap: 6 }} title="Áfa tv. 58. § – pl. havi bérleti díj, folyamatos szolgáltatás">
+          <input type="checkbox" checked={h.periodic} onChange={(e) => setH({ ...h, periodic: e.target.checked })} /> Időszakos elszámolás
+        </label>
       </div>
 
       <table className="lines">

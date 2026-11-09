@@ -9,6 +9,7 @@ import { eq, and } from "drizzle-orm";
 import { db, sql, schema } from "../src/db";
 import { createCompany, saveInvoiceDraft, postInvoice, payInvoice, cancelInvoice, accountIdByCode, manualEntry, lockPeriod } from "../src/lib/ledger";
 import { trialBalance, vatAnalytics, vehicleStock, openItems } from "../src/lib/reports";
+import { storeRates } from "../src/lib/fx-service";
 import bcrypt from "bcryptjs";
 
 function assert(cond: unknown, msg: string): asserts cond {
@@ -71,14 +72,47 @@ async function main() {
   await postInvoice(id, saleId, user.id);
   await payInvoice(id, saleId, { date: "2026-10-22", moneyAccountId: await acc("384"), amountFx: 3_135_000, fxRate: 1 });
 
-  console.log("4) EUR alkatrész Németországból (KBB), kifizetés eltérő banki árfolyamon");
+  console.log("4) Devizás ügyletek MNB árfolyamon");
+  // Tesztben az MNB-t nem érjük el – az árfolyamokat előre betöltjük (2026.10.18. vasárnap → péntek 10.16.)
+  await storeRates(db, [
+    { date: "2026-10-15", currency: "EUR", rate: 390 },
+    { date: "2026-10-16", currency: "EUR", rate: 392 },
+    { date: "2026-10-20", currency: "EUR", rate: 394 },
+  ], "manual");
+  const [kulfoldiVevo] = await db.insert(schema.partners).values({ companyId: id, name: "Teile KG", country: "AT", euVatNumber: "ATU12345678" }).returning();
+
+  // 4a) KBB alkatrész: árfolyam-nap = számla kelte (10.15.) → 390
   const deId = await saveInvoiceDraft(id, {
-    direction: "in", partnerId: nemet.id, invoiceNumber: "DE-2026-55", issueDate: "2026-10-15", fulfillmentDate: "2026-10-15",
-    paymentMethod: "transfer", currency: "EUR", exchangeRate: 390,
+    direction: "in", partnerId: nemet.id, invoiceNumber: "DE-2026-55", issueDate: "2026-10-15", fulfillmentDate: "2026-10-12",
+    paymentMethod: "transfer", currency: "EUR", exchangeRate: 0,
     lines: [{ description: "Alkatrész", quantity: 2, unitPrice: 100, vatCodeId: await vat("KBB27"), accountId: await acc("262") }],
   });
   await postInvoice(id, deId, user.id);
-  await payInvoice(id, deId, { date: "2026-10-25", moneyAccountId: await acc("384"), amountFx: 200, fxRate: 395 });
+  const [deInv] = await db.select().from(schema.invoices).where(eq(schema.invoices.id, deId));
+  assert(Number(deInv.exchangeRate) === 390 && deInv.rateDate === "2026-10-15", "KBB számla árfolyama: kibocsátás napi MNB (390)");
+
+  // 4b) KBE alkatrész eladás vasárnapi teljesítéssel → pénteki jegyzés (392)
+  const kbeId = await saveInvoiceDraft(id, {
+    direction: "out", partnerId: kulfoldiVevo.id, invoiceNumber: "MM-2026-0002", issueDate: "2026-10-18", fulfillmentDate: "2026-10-18",
+    paymentMethod: "transfer", currency: "EUR", exchangeRate: 0,
+    lines: [{ description: "Alkatrész", quantity: 1, unitPrice: 100, vatCodeId: await vat("KBE"), accountId: await acc("931") }],
+  });
+  await postInvoice(id, kbeId, user.id);
+  const [kbeInv] = await db.select().from(schema.invoices).where(eq(schema.invoices.id, kbeId));
+  assert(Number(kbeInv.exchangeRate) === 392, "vasárnapi teljesítés: utolsó (pénteki) MNB jegyzés");
+
+  // 4c) Befolyik a devizaszámlára 10.20-án MNB 394-en → 200 Ft realizált nyereség
+  await payInvoice(id, kbeId, { date: "2026-10-20", moneyAccountId: await acc("3841"), amountFx: 100 });
+  // 4d) Devizavásárlás forintért: tényleges forint (Szt. 60. § (1))
+  await manualEntry(id, {
+    journalCode: "BA", date: "2026-10-21", description: "EUR vásárlás",
+    lines: [
+      { accountId: await acc("3841"), debit: 39_500, credit: 0, amountFx: 100 },
+      { accountId: await acc("384"), debit: 0, credit: 39_500 },
+    ],
+  });
+  // 4e) Szállító kifizetése devizaszámláról: átlagár (39 400 + 39 500) / 200 → a teljes állomány 78 900 Ft
+  await payInvoice(id, deId, { date: "2026-10-25", moneyAccountId: await acc("3841"), amountFx: 200 });
 
   console.log("5) Hibás piszkozat törlése, könyvelt számla sztornója");
   const wrongId = await saveInvoiceDraft(id, {
@@ -106,7 +140,9 @@ async function main() {
   const v = await vatAnalytics(id, "2026-10-01", "2026-10-31");
   assert(v.payable === 135_000 + 21_060, `fizetendő ÁFA = különbözeti 135 000 + KBB 21 060 (${v.payable})`);
   assert(v.deductible === 81_000 + 21_060, `levonható ÁFA = fényezés 81 000 + KBB 21 060 (${v.deductible})`);
-  assert(row("876")?.closingDebit === 1000, "árfolyamveszteség 200 × (395 − 390) = 1 000");
+  assert(row("976")?.closingCredit === 200, "realizált nyereség: 100 EUR × (394 − 392) = 200");
+  assert(row("876")?.closingDebit === 900, "realizált veszteség: 78 900 (átlagár) − 78 000 (könyv szerinti) = 900");
+  assert((row("3841")?.closingDebit ?? 0) === 0 && !row("3841")?.closingCredit, "devizaszámla kiürült, forint egyenleg is 0");
   const stock = await vehicleStock(id);
   assert(stock[0].status === "sold" && stock[0].bookValue === 0, "Golf eladva, könyv szerinti érték 0");
   const open = await openItems(id, "in");

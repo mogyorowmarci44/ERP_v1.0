@@ -6,9 +6,9 @@ import { fmtHuf, parseNumber, round2 } from "@/lib/money";
 import type { AccountOpt, PartnerOpt, VehicleOpt } from "@/lib/options";
 import { manualEntryAction } from "@/app/c/[cid]/actions";
 
-type Line = { accountId: number | ""; debit: string; credit: string; description: string; partnerId: number | ""; vehicleId: number | "" };
+type Line = { accountId: number | ""; debit: string; credit: string; amountFx: string; description: string; partnerId: number | ""; vehicleId: number | "" };
 
-const empty = (): Line => ({ accountId: "", debit: "", credit: "", description: "", partnerId: "", vehicleId: "" });
+const empty = (): Line => ({ accountId: "", debit: "", credit: "", amountFx: "", description: "", partnerId: "", vehicleId: "" });
 
 export function EntryForm(props: { cid: number; accounts: AccountOpt[]; partners: PartnerOpt[]; vehicles: VehicleOpt[]; today: string }) {
   const { cid, accounts, partners, vehicles } = props;
@@ -40,6 +40,7 @@ export function EntryForm(props: { cid: number; accounts: AccountOpt[]; partners
           accountId: Number(l.accountId),
           debit: num(l.debit) || 0,
           credit: num(l.credit) || 0,
+          amountFx: num(l.amountFx) || null,
           description: l.description || description,
           partnerId: l.partnerId ? Number(l.partnerId) : null,
           vehicleId: l.vehicleId ? Number(l.vehicleId) : null,
@@ -65,7 +66,7 @@ export function EntryForm(props: { cid: number; accounts: AccountOpt[]; partners
         <label style={{ gridColumn: "span 2" }}>Megnevezés<input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="pl. Bankköltség október" /></label>
       </div>
       <table className="lines">
-        <thead><tr><th style={{ width: "28%" }}>Főkönyvi számla</th><th className="num">Tartozik</th><th className="num">Követel</th><th>Szöveg</th><th>Partner</th><th>Gépkocsi</th><th></th></tr></thead>
+        <thead><tr><th style={{ width: "28%" }}>Főkönyvi számla</th><th className="num">Tartozik</th><th className="num">Követel</th><th className="num" title="Devizás pénzeszköz számlánál kötelező">Deviza összeg</th><th>Szöveg</th><th>Partner</th><th>Gépkocsi</th><th></th></tr></thead>
         <tbody>
           {lines.map((l, i) => (
             <tr key={i}>
@@ -77,6 +78,14 @@ export function EntryForm(props: { cid: number; accounts: AccountOpt[]; partners
               </td>
               <td><input className="num" value={l.debit} onChange={(e) => setLine(i, { debit: e.target.value, credit: e.target.value ? "" : l.credit })} /></td>
               <td><input className="num" value={l.credit} onChange={(e) => setLine(i, { credit: e.target.value, debit: e.target.value ? "" : l.debit })} /></td>
+              <td>
+                {(() => {
+                  const a = accounts.find((x) => x.id === l.accountId);
+                  return a && a.currency !== "HUF" ? (
+                    <input className="num" placeholder={a.currency} value={l.amountFx} onChange={(e) => setLine(i, { amountFx: e.target.value })} />
+                  ) : null;
+                })()}
+              </td>
               <td><input value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} /></td>
               <td>
                 <select value={l.partnerId} onChange={(e) => setLine(i, { partnerId: e.target.value ? Number(e.target.value) : "" })}>
@@ -99,7 +108,7 @@ export function EntryForm(props: { cid: number; accounts: AccountOpt[]; partners
             <td><button type="button" onClick={() => setLines((ls) => [...ls, empty()])}>+ Sor</button></td>
             <td className="num">{fmtHuf(td)}</td>
             <td className="num">{fmtHuf(tc)}</td>
-            <td colSpan={4} style={{ color: diff === 0 ? "var(--ok)" : "var(--danger)" }}>{diff === 0 ? "Egyensúlyban" : `Eltérés: ${fmtHuf(diff)}`}</td>
+            <td colSpan={5} style={{ color: diff === 0 ? "var(--ok)" : "var(--danger)" }}>{diff === 0 ? "Egyensúlyban" : `Eltérés: ${fmtHuf(diff)}`}</td>
           </tr>
         </tfoot>
       </table>

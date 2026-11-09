@@ -5,7 +5,8 @@ import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { invoiceOpenAmount } from "@/lib/ledger";
 import { invoicePayments } from "@/lib/reports";
-import { postInvoiceAction, cancelInvoiceAction, payInvoiceAction, reversePaymentAction } from "../../actions";
+import { postInvoiceAction, cancelInvoiceAction, reversePaymentAction } from "../../actions";
+import { PaymentForm } from "@/components/PaymentForm";
 import { Flash } from "@/components/Flash";
 import { fmtHuf, fmtMoney } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
@@ -93,7 +94,11 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
           <div>Nettó: {fmtHuf(inv.netHuf)} Ft</div>
           <div>ÁFA: {fmtHuf(inv.vatHuf)} Ft</div>
           <div><strong>Végösszeg: {fmtMoney(inv.grossFx, inv.currency)}</strong></div>
-          {inv.currency !== "HUF" && <div className="muted">Árfolyam: {inv.exchangeRate} → {fmtHuf(inv.grossHuf)} Ft</div>}
+          {inv.currency !== "HUF" && (
+            <div className="muted">
+              Árfolyam: {String(inv.exchangeRate).replace(".", ",")} ({inv.rateSource === "manual" ? "kézi" : `MNB ${fmtDate(inv.rateDate)}`}{inv.periodic ? ", időszakos" : ""}) → {fmtHuf(inv.grossHuf)} Ft
+            </div>
+          )}
           {open && <div style={{ marginTop: 6 }}>Nyitott: <strong>{fmtMoney(open.openFx, inv.currency)}</strong></div>}
         </div>
       </div>
@@ -124,19 +129,15 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         <>
           <h2>Pénzügyi rendezés</h2>
           {open && open.openFx > 0 && (
-            <form action={payInvoiceAction} className="card form-grid no-print">
-              <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} />
-              <label>Dátum<input type="date" name="date" defaultValue={today()} required /></label>
-              <label>Pénzeszköz
-                <select name="moneyAccountId">
-                  {moneyAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
-                </select>
-              </label>
-              <label>Összeg ({inv.currency})<input name="amountFx" className="num" defaultValue={String(open.openFx).replace(".", ",")} required /></label>
-              {inv.currency !== "HUF" && <label>Tényleges (banki) árfolyam<input name="fxRate" className="num" required placeholder="pl. 395,12" /></label>}
-              <label>Megjegyzés<input name="note" /></label>
-              <div style={{ alignSelf: "end" }}><button className="primary">Rendezés könyvelése</button></div>
-            </form>
+            <PaymentForm
+              cid={cid}
+              invoiceId={id}
+              currency={inv.currency}
+              direction={inv.direction}
+              openFx={open.openFx}
+              today={today()}
+              moneyAccounts={moneyAccounts.map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency }))}
+            />
           )}
         </>
       )}

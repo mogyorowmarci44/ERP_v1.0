@@ -227,12 +227,22 @@ export type PaymentInput = {
   direction: Direction;
   partnerId: number;
   invoiceNumber: string;
+  /** A számla devizaneme. */
   currency: string;
+  /** Kiegyenlített összeg a számla devizájában. */
   amountFx: number;
-  payRate: number; // tényleges banki árfolyam
+  /**
+   * Pénzeszköz oldali forintérték (Szt. 60. §):
+   *  - forintszámláról/-ra: a ténylegesen terhelt / jóváírt forint,
+   *  - devizaszámlára befolyó: választott (MNB) árfolyamon,
+   *  - devizaszámláról kifizetett: a deviza könyv szerinti (átlag)árfolyamán.
+   */
+  moneyHuf: number;
+  /** Ha a pénzeszköz devizás: a pénzeszköz sor devizaadatai. */
+  moneyFx?: { currency: string; rate: number } | null;
+  /** Vevő / szállító oldali forintérték (a számla könyv szerinti árfolyamán, teljes rendezésnél a nyitott HUF egyenleg). */
+  partnerHuf: number;
   invoiceRate: number;
-  /** Ha a fizetés a teljes hátralékot rendezi: a partnerszámlát a nyitott HUF egyenleggel vezetjük ki. */
-  remainingHufIfSettles?: number | null;
 };
 
 export type PaymentAccounts = {
@@ -242,26 +252,24 @@ export type PaymentAccounts = {
   fxLossId: number;
 };
 
-export function buildPaymentPosting(p: PaymentInput, acc: PaymentAccounts): { lines: DraftLine[]; amountHuf: number; fxDiff: number } {
+export function buildPaymentPosting(p: PaymentInput, acc: PaymentAccounts): { lines: DraftLine[]; fxDiff: number } {
   const isFx = p.currency !== "HUF";
-  const moneyHuf = roundHuf(p.amountFx * (isFx ? p.payRate : 1));
-  const partnerHuf =
-    p.remainingHufIfSettles !== null && p.remainingHufIfSettles !== undefined
-      ? p.remainingHufIfSettles
-      : roundHuf(p.amountFx * (isFx ? p.invoiceRate : 1));
-  const fxMeta = (rate: number) => (isFx ? { currency: p.currency, amountFx: p.amountFx, fxRate: rate } : {});
+  const partnerMeta = isFx ? { currency: p.currency, amountFx: p.amountFx, fxRate: p.invoiceRate } : {};
+  const moneyMeta = p.moneyFx ? { currency: p.moneyFx.currency, amountFx: p.amountFx, fxRate: p.moneyFx.rate } : {};
   const desc = `${p.direction === "out" ? "Vevő befizetés" : "Szállító kifizetés"}: ${p.invoiceNumber}`;
+  const moneyHuf = roundHuf(p.moneyHuf);
+  const partnerHuf = round2(p.partnerHuf);
 
   const lines: DraftLine[] = [];
-  let fxDiff = 0;
+  let fxDiff: number;
   if (p.direction === "out") {
-    lines.push({ accountId: acc.moneyAccountId, debit: moneyHuf, credit: 0, description: desc, partnerId: p.partnerId, ...fxMeta(p.payRate) });
-    lines.push({ accountId: acc.partnerAccountId, debit: 0, credit: partnerHuf, description: desc, partnerId: p.partnerId, ...fxMeta(p.invoiceRate) });
-    fxDiff = moneyHuf - partnerHuf; // + nyereség
+    lines.push({ accountId: acc.moneyAccountId, debit: moneyHuf, credit: 0, description: desc, partnerId: p.partnerId, ...moneyMeta });
+    lines.push({ accountId: acc.partnerAccountId, debit: 0, credit: partnerHuf, description: desc, partnerId: p.partnerId, ...partnerMeta });
+    fxDiff = round2(moneyHuf - partnerHuf); // + nyereség
   } else {
-    lines.push({ accountId: acc.partnerAccountId, debit: partnerHuf, credit: 0, description: desc, partnerId: p.partnerId, ...fxMeta(p.invoiceRate) });
-    lines.push({ accountId: acc.moneyAccountId, debit: 0, credit: moneyHuf, description: desc, partnerId: p.partnerId, ...fxMeta(p.payRate) });
-    fxDiff = partnerHuf - moneyHuf; // + nyereség (kevesebbet fizettünk)
+    lines.push({ accountId: acc.partnerAccountId, debit: partnerHuf, credit: 0, description: desc, partnerId: p.partnerId, ...partnerMeta });
+    lines.push({ accountId: acc.moneyAccountId, debit: 0, credit: moneyHuf, description: desc, partnerId: p.partnerId, ...moneyMeta });
+    fxDiff = round2(partnerHuf - moneyHuf); // + nyereség (kevesebbet fizettünk)
   }
   if (fxDiff > 0) {
     lines.push({ accountId: acc.fxGainId, debit: 0, credit: fxDiff, description: "Realizált árfolyamnyereség", partnerId: p.partnerId });
@@ -269,7 +277,7 @@ export function buildPaymentPosting(p: PaymentInput, acc: PaymentAccounts): { li
     lines.push({ accountId: acc.fxLossId, debit: -fxDiff, credit: 0, description: "Realizált árfolyamveszteség", partnerId: p.partnerId });
   }
   assertBalanced(lines);
-  return { lines, amountHuf: moneyHuf, fxDiff };
+  return { lines, fxDiff };
 }
 
 // ---------------------------------------------------------------------------

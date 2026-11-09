@@ -32,6 +32,8 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ ci
           paymentMethod: inv.paymentMethod,
           currency: inv.currency,
           exchangeRate: inv.currency === "HUF" ? "" : String(inv.exchangeRate).replace(".", ","),
+          rateManual: inv.rateSource === "manual",
+          periodic: inv.periodic,
           note: inv.note ?? "",
           lines: lines.map((l) => ({
             description: l.description,

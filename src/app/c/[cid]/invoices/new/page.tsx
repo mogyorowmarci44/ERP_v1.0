@@ -32,6 +32,8 @@ export default async function NewInvoicePage({ params, searchParams }: { params:
           paymentMethod: "transfer",
           currency: "HUF",
           exchangeRate: "",
+          rateManual: false,
+          periodic: false,
           note: "",
           lines: [{ description: "", quantity: "1", unitPrice: "", vatCodeId: vat("27"), accountId: acc(dir === "out" ? "913" : "523"), vehicleId: null }],
         }}

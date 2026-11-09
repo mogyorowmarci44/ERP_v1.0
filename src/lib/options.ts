@@ -4,7 +4,7 @@ import { db, schema } from "@/db";
 import { marginPurchaseBase } from "./ledger";
 
 export type Opt = { id: number; label: string };
-export type AccountOpt = { id: number; code: string; name: string };
+export type AccountOpt = { id: number; code: string; name: string; currency: string };
 export type VatOpt = { id: number; code: string; name: string; rate: number; kind: string };
 export type VehicleOpt = { id: number; label: string; vatTreatment: string; marginBase: number };
 export type PartnerOpt = { id: number; name: string; country: string };
@@ -32,7 +32,7 @@ export async function formOptions(cid: number, includeVehicleIds: number[] = [])
   }
   return {
     partners: partners.map((p) => ({ id: p.id, name: p.name, country: p.country })) as PartnerOpt[],
-    accounts: accounts.map((a) => ({ id: a.id, code: a.code, name: a.name })) as AccountOpt[],
+    accounts: accounts.map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency })) as AccountOpt[],
     vatCodes: vatCodes.map((v) => ({ id: v.id, code: v.code, name: v.name, rate: Number(v.rate), kind: v.kind })) as VatOpt[],
     vehicles: vehicleOpts,
   };

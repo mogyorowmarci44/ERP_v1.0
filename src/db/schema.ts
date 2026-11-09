@@ -121,6 +121,8 @@ export const accounts = pgTable(
     isActive: boolean("is_active").notNull().default(true),
     /** Mérleg / eredménykimutatás sor hozzárendelés (későbbi riportokhoz). */
     reportLine: varchar("report_line", { length: 20 }),
+    /** Pénzeszköz számla devizaneme (pl. 3841 devizaszámla: EUR). Egyéb számláknál HUF. */
+    currency: varchar("currency", { length: 3 }).notNull().default("HUF"),
   },
   (t) => [uniqueIndex("accounts_company_code").on(t.companyId, t.code)],
 );
@@ -161,6 +163,19 @@ export const periodLocks = pgTable(
     lockedBy: integer("locked_by").references(() => users.id),
   },
   (t) => [primaryKey({ columns: [t.companyId, t.year, t.month] })],
+);
+
+/** Hivatalos devizaárfolyamok (MNB), Ft / 1 egység. Cégfüggetlen gyorsítótár. */
+export const fxRates = pgTable(
+  "fx_rates",
+  {
+    currency: varchar("currency", { length: 3 }).notNull(),
+    date: date("date").notNull(),
+    rate: rate("rate").notNull(),
+    source: varchar("source", { length: 10 }).notNull().default("MNB"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.currency, t.date] })],
 );
 
 // ---------------------------------------------------------------------------
@@ -276,8 +291,18 @@ export const invoices = pgTable(
     dueDate: date("due_date"),
     paymentMethod: varchar("payment_method", { length: 20 }).notNull().default("transfer"), // transfer | cash | card
     currency: varchar("currency", { length: 3 }).notNull().default("HUF"),
-    /** Könyvelési árfolyam (HUF / 1 deviza). HUF számlán 1. */
+    /**
+     * Átszámítási árfolyam (HUF / 1 deviza). HUF számlán 1.
+     * Egységesen az ÁFA alap átszámításához használt árfolyam (Áfa tv. 80. §), a követelés /
+     * kötelezettség könyv szerinti értéke is ezen (Szt. 60. § (5a)).
+     */
     exchangeRate: rate("exchange_rate").notNull().default(1),
+    /** Melyik nap árfolyama (Áfa tv. 80. § szerinti időpont). */
+    rateDate: date("rate_date"),
+    /** MNB = automatikusan lekért hivatalos árfolyam, manual = kézzel megadott. */
+    rateSource: varchar("rate_source", { length: 10 }).notNull().default("MNB"),
+    /** Időszakos elszámolású ügylet (Áfa tv. 58. §) – árfolyam a számla kibocsátásakor. */
+    periodic: boolean("periodic").notNull().default(false),
     netHuf: money("net_huf").notNull().default(0),
     vatHuf: money("vat_huf").notNull().default(0),
     grossHuf: money("gross_huf").notNull().default(0),

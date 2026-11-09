@@ -124,6 +124,9 @@ export const DEFAULT_COA: CoaRow[] = [
   ["979", "Kerekítési különbözet (bevétel)", "revenue", "III"],
 ];
 
+/** Devizás pénzeszköz számlák devizaneme. */
+export const ACCOUNT_CURRENCY: Record<string, string> = { "3811": "EUR", "3841": "EUR" };
+
 /** Gyűjtőszámlák (1 jegyű) nem könyvelhetők. */
 export const isPostingCode = (code: string) => code.length > 1;
 

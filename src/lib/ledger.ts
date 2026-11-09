@@ -4,7 +4,7 @@
  */
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema, type DbOrTx, type Tx } from "@/db";
-import { DEFAULT_COA, DEFAULT_JOURNALS, DEFAULT_SETTINGS, DEFAULT_VAT_CODES, isPostingCode } from "./coa";
+import { ACCOUNT_CURRENCY, DEFAULT_COA, DEFAULT_JOURNALS, DEFAULT_SETTINGS, DEFAULT_VAT_CODES, isPostingCode } from "./coa";
 import {
   assertBalanced,
   buildInvoicePosting,
@@ -13,7 +13,9 @@ import {
   type DraftLine,
   type VatKind,
 } from "./posting";
-import { round2 } from "./money";
+import { round2, roundHuf } from "./money";
+import { vatRateDate } from "./fx";
+import { getMnbRate } from "./fx-service";
 
 const { accounts, companies, memberships, vatCodes, journals, journalEntries, journalLines, invoices, invoiceLines, partners, vehicles, payments, periodLocks } =
   schema;
@@ -47,6 +49,7 @@ export async function createCompany(userId: number, data: NewCompany) {
         type,
         reportLine: reportLine ?? null,
         isPosting: isPostingCode(code),
+        currency: ACCOUNT_CURRENCY[code] ?? "HUF",
       })),
     );
     await tx.insert(vatCodes).values(DEFAULT_VAT_CODES.map((v) => ({ ...v, companyId: c.id })));
@@ -193,7 +196,19 @@ export async function manualEntry(
     if (l.debit < 0 || l.credit < 0) throw new Error("Kézi tételben nem lehet negatív összeg (használd a stornót).");
     if (l.debit !== 0 && l.credit !== 0) throw new Error("Egy sorban vagy Tartozik, vagy Követel összeg legyen.");
   }
-  return db.transaction((tx) => postEntry(tx, { companyId, ...input, sourceType: "manual", userId }));
+  // Devizás pénzeszköz számlán a devizaösszeg is kötelező (átlagár-nyilvántartás miatt)
+  const ids = [...new Set(input.lines.map((l) => l.accountId))];
+  const accRows = ids.length ? await db.select().from(accounts).where(and(eq(accounts.companyId, companyId), inArray(accounts.id, ids))) : [];
+  const lines = input.lines.map((l) => {
+    const a = accRows.find((x) => x.id === l.accountId);
+    if (a && a.currency !== "HUF") {
+      if (!l.amountFx || !(l.amountFx > 0)) throw new Error(`A(z) ${a.code} devizás számlán a ${a.currency} összeget is meg kell adni.`);
+      const huf = l.debit || l.credit;
+      return { ...l, currency: a.currency, fxRate: Math.round((huf / l.amountFx) * 1e6) / 1e6 };
+    }
+    return { ...l, currency: null, amountFx: null, fxRate: null };
+  });
+  return db.transaction((tx) => postEntry(tx, { companyId, ...input, lines, sourceType: "manual", userId }));
 }
 
 // ---------------------------------------------------------------------------
@@ -262,9 +277,14 @@ export type InvoiceInput = {
   dueDate?: string | null;
   paymentMethod: string;
   currency: string;
+  /** Csak kézi árfolyamnál számít; egyébként a szerver MNB-ből tölti. */
   exchangeRate: number;
+  rateManual?: boolean;
+  periodic?: boolean;
   note?: string | null;
   lines: InvoiceLineInput[];
+  /** Belső: a már eltárolt MNB árfolyam újrahasznosítása könyveléskor. */
+  storedRate?: { rate: number; rateDate: string | null } | null;
 };
 
 async function loadPostingContext(tx: DbOrTx, companyId: number, partnerId: number, direction: "out" | "in") {
@@ -289,12 +309,12 @@ async function loadPostingContext(tx: DbOrTx, companyId: number, partnerId: numb
 
 async function buildFromInput(tx: DbOrTx, companyId: number, input: InvoiceInput, withBookValues: boolean) {
   if (input.lines.length === 0) throw new Error("A számlának legalább egy tétele kell legyen.");
-  const fxRate = input.currency === "HUF" ? 1 : input.exchangeRate;
-  if (!(fxRate > 0)) throw new Error("Devizás számlához meg kell adni az árfolyamot.");
   const ctx = await loadPostingContext(tx, companyId, input.partnerId, input.direction);
   const codeIds = [...new Set(input.lines.map((l) => l.vatCodeId))];
   const codes = await tx.select().from(vatCodes).where(and(eq(vatCodes.companyId, companyId), inArray(vatCodes.id, codeIds)));
   const codeMap = new Map(codes.map((c) => [c.id, c]));
+  const rateInfo = await resolveInvoiceRate(tx, input, codes.map((c) => c.kind));
+  const fxRate = rateInfo.rate;
 
   const lines = [];
   for (const l of input.lines) {
@@ -314,13 +334,32 @@ async function buildFromInput(tx: DbOrTx, companyId: number, input: InvoiceInput
     ctx.acc,
     bv,
   );
-  return { posting, lines, fxRate, ctx };
+  return { posting, lines, fxRate, rateInfo, ctx };
+}
+
+/**
+ * A számla átszámítási árfolyama: az Áfa tv. 80. § / 63. § szerinti napon érvényes MNB árfolyam
+ * (a cég a NAV-nál az MNB árfolyamot jelentette be), kivéve ha kézzel adták meg.
+ * Ugyanez a követelés / kötelezettség könyv szerinti árfolyama (Szt. 60. § (5a)).
+ */
+export async function resolveInvoiceRate(tx: DbOrTx, input: InvoiceInput, vatKinds: string[]) {
+  if (input.currency === "HUF") return { rate: 1, rateDate: null as string | null, source: "MNB" };
+  const { date } = vatRateDate({ issueDate: input.issueDate, fulfillmentDate: input.fulfillmentDate, periodic: !!input.periodic, vatKinds });
+  if (input.rateManual) {
+    if (!(input.exchangeRate > 0)) throw new Error("Kézi árfolyamnál meg kell adni az árfolyamot.");
+    return { rate: input.exchangeRate, rateDate: date, source: "manual" };
+  }
+  if (input.storedRate && input.storedRate.rateDate === date && input.storedRate.rate > 0) {
+    return { rate: input.storedRate.rate, rateDate: date, source: "MNB" };
+  }
+  const r = await getMnbRate(input.currency, date, tx);
+  return { rate: r.rate, rateDate: date, source: "MNB" };
 }
 
 /** Számla mentése piszkozatként (új vagy meglévő piszkozat felülírása). */
 export async function saveInvoiceDraft(companyId: number, input: InvoiceInput, invoiceId?: number) {
   return db.transaction(async (tx) => {
-    const { posting, lines, fxRate } = await buildFromInput(tx, companyId, input, false);
+    const { posting, lines, fxRate, rateInfo } = await buildFromInput(tx, companyId, input, false);
     const header = {
       companyId,
       direction: input.direction,
@@ -332,6 +371,9 @@ export async function saveInvoiceDraft(companyId: number, input: InvoiceInput, i
       paymentMethod: input.paymentMethod,
       currency: input.currency,
       exchangeRate: fxRate,
+      rateDate: rateInfo.rateDate,
+      rateSource: rateInfo.source,
+      periodic: !!input.periodic,
       netHuf: posting.totals.netHuf,
       vatHuf: posting.totals.vatHuf,
       grossHuf: posting.totals.payableHuf,
@@ -383,6 +425,9 @@ async function loadInvoiceInput(tx: DbOrTx, companyId: number, invoiceId: number
     paymentMethod: inv.paymentMethod,
     currency: inv.currency,
     exchangeRate: Number(inv.exchangeRate),
+    rateManual: inv.rateSource === "manual",
+    periodic: inv.periodic,
+    storedRate: { rate: Number(inv.exchangeRate), rateDate: inv.rateDate },
     note: inv.note,
     lines: ls.map((l) => ({
       description: l.description,
@@ -402,7 +447,7 @@ export async function postInvoice(companyId: number, invoiceId: number, userId?:
     await tx.execute(sql`select id from invoices where id = ${invoiceId} for update`);
     const { inv, input } = await loadInvoiceInput(tx, companyId, invoiceId);
     if (inv.status !== "draft") throw new Error("A számla már könyvelve vagy sztornózva van.");
-    const { posting, lines, ctx } = await buildFromInput(tx, companyId, input, true);
+    const { posting, lines, ctx, rateInfo } = await buildFromInput(tx, companyId, input, true);
 
     if (inv.direction === "out") {
       const soldIds = lines.filter((l) => l.vehicleId).map((l) => l.vehicleId!);
@@ -436,6 +481,9 @@ export async function postInvoice(companyId: number, invoiceId: number, userId?:
       .set({
         status: "posted",
         journalEntryId: entry.id,
+        exchangeRate: rateInfo.rate,
+        rateDate: rateInfo.rateDate,
+        rateSource: rateInfo.source,
         netHuf: posting.totals.netHuf,
         vatHuf: posting.totals.vatHuf,
         grossHuf: posting.totals.payableHuf,
@@ -504,12 +552,32 @@ export async function invoiceOpenAmount(tx: DbOrTx, invoiceId: number) {
   return { openFx: round2(Number(inv.grossFx) - paidFx), openHuf: round2(Number(inv.grossHuf) - paidHuf) };
 }
 
-export async function payInvoice(
-  companyId: number,
-  invoiceId: number,
-  input: { date: string; moneyAccountId: number; amountFx: number; fxRate: number; note?: string | null },
-  userId?: number,
-) {
+/** Devizás pénzeszköz számla egyenlege adott napig: forint könyv szerinti érték és devizaállomány. */
+export async function fxAccountBalance(tx: DbOrTx, accountId: number, date: string) {
+  const [r] = await tx
+    .select({
+      huf: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)::float8`,
+      fx: sql<number>`coalesce(sum(case when ${journalLines.debit} <> 0 then ${journalLines.amountFx} else -${journalLines.amountFx} end), 0)::float8`,
+    })
+    .from(journalLines)
+    .innerJoin(journalEntries, eq(journalEntries.id, journalLines.entryId))
+    .where(and(eq(journalLines.accountId, accountId), sql`${journalEntries.date} <= ${date}`));
+  return { huf: round2(Number(r.huf)), fx: round2(Number(r.fx)) };
+}
+
+export type PaymentRequest = {
+  date: string;
+  moneyAccountId: number;
+  /** Kiegyenlített összeg a számla devizájában. */
+  amountFx: number;
+  /** Devizás számla forintszámláról: a ténylegesen terhelt / jóváírt forint. */
+  moneyHuf?: number | null;
+  /** Devizaszámlára befolyó összeg árfolyama – üresen az aznapi MNB. */
+  fxRate?: number | null;
+  note?: string | null;
+};
+
+export async function payInvoice(companyId: number, invoiceId: number, input: PaymentRequest, userId?: number) {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select id from invoices where id = ${invoiceId} for update`);
     const [inv] = await tx.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
@@ -522,7 +590,37 @@ export async function payInvoice(
     const s = ctx.company.settings;
     const [moneyAcc] = await tx.select().from(accounts).where(and(eq(accounts.id, input.moneyAccountId), eq(accounts.companyId, companyId)));
     if (!moneyAcc || !moneyAcc.code.startsWith("38")) throw new Error("Pénzeszköz számlát (38x) kell választani.");
-    const isHuf = inv.currency === "HUF";
+
+    const invRate = inv.currency === "HUF" ? 1 : Number(inv.exchangeRate);
+    // Vevő / szállító oldal: könyv szerinti érték (teljes rendezésnél a teljes nyitott HUF egyenleg)
+    const partnerHuf = settles ? open.openHuf : roundHuf(input.amountFx * invRate);
+
+    // Pénzeszköz oldal – Szt. 60. §
+    let moneyHuf: number;
+    let moneyFx: { currency: string; rate: number } | null = null;
+    if (moneyAcc.currency === "HUF") {
+      if (inv.currency === "HUF") moneyHuf = input.amountFx;
+      else {
+        // Forintért vásárolt / eladott deviza: a ténylegesen fizetett / kapott forint
+        if (!input.moneyHuf || !(input.moneyHuf > 0)) throw new Error("Add meg a forintszámlán ténylegesen terhelt / jóváírt összeget.");
+        moneyHuf = input.moneyHuf;
+      }
+    } else {
+      if (moneyAcc.currency !== inv.currency) throw new Error(`A ${moneyAcc.code} számla devizaneme ${moneyAcc.currency}, a számláé ${inv.currency}.`);
+      if (inv.direction === "out") {
+        // Befolyó deviza: választott (MNB) árfolyamon
+        const rate = input.fxRate && input.fxRate > 0 ? input.fxRate : (await getMnbRate(inv.currency, input.date, tx)).rate;
+        moneyHuf = roundHuf(input.amountFx * rate);
+        moneyFx = { currency: inv.currency, rate };
+      } else {
+        // Kiáramló deviza: könyv szerinti értéken (átlagár módszer)
+        const bal = await fxAccountBalance(tx, moneyAcc.id, input.date);
+        if (bal.fx + 0.005 < input.amountFx) throw new Error(`Nincs elég deviza a ${moneyAcc.code} számlán (egyenleg: ${bal.fx} ${moneyAcc.currency}).`);
+        moneyHuf = Math.abs(bal.fx - input.amountFx) < 0.005 ? bal.huf : roundHuf((input.amountFx * bal.huf) / bal.fx);
+        moneyFx = { currency: inv.currency, rate: Math.round((moneyHuf / input.amountFx) * 1e6) / 1e6 };
+      }
+    }
+
     const res = buildPaymentPosting(
       {
         direction: inv.direction,
@@ -530,9 +628,10 @@ export async function payInvoice(
         invoiceNumber: inv.invoiceNumber,
         currency: inv.currency,
         amountFx: input.amountFx,
-        payRate: isHuf ? 1 : input.fxRate,
-        invoiceRate: isHuf ? 1 : Number(inv.exchangeRate),
-        remainingHufIfSettles: settles ? open.openHuf : null,
+        moneyHuf,
+        moneyFx,
+        partnerHuf,
+        invoiceRate: invRate,
       },
       {
         partnerAccountId: ctx.acc.partnerAccountId,
@@ -541,7 +640,6 @@ export async function payInvoice(
         fxLossId: await accountIdByCode(tx, companyId, s.fxLoss),
       },
     );
-    const partnerHuf = res.lines.find((l) => l.accountId === ctx.acc.partnerAccountId)!;
     const entry = await postEntry(tx, {
       companyId,
       journalCode: moneyAcc.code.startsWith("381") ? "PE" : "BA",
@@ -558,9 +656,9 @@ export async function payInvoice(
       date: input.date,
       moneyAccountId: moneyAcc.id,
       amountFx: input.amountFx,
-      fxRate: isHuf ? 1 : input.fxRate,
-      amountHuf: res.amountHuf,
-      partnerHuf: partnerHuf.debit + partnerHuf.credit,
+      fxRate: inv.currency === "HUF" ? 1 : Math.round((moneyHuf / input.amountFx) * 1e6) / 1e6,
+      amountHuf: roundHuf(moneyHuf),
+      partnerHuf,
       journalEntryId: entry.id,
       note: input.note ?? null,
     });

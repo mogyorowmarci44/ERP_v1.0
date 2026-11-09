@@ -24,6 +24,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
         <Link href={`${b}/partners`}>Partnerek</Link>
         <Link href={`${b}/vehicles`}>Gépkocsi készlet</Link>
         <Link href={`${b}/accounts`}>Számlatükör</Link>
+        <Link href={`${b}/fx`}>Árfolyamok (MNB)</Link>
         <div className="group">Főkönyv</div>
         <Link href={`${b}/journal`}>Napló</Link>
         <Link href={`${b}/reports/trial-balance`}>Főkönyvi kivonat</Link>

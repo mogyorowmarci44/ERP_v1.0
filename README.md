@@ -14,7 +14,8 @@ Többcéges, kettős könyvviteli ERP használtautó-kereskedéshez és szervizh
 | Számlák | Vevő- és szállítói számla, piszkozat → könyvelés, devizás számla saját (banki) árfolyamon, sztornó |
 | Különbözeti adózás | Tételes (gépkocsinkénti) árrés: ÁFA = (bruttó eladási ár − beszerzési ár) × 27/127, negatív árrésnél 0 |
 | Gépkocsi készlet | Egyedi nyilvántartás; beszerzés + fényezés/javítás a 261-re aktiválva, eladáskor automatikus ELÁBÉ (T 814 / K 261), fedezet gépkocsinként |
-| Pénzügyi rendezés | Bank/pénztár kiegyenlítés, részfizetés, realizált árfolyam-különbözet (976/876) |
+| Árfolyamok | MNB hivatalos árfolyam automatikus letöltése, Áfa tv. 80. § / 63. § szerinti árfolyam-nap |
+| Pénzügyi rendezés | Bank/pénztár (forint és deviza) kiegyenlítés, részfizetés, devizaszámla átlagár, realizált árfolyam-különbözet (976/876) |
 | Főkönyv | Napló (VE, SZ, BA, PE, VN), vegyes tételek, piros storno, időszakzárás |
 | Riportok | Főkönyvi kivonat (analitikus / szintenként), számlakarton, nyitott tételek, ÁFA analitika (összesítő + különbözeti tételes) |
 
@@ -24,7 +25,7 @@ Többcéges, kettős könyvviteli ERP használtautó-kereskedéshez és szervizh
 2. ÁFA bevallás (2665A sorok), NAV Online Számla lekérdezés / egyeztetés
 3. Bankkivonat import, pénztár bizonylatok
 4. Tárgyi eszköz nyilvántartás + értékcsökkenés
-5. Mérleg és eredménykimutatás (2000. évi C. tv.), évzárás / évnyitás
+5. Mérleg és eredménykimutatás (2000. évi C. tv.), fordulónapi devizás átértékelés, évzárás / évnyitás
 6. Exportok (Excel/PDF), elemzések, dashboard
 
 ## Helyi fejlesztés
@@ -53,7 +54,8 @@ Minden `main`-re pusholt commit automatikusan deployol.
 
 - Könyvelt tétel nem módosítható – javítás piros stornóval (ugyanazon oldal, negatív összeg), így a forgalom nem duzzad.
 - Minden tétel egyensúlyát az adatbázisba írás előtt ellenőrizzük; lezárt hónapba nem lehet könyvelni.
-- Devizás tételek a számlán megadott (banki) árfolyamon; a kiegyenlítéskori eltérés realizált árfolyam-különbözet.
+- **Árfolyam-politika (MNB):** a devizás számla ÁFA alapja és a követelés / kötelezettség könyv szerinti értéke is az MNB hivatalos árfolyamán, az Áfa tv. 80. § szerinti napon (teljesítés; időszakos elszámolásnál a számla kelte; KBB-nél a számla kelte, legkésőbb a teljesítést követő hó 15-e) – Szt. 60. § (5a). Az árfolyamot az app automatikusan letölti az MNB-től (kézzel felülírható).
+- **Kiegyenlítés (Szt. 60. §):** forintszámláról a ténylegesen terhelt / jóváírt forint; devizaszámlára befolyó deviza MNB árfolyamon; devizaszámláról kifizetett deviza könyv szerinti átlagárfolyamon. Az eltérés realizált árfolyam-különbözet (976 / 876).
 - A gépkocsi könyv szerinti értéke a 261-es számla gépkocsihoz rendelt tételeiből adódik. A különbözeti ÁFA alapja csak a beszerzési ár (a javítás ÁFÁ-ja levonható, nem része az alapnak) – a gépkocsin kézzel felülírható.
 
 > A könyvelési szabályokat egyeztesd a könyvelőddel – különösen az EU-s gépkocsi beszerzéseknél (különbözeti vs. KBB), és a devizás számlák ÁFA-árfolyamánál.

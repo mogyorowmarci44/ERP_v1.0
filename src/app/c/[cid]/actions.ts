@@ -20,6 +20,8 @@ import { runOrRedirect, str, optStr, intOrNull, errMsg } from "@/lib/action-util
 import { parseNumber } from "@/lib/money";
 import { isDate, today } from "@/lib/dates";
 import type { DraftLine } from "@/lib/posting";
+import { getMnbRate, storeRates, fetchMnbRates } from "@/lib/fx-service";
+import { addDays } from "@/lib/fx";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
@@ -98,6 +100,7 @@ export async function saveAccountAction(fd: FormData) {
         type: str(fd, "type") as "asset",
         isPosting: code.length > 1,
         reportLine: optStr(fd, "reportLine"),
+        currency: (str(fd, "currency") || "HUF").toUpperCase(),
       });
     }
     revalidatePath(`/c/${cid}/accounts`);
@@ -157,7 +160,8 @@ export async function payInvoiceAction(fd: FormData) {
         date: str(fd, "date"),
         moneyAccountId: Number(fd.get("moneyAccountId")),
         amountFx: parseNumber(fd.get("amountFx")),
-        fxRate: parseNumber(fd.get("fxRate")) || 1,
+        moneyHuf: parseNumber(fd.get("moneyHuf")) || null,
+        fxRate: parseNumber(fd.get("fxRate")) || null,
         note: optStr(fd, "note"),
       },
       user.id,
@@ -240,5 +244,44 @@ export async function lockPeriodAction(fd: FormData) {
       await unlockPeriod(cid, y, m);
     } else await lockPeriod(cid, y, m, user.id);
     return `/c/${cid}/settings?ok=${encodeURIComponent("Időszak frissítve.")}`;
+  });
+}
+
+// --- Árfolyamok -------------------------------------------------------------
+
+/** Kliens oldali előnézethez: adott napon érvényes MNB árfolyam. */
+export async function getRateAction(cid: number, currency: string, date: string): Promise<{ rate?: number; rateDate?: string; error?: string }> {
+  await requireCompany(cid);
+  try {
+    if (!isDate(date)) throw new Error("Hibás dátum.");
+    return await getMnbRate(currency, date);
+  } catch (e) {
+    return { error: errMsg(e) };
+  }
+}
+
+export async function refreshRatesAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/fx`, async () => {
+    const to = str(fd, "to") || today();
+    const from = str(fd, "from") || addDays(to, -31);
+    const cur = (str(fd, "currencies") || "EUR,USD,CHF,GBP").toUpperCase().split(/[ ,;]+/).filter(Boolean);
+    const rates = await fetchMnbRates(from, to, cur);
+    await storeRates(db, rates);
+    return `/c/${cid}/fx?ok=${encodeURIComponent(`${rates.length} árfolyam letöltve az MNB-től.`)}`;
+  });
+}
+
+export async function manualRateAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/fx`, async () => {
+    const date = str(fd, "date");
+    const currency = str(fd, "currency").toUpperCase();
+    const rate = parseNumber(fd.get("rate"));
+    if (!isDate(date) || !/^[A-Z]{3}$/.test(currency) || !(rate > 0)) throw new Error("Dátum, devizanem és pozitív árfolyam kell.");
+    await storeRates(db, [{ date, currency, rate }], "manual");
+    return `/c/${cid}/fx?ok=${encodeURIComponent("Árfolyam rögzítve.")}`;
   });
 }
