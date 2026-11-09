@@ -352,6 +352,11 @@ def convert():
                      "description": "2025. évi társasági adó (a forrás 2026-os nyitómérlege szerint)",
                      "lines": [{"account": "891", "debit": r2(tao), "credit": 0}, {"account": "463", "debit": 0, "credit": r2(tao)}]})
         log.append(("PÓTLÁS", "2026:évnyitás", "TAO-2025", f"2025. évi TAO {tao:.0f} Ft lekönyvelve 2025-12-31-re (a 2025-ös naplóban nem szerepelt) – ellenőrizd a bevallással"))
+        docs.append({"kind": "entry", "src": "felhasználói adat", "journal": "BA", "date": "2026-06-01", "ref": "TAO-2025-BEFIZ",
+                     "description": "2025. évi társasági adó befizetése – Nemzeti adó és vámhivatal",
+                     "lines": [{"account": "463", "debit": r2(tao), "credit": 0, "partner": partner("Nemzeti adó és vámhivatal")},
+                               {"account": "384", "debit": 0, "credit": r2(tao), "partner": partner("Nemzeti adó és vámhivatal")}]})
+        log.append(("PÓTLÁS", "felhasználói adat", "TAO-2025-BEFIZ", f"2025. évi TAO befizetése {tao:.0f} Ft, 2026-06-01, Erste HUF (a forrásban nem szerepelt)"))
     return vs, partners, docs, log
 
 def groups_of(rows):
