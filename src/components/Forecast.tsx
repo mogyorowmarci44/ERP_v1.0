@@ -33,7 +33,7 @@ export function ScenarioSwitch({ href, active }: { href: (sc: Scenario) => strin
 }
 
 /** Pénzeszközök (pénztár + bank) hó végi egyenlege a három forgatókönyvben: vonalak, közvetlen címkék, hover tooltip. */
-export function ScenarioChart({ series, caption = "Pénztár + bank időszak végi egyenlege (Ft)", highlight }: { series: Array<{ scenario: Scenario; points: Array<{ label: string; value: number; min: number }> }>; caption?: string; highlight?: Scenario }) {
+export function ScenarioChart({ series, caption = "Pénztár + bank időszak végi egyenlege (Ft)", highlight, splitIndex }: { series: Array<{ scenario: Scenario; points: Array<{ label: string; value: number; min: number }> }>; caption?: string; highlight?: Scenario; splitIndex?: number }) {
   const W = 760, H = 230, L = 64, R = 96, T = 14, B = 26;
   const all = series.flatMap((s) => s.points.flatMap((p) => [p.value, p.min]));
   if (!all.length) return null;
@@ -64,6 +64,14 @@ export function ScenarioChart({ series, caption = "Pénztár + bank időszak vé
             <text x={L - 8} y={y(t) + 4} textAnchor="end" className="ml-axis">{fmtShort(t)}</text>
           </g>
         ))}
+        {splitIndex !== undefined && splitIndex > 0 && (
+          <g className="sc-split">
+            <rect x={L} y={T} width={Math.max(0, x(splitIndex) - L)} height={H - T - B} />
+            <line x1={x(splitIndex)} x2={x(splitIndex)} y1={T} y2={H - B} />
+            <text x={x(splitIndex) - 6} y={T + 12} textAnchor="end">tény</text>
+            <text x={x(splitIndex) + 6} y={T + 12}>terv</text>
+          </g>
+        )}
         {series.map((s) => (
           <path key={s.scenario} className={`sc-line sc-${s.scenario}${highlight && highlight !== s.scenario ? " dim" : ""}`} d={s.points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ")} />
         ))}

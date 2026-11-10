@@ -8,8 +8,8 @@ import { today, addDaysIso } from "./dates";
 import { round2 } from "./money";
 import { vehicleTitle } from "./vehicle-id";
 import {
-  normalizeSettings, calibrate, quantile, MIN_CALIBRATION_SALES,
-  type FcOpening, type FcPlan, type FcItem, type SoldHistory, type Channel,
+  normalizeSettings, calibrate, quantile, MIN_CALIBRATION_SALES, periodList, periodKey,
+  type FcOpening, type FcPlan, type FcItem, type SoldHistory, type Channel, type FcMonth, type Granularity,
 } from "./forecast";
 
 const { accounts, journalEntries, journalLines, vehicles, invoices, invoiceLines, vatCodes, partners, payments, companies, forecastPlans, forecastPlanCosts, forecastItems, forecastSettings } = schema;
@@ -257,4 +257,103 @@ export async function costSuggestions(companyId: number): Promise<CostSuggestion
       monthlyNet: Math.round(a.byMonth.get([...a.months].sort().pop()!) ?? a.net / a.months.size), vatRate: rate > 20 ? 27 : rate > 12 ? 18 : rate > 3 ? 5 : 0, payment: a.cash * 2 > a.n ? "cash" : "bank", frequency: "monthly" });
   }
   return out.sort((x, y) => y.monthlyNet - x.monthlyNet);
+}
+
+// ---------------------------------------------------------------------------
+// Tény időszakok a főkönyvből (a terv mellé: teljes üzleti év / kezdettől)
+// ---------------------------------------------------------------------------
+
+/** Az első könyvelési tétel dátuma (life to date kezdete). */
+export async function firstEntryDate(companyId: number): Promise<string | null> {
+  const [r] = await db.select({ d: sql<string | null>`min(${journalEntries.date})::text` }).from(journalEntries).where(eq(journalEntries.companyId, companyId));
+  return r?.d ?? null;
+}
+
+/**
+ * Tény időszakok (from … to, a mai napig) ugyanabban a szerkezetben, mint a terv: árbevétel (91–93), ELÁBÉ (811/814/815),
+ * adózás előtti eredmény (eredményszámlák, 89 nélkül), fizetendő ÁFA (467 követel), levonható ÁFA (466 tartozik),
+ * NAV-nak fizetett ÁFA (467/468 tartozik pénzmozgással), pénzmozgás (38x, belső átvezetés nélkül), napi záró és minimum egyenlegek.
+ */
+export async function loadActualPeriods(companyId: number, from: string, to: string, gran: Granularity): Promise<FcMonth[]> {
+  if (from > to) return [];
+  const periods = periodList(from, to, gran);
+  const M = new Map<string, FcMonth>(periods.map((p) => [p.key, {
+    month: p.key, label: p.label, start: p.start, end: p.end, kind: "actual" as const,
+    revenue: 0, cogs: 0, grossMargin: 0, vehicleCosts: 0, fixedCosts: 0, preTax: 0, salesGross: 0, carsSold: 0, marginVat: 0, inputVat: 0, vatBalance: 0,
+    vatPaid: 0, taxPaid: 0, cashIn: 0, cashOut: 0, endCash: 0, endBank: 0, minCash: Infinity, minBank: Infinity, minCashDate: "", minBankDate: "", minTotal: Infinity, minTotalDate: "",
+  }]));
+  const accRows = await db.select({ code: accounts.code, type: accounts.type }).from(accounts).where(eq(accounts.companyId, companyId));
+  const typeOf = new Map(accRows.map((a) => [a.code, a.type]));
+  const daily = (await db.execute(sql`
+    select e.date::text as date, a.code, sum(l.debit)::float8 as d, sum(l.credit)::float8 as c
+    from journal_lines l join journal_entries e on e.id = l.entry_id join accounts a on a.id = l.account_id
+    where l.company_id = ${companyId} and e.date <= ${to}
+    group by e.date, a.code order by e.date`)) as unknown as Array<{ date: string; code: string; d: number; c: number }>;
+  const money = (await db.execute(sql`
+    with m as (
+      select e.id, e.date, sum(l.debit - l.credit) as net
+      from journal_lines l join journal_entries e on e.id = l.entry_id join accounts a on a.id = l.account_id
+      where l.company_id = ${companyId} and a.code like '38%' and e.date between ${from} and ${to}
+      group by e.id, e.date)
+    select date::text as date, sum(greatest(net, 0))::float8 as inn, sum(greatest(-net, 0))::float8 as outt from m group by date`)) as unknown as Array<{ date: string; inn: number; outt: number }>;
+  const taxPaid = (await db.execute(sql`
+    select e.date::text as date,
+      sum(case when a.code ~ '^46[78]' then l.debit else 0 end)::float8 as vat,
+      sum(case when a.code ~ '^461' then l.debit else 0 end)::float8 as tao
+    from journal_lines l join journal_entries e on e.id = l.entry_id join accounts a on a.id = l.account_id
+    where l.company_id = ${companyId} and e.date between ${from} and ${to} and l.debit > 0 and a.code ~ '^46[178]'
+      and exists (select 1 from journal_lines l2 join accounts a2 on a2.id = l2.account_id where l2.entry_id = e.id and a2.code like '38%')
+    group by e.date`)) as unknown as Array<{ date: string; vat: number; tao: number }>;
+  const sales = (await db.execute(sql`
+    select i.fulfillment_date::text as date, count(distinct il.vehicle_id)::int as n, sum(il.gross_huf)::float8 as gross
+    from invoice_lines il join invoices i on i.id = il.invoice_id
+    where i.company_id = ${companyId} and i.direction = 'out' and i.status = 'posted' and il.vehicle_id is not null and i.fulfillment_date between ${from} and ${to}
+    group by i.fulfillment_date`)) as unknown as Array<{ date: string; n: number; gross: number }>;
+
+  const kOf = (d: string) => periodKey(d, gran);
+  let cash = 0, bank = 0;
+  const byDate = new Map<string, Array<{ code: string; d: number; c: number }>>();
+  for (const r of daily) byDate.set(r.date, [...(byDate.get(r.date) ?? []), { code: r.code, d: Number(r.d), c: Number(r.c) }]);
+  for (const [date, rows] of [...byDate.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    for (const r of rows) {
+      if (r.code.startsWith("381")) cash += r.d - r.c;
+      if (r.code.startsWith("384")) bank += r.d - r.c;
+    }
+    if (date < from) continue;
+    const b = M.get(kOf(date));
+    if (!b) continue;
+    for (const r of rows) {
+      const net = r.c - r.d;
+      if (/^9[123]/.test(r.code)) b.revenue += net;
+      if (/^81[145]/.test(r.code)) b.cogs -= net;
+      const t = typeOf.get(r.code);
+      if ((t === "revenue" || t === "expense") && !r.code.startsWith("89")) b.preTax += net;
+      if (r.code.startsWith("467")) b.marginVat += r.c;
+      if (r.code.startsWith("466")) b.inputVat += r.d;
+    }
+    if (cash < b.minCash) { b.minCash = cash; b.minCashDate = date; }
+    if (bank < b.minBank) { b.minBank = bank; b.minBankDate = date; }
+    if (cash + bank < b.minTotal) { b.minTotal = cash + bank; b.minTotalDate = date; }
+    b.endCash = cash; b.endBank = bank;
+  }
+  for (const r of money) { const b = M.get(kOf(r.date)); if (b) { b.cashIn += Number(r.inn); b.cashOut += Number(r.outt); } }
+  for (const r of taxPaid) { const b = M.get(kOf(r.date)); if (b) { b.vatPaid += Number(r.vat); b.taxPaid += Number(r.tao); } }
+  for (const r of sales) { const b = M.get(kOf(r.date)); if (b) { b.carsSold += r.n; b.salesGross += Number(r.gross); } }
+  // Mozgás nélküli időszak: az előző záró egyenleg érvényes
+  let pc = 0, pb = 0;
+  {
+    // nyitó: a from előtti egyenleg
+    for (const r of daily) if (r.date < from) { if (r.code.startsWith("381")) pc += Number(r.d) - Number(r.c); if (r.code.startsWith("384")) pb += Number(r.d) - Number(r.c); }
+  }
+  for (const p of periods) {
+    const b = M.get(p.key)!;
+    if (b.minTotal === Infinity) { b.endCash = pc; b.endBank = pb; b.minCash = pc; b.minBank = pb; b.minTotal = pc + pb; b.minCashDate = b.minBankDate = b.minTotalDate = p.start; }
+    else { b.minCash = Math.min(b.minCash, pc); b.minBank = Math.min(b.minBank, pb); }
+    pc = b.endCash; pb = b.endBank;
+    b.grossMargin = b.revenue - b.cogs;
+    b.fixedCosts = b.grossMargin - b.preTax; // minden egyéb költség, ráfordítás és egyéb bevétel nettója
+    b.vatBalance = b.marginVat - b.inputVat;
+    for (const k of ["revenue", "cogs", "grossMargin", "fixedCosts", "preTax", "marginVat", "inputVat", "vatBalance", "cashIn", "cashOut", "vatPaid", "taxPaid", "salesGross"] as const) b[k] = Math.round(b[k]);
+  }
+  return periods.map((p) => M.get(p.key)!);
 }

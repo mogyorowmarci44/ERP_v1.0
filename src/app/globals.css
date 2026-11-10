@@ -414,3 +414,9 @@ button.chk:hover { border-color: var(--accent); }
 }
 .nowrap { white-space: nowrap; }
 .sc-line.dim { opacity: 0.35; stroke-width: 1.5; }
+.sc-split rect { fill: var(--surface-2); opacity: 0.7; }
+.sc-split line { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.sc-split text { font-size: 11px; fill: var(--muted); }
+table.statement th.k-actual, table.statement td.k-actual { background: color-mix(in srgb, var(--surface-2) 70%, transparent); color: var(--muted); }
+table.statement th.k-mixed { box-shadow: inset 0 -2px 0 var(--accent); }
+.kind-tag { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: none; }

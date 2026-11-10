@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runForecast, calibrate, vatDueDate, DEFAULT_FORECAST_SETTINGS, normalizeSettings, type FcOpening, type FcPlan, type FcItem } from "@/lib/forecast";
+import { runForecast, calibrate, vatDueDate, applyScope, periodList, DEFAULT_FORECAST_SETTINGS, normalizeSettings, type FcOpening, type FcPlan, type FcItem, type FcMonth } from "@/lib/forecast";
 
 const opening: FcOpening = {
   asOf: "2026-11-10", cash: 1_000_000, bank: 500_000, vatPayable: 0, fiscalYearStartMonth: 1, vatPeriod: "monthly", ytdPreTax: 0, ytdHipaBase: 0,
@@ -103,6 +103,25 @@ describe("forecast – heti / havi / negyedéves bontás", () => {
     expect(q.months.length).toBe(5); // 2026 Q4 … 2027 Q4 (a horizont okt. végéig tart)
     expect(w.months[0].month).toBe("2026-11-09"); // a 2026.11.10-i hét hétfője
     expect(w.months.find((x) => x.carsSold === 1)!.month).toBe("2026-11-30"); // 12.05. eladás → a nov. 30-i héten
+  });
+});
+
+describe("forecast – tény + terv hatókör", () => {
+  it("a folyó hónap tény + terv, a korábbi hónapok tény, az összesítés a kettő összege", () => {
+    const r = runForecast({ opening, plans: [stockPlan], items: [], settings }, "base", "month");
+    const actual: FcMonth[] = periodList("2026-01-01", "2026-11-10", "month").map((p) => ({
+      month: p.key, label: p.label, start: p.start, end: p.end, kind: "actual", revenue: 100, cogs: 60, grossMargin: 40, vehicleCosts: 0, fixedCosts: 10, preTax: 30,
+      salesGross: 0, carsSold: 1, marginVat: 5, inputVat: 2, vatBalance: 3, vatPaid: 0, taxPaid: 0, cashIn: 0, cashOut: 0, endCash: 1_000_000, endBank: 500_000,
+      minCash: 900_000, minBank: 400_000, minCashDate: p.start, minBankDate: p.start, minTotal: 1_300_000, minTotalDate: p.start,
+    }));
+    const s = applyScope(r, actual, { from: "2026-01-01", to: "2026-12-31" });
+    expect(s.months.length).toBe(12);
+    expect(s.months[0].kind).toBe("actual");
+    expect(s.months[10].kind).toBe("mixed");
+    expect(s.months[11].kind).toBe("forecast");
+    expect(s.months[10].carsSold).toBe(1); // a novemberi tény
+    expect(s.totals.preTax).toBe(11 * 30 + r.months.filter((m) => m.start <= "2026-12-31").reduce((a, m) => a + m.preTax, 0));
+    expect(s.totals.carsSold).toBe(11 + 1);
   });
 });
 

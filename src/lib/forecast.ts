@@ -193,6 +193,11 @@ export type FcMonth = {
   minBank: number;
   minCashDate: string;
   minBankDate: string;
+  /** Pénztár + bank együttes legalacsonyabb egyenlege az időszakban. */
+  minTotal: number;
+  minTotalDate: string;
+  /** actual = főkönyvi tény, mixed = tény a mai napig + terv, forecast = terv. */
+  kind?: "actual" | "mixed" | "forecast";
 };
 export type FcSaleRow = {
   planId: number;
@@ -236,7 +241,7 @@ export function runForecast(
   const M = new Map<string, FcMonth>();
   for (const per of periods)
     M.set(per.key, { month: per.key, label: per.end > horizonEnd ? `${per.label}*` : per.label, start: per.start, end: per.end, revenue: 0, cogs: 0, grossMargin: 0, vehicleCosts: 0, fixedCosts: 0, preTax: 0, salesGross: 0, carsSold: 0, marginVat: 0, inputVat: 0,
-      vatBalance: 0, vatPaid: 0, taxPaid: 0, cashIn: 0, cashOut: 0, endCash: 0, endBank: 0, minCash: 0, minBank: 0, minCashDate: "", minBankDate: "" });
+      vatBalance: 0, vatPaid: 0, taxPaid: 0, cashIn: 0, cashOut: 0, endCash: 0, endBank: 0, minCash: 0, minBank: 0, minCashDate: "", minBankDate: "", minTotal: 0, minTotalDate: "", kind: "forecast" });
   const bucket = (d: string) => M.get(kOf(d < opening.asOf ? opening.asOf : d));
   const events: Ev[] = [];
   const atLeastToday = (d: string) => (d < opening.asOf ? opening.asOf : d);
@@ -397,8 +402,8 @@ export function runForecast(
   let prevCashNeg = opening.cash < 0, prevBankNeg = opening.bank < 0;
   for (const m of months) {
     const b = M.get(m)!;
-    b.minCash = cash; b.minBank = bank;
-    b.minCashDate = b.minBankDate = m === start ? opening.asOf : b.start;
+    b.minCash = cash; b.minBank = bank; b.minTotal = cash + bank;
+    b.minCashDate = b.minBankDate = b.minTotalDate = m === start ? opening.asOf : b.start;
     for (; ei < events.length && kOf(events[ei].date) <= m; ei++) {
       const e = events[ei];
       if (e.channel === "cash") cash += e.amount;
@@ -410,6 +415,7 @@ export function runForecast(
       if (cash < b.minCash) { b.minCash = cash; b.minCashDate = e.date; }
       if (bank < b.minBank) { b.minBank = bank; b.minBankDate = e.date; }
       if (cash + bank < minTotal) { minTotal = cash + bank; minTotalDate = e.date; }
+      if (cash + bank < b.minTotal) { b.minTotal = cash + bank; b.minTotalDate = e.date; }
     }
     b.endCash = cash; b.endBank = bank;
     b.grossMargin = b.revenue - b.cogs;
@@ -468,4 +474,49 @@ export function calibrate(history: SoldHistory[], current: ForecastSettings): { 
     calibratedFrom: `${h.length} eladás alapján`,
   };
   return { settings, used: true, stats: { n: h.length, medianDays: Math.round(medD), medianMarkup: medM } };
+}
+
+// ---------------------------------------------------------------------------
+// Tény + terv: időszak-hatókör (csak terv / teljes üzleti év / kezdettől)
+// ---------------------------------------------------------------------------
+
+export type Scope = "forecast" | "fy" | "ltd";
+export const SCOPE_HU: Record<Scope, string> = { forecast: "Forecast időszak", fy: "Teljes üzleti év", ltd: "Kezdettől (life to date)" };
+const FLOW: Array<keyof FcMonth> = ["revenue", "cogs", "grossMargin", "vehicleCosts", "fixedCosts", "preTax", "salesGross", "carsSold", "marginVat", "inputVat", "vatBalance", "vatPaid", "taxPaid", "cashIn", "cashOut"];
+
+/**
+ * A terv-időszakok és a főkönyvi tény-időszakok összefésülése egy hatókörre.
+ * A folyó időszak „vegyes”: a tény a mai napig + a terv a mai naptól (a záró egyenleg a tervből, a minimum a kettő minimuma).
+ */
+export function applyScope(r: FcResult, actual: FcMonth[], range: { from: string; to: string }): FcResult {
+  const fc = r.months.filter((m) => m.start <= range.to);
+  const act = actual.filter((m) => m.end >= range.from);
+  const byKey = new Map<string, FcMonth>();
+  for (const a of act) byKey.set(a.month, { ...a, kind: "actual" });
+  for (const f of fc) {
+    const a = byKey.get(f.month);
+    if (!a) { byKey.set(f.month, { ...f, kind: "forecast" }); continue; }
+    const m: FcMonth = { ...f, kind: "mixed" };
+    for (const k of FLOW) (m[k] as number) = (a[k] as number) + (f[k] as number);
+    if (a.minCash < f.minCash) { m.minCash = a.minCash; m.minCashDate = a.minCashDate; }
+    if (a.minBank < f.minBank) { m.minBank = a.minBank; m.minBankDate = a.minBankDate; }
+    if (a.minTotal < f.minTotal) { m.minTotal = a.minTotal; m.minTotalDate = a.minTotalDate; }
+    byKey.set(f.month, m);
+  }
+  const months = [...byKey.values()].sort((x, y) => (x.start < y.start ? -1 : 1));
+  const sum = (f: (x: FcMonth) => number) => months.reduce((a, x) => a + f(x), 0);
+  let minRow = months[0];
+  for (const m of months) if (m.minTotal < minRow.minTotal) minRow = m;
+  const last = months[months.length - 1];
+  return {
+    ...r,
+    months,
+    sales: r.sales.filter((x) => x.saleDate <= range.to),
+    warnings: r.warnings,
+    totals: {
+      revenue: sum((x) => x.revenue), grossMargin: sum((x) => x.grossMargin), preTax: sum((x) => x.preTax), marginVat: sum((x) => x.marginVat),
+      inputVat: sum((x) => x.inputVat), carsSold: sum((x) => x.carsSold), endCash: last?.endCash ?? 0, endBank: last?.endBank ?? 0,
+      minTotal: minRow?.minTotal ?? 0, minTotalDate: minRow?.minTotalDate ?? "",
+    },
+  };
 }

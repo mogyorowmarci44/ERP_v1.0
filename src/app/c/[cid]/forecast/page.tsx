@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireCompany } from "@/lib/auth";
-import { loadForecastInput } from "@/lib/forecast-data";
-import { runForecast, SCENARIOS, SCENARIO_LABEL, GRAN_HU, type Scenario, type FcMonth, type FcResult, type Granularity } from "@/lib/forecast";
+import { loadForecastInput, loadActualPeriods, firstEntryDate } from "@/lib/forecast-data";
+import { fiscalYearStart } from "@/lib/reports";
+import { addDaysIso } from "@/lib/dates";
+import { runForecast, applyScope, SCENARIOS, SCENARIO_LABEL, GRAN_HU, SCOPE_HU, type Scenario, type FcMonth, type FcResult, type Granularity, type Scope } from "@/lib/forecast";
 import { ForecastTabs, ScenarioSwitch, ScenarioChart } from "@/components/Forecast";
 import { Flash } from "@/components/Flash";
 import { fmtHuf } from "@/lib/money";
@@ -22,10 +24,10 @@ const ROWS: Row[] = [
   { label: "ELÁBÉ (könyv szerinti érték)", get: (m) => -m.cogs, total: "sum" },
   { label: "Bruttó fedezet", kind: "subtotal", get: (m) => m.grossMargin, total: "sum" },
   { label: "Autós költségek (azonnal elszámolt)", get: (m) => -m.vehicleCosts, total: "sum" },
-  { label: "Ismétlődő és egyszeri költségek", get: (m) => -m.fixedCosts, total: "sum" },
+  { label: "Egyéb költségek (tény: minden egyéb · terv: ismétlődő + egyszeri)", get: (m) => -m.fixedCosts, total: "sum" },
   { label: "Adózás előtti eredmény", kind: "total", get: (m) => m.preTax, total: "sum" },
   { label: "ÁFA", kind: "head" },
-  { label: "Különbözeti ÁFA (fizetendő)", get: (m) => m.marginVat, total: "sum" },
+  { label: "Fizetendő ÁFA (terv: különbözeti)", get: (m) => m.marginVat, total: "sum" },
   { label: "Levonható ÁFA", get: (m) => -m.inputVat, total: "sum" },
   { label: "ÁFA egyenleg", kind: "subtotal", get: (m) => m.vatBalance, total: "sum" },
   { label: "ÁFA befizetés", get: (m) => -m.vatPaid, total: "sum" },
@@ -51,7 +53,11 @@ function MonthTable({ r, gran }: { r: FcResult; gran: Granularity }) {
     <div className="table-wrap">
       <table className="statement">
         <thead>
-          <tr><th>{GRAN_HU[gran]} terv – {SCENARIO_LABEL[r.scenario].toLowerCase()} forgatókönyv (Ft)</th>{r.months.map((m) => <th key={m.month} className="num" title={`${m.start} – ${m.end}`}>{m.label}</th>)}<th className="num col-total">Összesen</th></tr>
+          <tr><th>{GRAN_HU[gran]} terv – {SCENARIO_LABEL[r.scenario].toLowerCase()} forgatókönyv (Ft)</th>{r.months.map((m) => (
+            <th key={m.month} className={`num k-${m.kind ?? "forecast"}`} title={`${m.start} – ${m.end}`}>
+              {m.label}{m.kind && m.kind !== "forecast" && <div className="kind-tag">{m.kind === "actual" ? "tény" : "tény + terv"}</div>}
+            </th>
+          ))}<th className="num col-total">Összesen</th></tr>
         </thead>
         <tbody>
           {ROWS.map((row) =>
@@ -60,7 +66,7 @@ function MonthTable({ r, gran }: { r: FcResult; gran: Granularity }) {
             ) : (
               <tr key={row.label} className={row.kind ? `k-${row.kind}` : undefined}>
                 <td className={row.indent ? "indent-1" : undefined}>{row.label}</td>
-                {r.months.map((m) => <td key={m.month} className="num">{row.count ? (row.get!(m) || <span className="muted">–</span>) : <Amount v={row.get!(m)} />}</td>)}
+                {r.months.map((m) => <td key={m.month} className={`num k-${m.kind ?? "forecast"}`}>{row.count ? (row.get!(m) || <span className="muted">–</span>) : <Amount v={row.get!(m)} />}</td>)}
                 <td className="num col-total">{row.count ? tot(row) : <Amount v={tot(row)} />}</td>
               </tr>
             ),
@@ -78,10 +84,20 @@ export default async function ForecastPage({ params, searchParams }: { params: P
   const view = sp.view === "compare" ? "compare" : "single";
   const sc: Scenario = (SCENARIOS as string[]).includes(sp.sc) ? (sp.sc as Scenario) : "base";
   const gran: Granularity = sp.gran === "week" || sp.gran === "quarter" ? sp.gran : "month";
+  const scope: Scope = sp.scope === "fy" || sp.scope === "ltd" ? sp.scope : "forecast";
   const input = await loadForecastInput(cid);
-  const results = Object.fromEntries(SCENARIOS.map((s) => [s, runForecast(input, s, gran)])) as Record<Scenario, FcResult>;
+  const raw = Object.fromEntries(SCENARIOS.map((s) => [s, runForecast(input, s, gran)])) as Record<Scenario, FcResult>;
+  // Hatókör: csak terv / teljes üzleti év (tény + terv) / kezdettől (tény + terv)
+  const asOf = input.opening.asOf;
+  const fyStart = fiscalYearStart(asOf, input.opening.fiscalYearStartMonth);
+  const fyEnd = addDaysIso(`${Number(fyStart.slice(0, 4)) + 1}${fyStart.slice(4)}`, -1);
+  const horizonEnd = raw.base.months[raw.base.months.length - 1].end;
+  const ltdFrom = (await firstEntryDate(cid)) ?? asOf;
+  const range = scope === "fy" ? { from: fyStart, to: fyEnd } : scope === "ltd" ? { from: ltdFrom, to: horizonEnd } : { from: asOf, to: horizonEnd };
+  const actual = scope === "forecast" ? [] : await loadActualPeriods(cid, range.from, asOf, gran);
+  const results = Object.fromEntries(SCENARIOS.map((s) => [s, applyScope(raw[s], actual, range)])) as Record<Scenario, FcResult>;
   const r = results[sc];
-  const link = (q: Record<string, string>) => `/c/${cid}/forecast?${new URLSearchParams({ sc, view, gran, ...q })}`;
+  const link = (q: Record<string, string>) => `/c/${cid}/forecast?${new URLSearchParams({ sc, view, gran, scope, ...q })}`;
   const curYear = r.years[0];
   const o = input.opening;
 
@@ -97,6 +113,11 @@ export default async function ForecastPage({ params, searchParams }: { params: P
           <div className="segmented no-print" role="tablist" aria-label="Bontás">
             {(["week", "month", "quarter"] as const).map((g) => (
               <Link key={g} href={link({ gran: g })} role="tab" aria-selected={g === gran} className={g === gran ? "on" : undefined}>{GRAN_HU[g]}</Link>
+            ))}
+          </div>
+          <div className="segmented no-print" role="tablist" aria-label="Időszak">
+            {(["forecast", "fy", "ltd"] as const).map((x) => (
+              <Link key={x} href={link({ scope: x })} role="tab" aria-selected={x === scope} className={x === scope ? "on" : undefined}>{SCOPE_HU[x]}</Link>
             ))}
           </div>
           <div className="segmented no-print">
@@ -115,9 +136,9 @@ export default async function ForecastPage({ params, searchParams }: { params: P
 
       {view === "single" && <>
       <div className="grid cols-4" style={{ marginBottom: 14 }}>
-        <div className="card stat primary"><div className="label">Adózás előtti eredmény (a tervezési időszakban)</div><div className="value">{fmtHuf(r.totals.preTax)}<small>Ft</small></div></div>
+        <div className="card stat primary"><div className="label">Adózás előtti eredmény ({scope === "forecast" ? "tervezési időszak" : scope === "fy" ? `${fyStart.slice(0, 4)}. üzleti év, tény + terv` : "kezdettől, tény + terv"})</div><div className="value">{fmtHuf(r.totals.preTax)}<small>Ft</small></div></div>
         <div className="card stat"><div className="label">Eladott autók · bruttó fedezet</div><div className="value">{r.totals.carsSold} db · {fmtHuf(r.totals.grossMargin)}<small>Ft</small></div></div>
-        <div className="card stat"><div className="label">Különbözeti ÁFA a tervben</div><div className="value">{fmtHuf(r.totals.marginVat)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">{scope === "forecast" ? "Különbözeti ÁFA a tervben" : "Fizetendő ÁFA (tény + terv)"}</div><div className="value">{fmtHuf(r.totals.marginVat)}<small>Ft</small></div></div>
         <div className="card stat"><div className="label">Legalacsonyabb pénzkészlet</div><div className={`value${r.totals.minTotal < 0 ? " neg" : ""}`}>{fmtHuf(r.totals.minTotal)}<small>Ft · {fmtDate(r.totals.minTotalDate)}</small></div></div>
       </div>
 
@@ -150,6 +171,7 @@ export default async function ForecastPage({ params, searchParams }: { params: P
         <ScenarioChart
           caption={`Pénztár + bank egyenlege ${gran === "week" ? "hetente" : gran === "month" ? "hó végén" : "negyedév végén"} (Ft)`}
           highlight={view === "single" ? sc : undefined}
+          splitIndex={scope === "forecast" ? undefined : r.months.findIndex((m) => m.kind !== "actual")}
           series={SCENARIOS.map((s) => ({ scenario: s, points: results[s].months.map((m) => ({ label: m.label, value: m.endCash + m.endBank, min: Math.min(m.minCash, m.minBank) })) }))}
         />
       </div>
@@ -164,8 +186,8 @@ export default async function ForecastPage({ params, searchParams }: { params: P
                   ["Eladott autók (db)", (x: FcResult) => x.totals.carsSold, true],
                   ["Nettó árbevétel", (x: FcResult) => x.totals.revenue],
                   ["Bruttó fedezet", (x: FcResult) => x.totals.grossMargin],
-                  ["Adózás előtti eredmény (horizont)", (x: FcResult) => x.totals.preTax],
-                  ["Különbözeti ÁFA", (x: FcResult) => x.totals.marginVat],
+                  ["Adózás előtti eredmény (kijelölt időszak)", (x: FcResult) => x.totals.preTax],
+                  ["Fizetendő ÁFA", (x: FcResult) => x.totals.marginVat],
                   [`${curYear?.year ?? ""}. évi eredmény (tény + terv)`, (x: FcResult) => x.years[0]?.preTax ?? 0],
                   [`${curYear?.year ?? ""}. évi TAO + HIPA`, (x: FcResult) => (x.years[0]?.tao ?? 0) + (x.years[0]?.hipa ?? 0)],
                   ["Záró pénztár + bank", (x: FcResult) => x.totals.endCash + x.totals.endBank],
