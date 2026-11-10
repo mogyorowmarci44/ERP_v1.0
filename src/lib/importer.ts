@@ -7,6 +7,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db";
 import { saveInvoiceDraft, postInvoice, payInvoice, manualEntry, invoiceOpenAmount, type InvoiceInput } from "./ledger";
 import { round2 } from "./money";
+import { getMnbRate } from "./fx-service";
 import type { DraftLine } from "./posting";
 
 type Acc = { code: string; name: string; type: string; currency?: string; reportLine?: string };
@@ -17,7 +18,9 @@ type BundleDoc =
       /** Opcionális: teljesítés / határidő / időszakos / deviza (alapból HUF, teljesítés = kelte). Devizánál MNB árfolyam, hacsak nincs exchangeRate+rateManual. */
       fulfillmentDate?: string; dueDate?: string | null; periodic?: boolean; currency?: string; exchangeRate?: number; rateManual?: boolean; note?: string }
   | { kind: "entry"; src: string; journal: string; date: string; ref: string; description: string;
-      lines: Array<{ account: string; debit: number; credit: number; partner?: string | null; vehicle?: string | null }> }
+      lines: Array<{ account: string; debit?: number | null; credit?: number | null; partner?: string | null; vehicle?: string | null;
+        /** Devizás sor: devizaösszeg; ha debit/credit nincs megadva, a forintérték MNB-árfolyamon (fxSide oldalra). */
+        amountFx?: number | null; fxCurrency?: string | null; fxSide?: "debit" | "credit" }> }
   | { kind: "sale_entry"; src: string; journal: string; date: string; ref: string; partner: string; description: string; gross: number; vat: number; cogs: number; cogsAccount: string }
   | { kind: "sale_payment"; src: string; date: string; ref: string; vehicle?: string | null; saleInvoice?: string | null; account: string; amount: number; partner?: string }
   | { kind: "cogs_ref"; src: string; ref: string; amount: number; vehicle?: string | null };
@@ -29,7 +32,9 @@ export type ImportBundle = {
   vatCodes?: Array<{ code: string; name: string; rate: number; kind: string }>;
   partners: Array<{ key: string; name: string; taxNumber?: string; isPrivatePerson?: boolean; country?: string }>;
   vehicles: Array<{ key: string; make: string; model: string; plate?: string | null; vin?: string | null; vatTreatment?: "margin" | "normal";
-    purchaseDate?: string | null; purchasePrice?: number | null; note?: string }>;
+    purchaseDate?: string | null; purchasePrice?: number | null; note?: string;
+    /** Devizás beszerzési ár (különbözeti adóalaphoz): forintra MNB-árfolyamon a megadott napon. */
+    purchasePriceFx?: { currency: string; amount: number; date: string } | null }>;
   documents: BundleDoc[];
   memberLoanTerms?: Array<{ date: string; amount: number; partner: string; dueDate: string; ref?: string | null; note?: string | null }>;
   log?: string[][];
@@ -92,6 +97,10 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
     const partnerId = (key?: string | null) => (key ? partnerIds.get(key) ?? null : null);
     const vehicleIds = new Map<string, number>();
     for (const v of bundle.vehicles) {
+      if (v.purchasePriceFx && (v.purchasePrice === null || v.purchasePrice === undefined)) {
+        const r = await getMnbRate(v.purchasePriceFx.currency, v.purchasePriceFx.date, tx);
+        v.purchasePrice = round2(v.purchasePriceFx.amount * r.rate);
+      }
       const [ins] = await tx
         .insert(schema.vehicles)
         .values({ companyId, make: v.make, model: v.model, plate: v.plate ?? null, vin: v.vin ?? null, vatTreatment: v.vatTreatment ?? "margin",
@@ -177,9 +186,19 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
             }
           }
         } else if (d.kind === "entry") {
-          const lines: DraftLine[] = d.lines
+          const resolved = [];
+          for (const l of d.lines) {
+            let debit = l.debit ?? 0, credit = l.credit ?? 0;
+            if (l.amountFx && l.fxCurrency && l.debit == null && l.credit == null) {
+              const r = await getMnbRate(l.fxCurrency, d.date, tx);
+              const huf = round2(l.amountFx * r.rate);
+              if (l.fxSide === "credit") credit = huf; else debit = huf;
+            }
+            resolved.push({ ...l, debit, credit });
+          }
+          const lines: DraftLine[] = resolved
             .filter((l) => Math.abs(l.debit) > 0.004 || Math.abs(l.credit) > 0.004)
-            .map((l) => ({ accountId: accId(l.account), debit: round2(l.debit), credit: round2(l.credit), partnerId: partnerId(l.partner), vehicleId: vehicleId(l.vehicle) }));
+            .map((l) => ({ accountId: accId(l.account), debit: round2(l.debit), credit: round2(l.credit), partnerId: partnerId(l.partner), vehicleId: vehicleId(l.vehicle), amountFx: l.amountFx ?? null }));
           if (lines.length < 2) continue;
           const loanAcc = accRows.find((a) => a.code === "4791")?.id;
           const isLoan = loanAcc !== undefined && lines.some((l) => l.accountId === loanAcc);
