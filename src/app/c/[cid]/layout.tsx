@@ -20,6 +20,7 @@ import {
   Upload,
   Wallet,
   HandCoins,
+  TrendingUp,
 } from "lucide-react";
 import { requireCompany } from "@/lib/auth";
 import { logoutAction } from "@/app/auth-actions";
@@ -62,6 +63,9 @@ export default async function CompanyLayout({ children, params }: { children: Re
         <div className="group">Pénzügy</div>
         <NavLink href={`${b}/money`}><Wallet />Pénztár és bank</NavLink>
         <NavLink href={`${b}/member-loans`}><HandCoins />Tagi kölcsön</NavLink>
+
+        <div className="group">Tervezés</div>
+        <NavLink href={`${b}/forecast`}><TrendingUp />Forecast (3 forgatókönyv)</NavLink>
 
         <div className="group">Kimutatások</div>
         <NavLink href={`${b}/reports/statements`}><ChartNoAxesCombined />P&amp;L, cash-flow, mérleg</NavLink>

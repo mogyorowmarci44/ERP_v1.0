@@ -379,3 +379,103 @@ export const memberLoanTerms = pgTable("member_loan_terms", {
   note: text("note"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------------------------------------------------------------------------
+// Tervezés (forecast)
+// ---------------------------------------------------------------------------
+
+/** Forgatókönyv-paraméterek: az alap a felhasználó inputja, a rosszabb / jobb ebből számolódik. */
+export type ForecastScenarioParams = {
+  /** Eladási ár módosítás (pl. −0.05 = −5%). */
+  priceAdj: number;
+  /** Eladás csúszása napokban (+ később, − korábban). */
+  dateShiftDays: number;
+  /** Autóhoz kötött tervezett költségek módosítása. */
+  vehicleCostAdj: number;
+  /** Ismétlődő / egyszeri költségek módosítása. */
+  fixedCostAdj: number;
+};
+export type ForecastSettings = {
+  pessimistic: ForecastScenarioParams;
+  optimistic: ForecastScenarioParams;
+  /** Tervezési horizont hónapokban (a folyó hónappal együtt). */
+  horizonMonths: number;
+  /** Helyi iparűzési adó mértéke (pl. 0.02). */
+  hipaRate: number;
+  /** Társasági adó mértéke. */
+  taoRate: number;
+  /** Honnan jöttek a forgatókönyv-paraméterek. */
+  calibratedFrom?: string | null;
+};
+
+export const forecastSettings = pgTable("forecast_settings", {
+  companyId: integer("company_id").primaryKey().references(() => companies.id, { onDelete: "cascade" }),
+  settings: jsonb("settings").$type<ForecastSettings>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Gépkocsi eladási terv – meglévő készletre (vehicleId) vagy tervezett beszerzésre (vehicleId nélkül). */
+export const forecastPlans = pgTable(
+  "forecast_plans",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+    label: varchar("label", { length: 128 }),
+    /** Tervezett beszerzés (csak vehicleId nélkül): bruttó vételár = különbözeti ÁFA alapja. */
+    purchaseDate: date("purchase_date"),
+    purchasePrice: money("purchase_price"),
+    purchasePayment: varchar("purchase_payment", { length: 8 }).notNull().default("cash"),
+    /** Tervezett eladás (bruttó, különbözeti ÁFA-val). */
+    salePrice: money("sale_price"),
+    saleDate: date("sale_date"),
+    salePayment: varchar("sale_payment", { length: 8 }).notNull().default("bank"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("forecast_plans_company").on(t.companyId), uniqueIndex("forecast_plans_vehicle").on(t.vehicleId)],
+);
+
+/** Autóhoz kötött tervezett költség (javítás, fényezés, honosítás, fuvar …). */
+export const forecastPlanCosts = pgTable(
+  "forecast_plan_costs",
+  {
+    id: serial("id").primaryKey(),
+    planId: integer("plan_id").notNull().references(() => forecastPlans.id, { onDelete: "cascade" }),
+    description: varchar("description", { length: 200 }).notNull(),
+    date: date("date"),
+    net: money("net").notNull(),
+    vatRate: integer("vat_rate").notNull().default(27),
+    deductible: boolean("deductible").notNull().default(true),
+    /** true: a gépkocsi bekerülési értékét növeli (ELÁBÉ-ként jelenik meg eladáskor); false: azonnal költség. */
+    capitalize: boolean("capitalize").notNull().default(true),
+    payment: varchar("payment", { length: 8 }).notNull().default("cash"),
+  },
+  (t) => [index("forecast_plan_costs_plan").on(t.planId)],
+);
+
+/** Ismétlődő és egyszeri tervtételek (költség, eszköz, tagi kölcsön, tőke, osztalék …). */
+export const forecastItems = pgTable(
+  "forecast_items",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    /** expense | asset | loan_in | loan_out | capital_in | dividend | other_in | other_out */
+    category: varchar("category", { length: 16 }).notNull().default("expense"),
+    description: varchar("description", { length: 200 }).notNull(),
+    accountCode: varchar("account_code", { length: 10 }),
+    partnerName: varchar("partner_name", { length: 200 }),
+    net: money("net").notNull(),
+    vatRate: integer("vat_rate").notNull().default(0),
+    deductible: boolean("deductible").notNull().default(true),
+    /** once | monthly | quarterly | yearly */
+    frequency: varchar("frequency", { length: 10 }).notNull().default("monthly"),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    payment: varchar("payment", { length: 8 }).notNull().default("bank"),
+    source: varchar("source", { length: 10 }).notNull().default("manual"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("forecast_items_company").on(t.companyId)],
+);

@@ -325,3 +325,30 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .ml-last.neg { fill: var(--neg); }
 .badge.overdue { background: color-mix(in srgb, var(--neg) 12%, transparent); color: var(--neg); border-color: transparent; }
 .badge.soon { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); border-color: transparent; }
+
+/* Tervezés (forecast) */
+.viz-sc { --sc-base: #2a78d6; --sc-pessimistic: #eb6834; --sc-optimistic: #1baf7a; }
+[data-mode="dark"] .viz-sc { --sc-base: #3987e5; --sc-pessimistic: #d95926; --sc-optimistic: #199e70; }
+.sc-base { --sc: var(--sc-base); }
+.sc-pessimistic { --sc: var(--sc-pessimistic); }
+.sc-optimistic { --sc: var(--sc-optimistic); }
+.sc-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--sc); margin-right: 7px; vertical-align: 1px; }
+.sc-line { fill: none; stroke: var(--sc); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.sc-grid { stroke: var(--line); stroke-width: 1; }
+.sc-cross { stroke: var(--muted); stroke-width: 1; opacity: 0; }
+.sc-hover:hover .sc-cross { opacity: 0.5; }
+.sc-end { font-size: 12px; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.sc-chart { margin: 0; }
+.sc-chart figcaption { font-size: 13px; margin-bottom: 4px; }
+.sc-legend { display: flex; gap: 16px; font-size: 13px; color: var(--ink); margin-bottom: 6px; }
+.fc-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; }
+.fc-warn { border-left: 3px solid var(--warn); }
+.fc-warn ul { margin: 6px 0 0; padding-left: 18px; }
+table.fc-plan td { vertical-align: top; }
+table.fc-plan input, table.fc-plan select { min-width: 0; }
+.fc-costs { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.fc-costs li { display: flex; gap: 8px; align-items: center; }
+details.fc-more summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+table.statement tr.k-head td { font-weight: 600; color: var(--muted); background: var(--surface-2); text-transform: uppercase; font-size: 12px; letter-spacing: 0.04em; }
+button.link { background: none; border: none; padding: 0; color: var(--accent); font-size: 13px; cursor: pointer; box-shadow: none; }
+button.link:hover { text-decoration: underline; }
