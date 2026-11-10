@@ -21,6 +21,7 @@ import {
   Wallet,
   HandCoins,
   TrendingUp,
+  Inbox,
 } from "lucide-react";
 import { requireCompany } from "@/lib/auth";
 import { logoutAction } from "@/app/auth-actions";
@@ -54,6 +55,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
         <NavLink href={b} exact><LayoutDashboard />Áttekintés</NavLink>
 
         <div className="group">Bizonylatok</div>
+        <NavLink href={`${b}/inbox`}><Inbox />Beérkező bizonylatok</NavLink>
         <NavLink href={`${b}/invoices?dir=out`} exact><FileOutput />Vevőszámlák</NavLink>
         <NavLink href={`${b}/invoices?dir=in`} exact><FileInput />Szállítói számlák</NavLink>
         <NavLink href={`${b}/invoices/new?dir=out`} exact><FilePlus2 />Új vevőszámla</NavLink>

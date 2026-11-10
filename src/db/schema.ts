@@ -493,3 +493,110 @@ export const invoiceChecks = pgTable("invoice_checks", {
   docUrl: text("doc_url"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------------------------------------------------------------------------
+// Beérkező bizonylatok (Gmail / Drive / feltöltés) – „Beolvasás és könyvelés”
+// ---------------------------------------------------------------------------
+
+/** Forrás-beállítások cégenként: a Google-fiókban futó Apps Script web app címe és titkos kulcsa (titkosítva). */
+export type InboxSettings = {
+  scriptUrl?: string | null;
+  /** AES-GCM-mel titkosított kulcs (base64). */
+  secretEnc?: string | null;
+  gmailQuery?: string | null;
+  invoiceFolderId?: string | null;
+  statementFolderId?: string | null;
+  /** Ennél régebbi leveleket / fájlokat nem kér le (YYYY-MM-DD). */
+  since?: string | null;
+  /** Automatikus könyvelés, ha minden ellenőrzés rendben (különben minden a jóváhagyási listába kerül). */
+  autoPost?: boolean;
+};
+
+export const inboxSettings = pgTable("inbox_settings", {
+  companyId: integer("company_id").primaryKey().references(() => companies.id, { onDelete: "cascade" }),
+  settings: jsonb("settings").$type<InboxSettings>().notNull(),
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Kiolvasott bizonylat-adat (a Claude API vagy kézi javítás eredménye). */
+export type ExtractedDoc = {
+  docType: "invoice" | "credit_note" | "receipt" | "sale_contract" | "bank_statement" | "proforma" | "other";
+  direction?: "in" | "out" | null;
+  seller?: { name?: string | null; taxNumber?: string | null; euVat?: string | null; address?: string | null; privatePerson?: boolean | null } | null;
+  buyer?: { name?: string | null; taxNumber?: string | null; euVat?: string | null; address?: string | null; privatePerson?: boolean | null } | null;
+  invoiceNumber?: string | null;
+  issueDate?: string | null;
+  fulfillmentDate?: string | null;
+  dueDate?: string | null;
+  paymentMethod?: "cash" | "transfer" | "card" | null;
+  paid?: boolean | null;
+  currency?: string | null;
+  periodic?: boolean | null;
+  lines?: Array<{ description: string; quantity?: number | null; unitNet?: number | null; net: number; vatRate?: number | null; vatType?: string | null; vat?: number | null; gross?: number | null }>;
+  totals?: { net?: number | null; vat?: number | null; gross?: number | null } | null;
+  vehicle?: { make?: string | null; model?: string | null; plate?: string | null; vin?: string | null; year?: number | null; km?: number | null } | null;
+  /** Hivatkozott eredeti számla (sztornó / helyesbítő). */
+  refInvoiceNumber?: string | null;
+  statement?: {
+    accountNumber?: string | null; currency?: string | null; number?: string | null; periodFrom?: string | null; periodTo?: string | null;
+    opening?: number | null; closing?: number | null;
+    transactions: Array<{ date: string; valueDate?: string | null; amount: number; counterparty?: string | null; counterpartyAccount?: string | null; description?: string | null; reference?: string | null; fxAmount?: number | null; fxCurrency?: string | null }>;
+  } | null;
+  confidence?: number | null;
+  notes?: string | null;
+};
+
+/** Könyvelési javaslat (amit a rendszer a kiolvasott adatból és a korábbi könyvelésekből összerakott). */
+export type InboxProposal = {
+  kind: "invoice" | "statement" | "none";
+  invoice?: {
+    direction: "in" | "out";
+    partner: { id?: number | null; name: string; taxNumber?: string | null; privatePerson: boolean; country?: string | null };
+    invoiceNumber: string; issueDate: string; fulfillmentDate: string; dueDate?: string | null;
+    paymentMethod: "cash" | "transfer" | "card"; currency: string; periodic: boolean;
+    lines: Array<{ description: string; quantity: number; unitPrice: number; accountCode: string; vatCode: string; vehicleId?: number | null; newVehicle?: boolean }>;
+    payNow?: { date: string; accountCode: string } | null;
+    vehicle?: { id?: number | null; make: string; model: string; plate?: string | null; vin?: string | null } | null;
+  } | null;
+  statement?: {
+    moneyAccountCode: string;
+    rows: Array<{ idx: number; date: string; amount: number; text: string; action: "pay_invoice" | "entry" | "transfer" | "skip" | "review"; invoiceId?: number | null; invoiceLabel?: string | null; accountCode?: string | null; done?: boolean; reason?: string | null }>;
+  } | null;
+  /** Ami miatt nem könyvelhető automatikusan. */
+  issues: string[];
+  /** Honnan jött a szabály (pl. „a partner 3 korábbi számlája alapján”). */
+  basis?: string | null;
+};
+
+export const inboxDocuments = pgTable(
+  "inbox_documents",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    /** gmail | drive | upload */
+    source: varchar("source", { length: 10 }).notNull(),
+    /** Forrásbeli azonosító (pl. Gmail üzenet + csatolmány, Drive fájl) – duplikáció ellen. */
+    sourceRef: varchar("source_ref", { length: 200 }).notNull(),
+    /** Hivatkozás az eredetire (Gmail / Drive link). */
+    sourceUrl: text("source_url"),
+    kind: varchar("kind", { length: 12 }).notNull().default("invoice"), // invoice | statement
+    filename: varchar("filename", { length: 255 }).notNull(),
+    mime: varchar("mime", { length: 100 }).notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    /** A fájl base64-ben (a Neon ingyenes keretén belül; a bizonylatok jellemzően 50–500 kB). */
+    data: text("data").notNull(),
+    emailFrom: varchar("email_from", { length: 255 }),
+    emailSubject: text("email_subject"),
+    emailDate: timestamp("email_date", { withTimezone: true }),
+    /** new | extracted | review | booked | duplicate | ignored | error */
+    status: varchar("status", { length: 12 }).notNull().default("new"),
+    extracted: jsonb("extracted").$type<ExtractedDoc>(),
+    proposal: jsonb("proposal").$type<InboxProposal>(),
+    invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("inbox_documents_ref").on(t.companyId, t.sourceRef), index("inbox_documents_status").on(t.companyId, t.status), index("inbox_documents_sha").on(t.companyId, t.sha256)],
+);

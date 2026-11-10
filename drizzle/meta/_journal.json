@@ -50,6 +50,13 @@
       "when": 1794300645409,
       "tag": "0006_invoice_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794318184275,
+      "tag": "0007_inbox",
+      "breakpoints": true
     }
   ]
 }
