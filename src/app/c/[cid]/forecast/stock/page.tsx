@@ -63,7 +63,7 @@ export default async function ForecastStockPage({ params, searchParams }: { para
 
   return (
     <div className="viz-sc">
-      <h1>Tervezés</h1>
+      <h1>Forecast</h1>
       <ForecastTabs cid={cid} active="stock" />
       <Flash error={sp.error} ok={sp.ok} />
 

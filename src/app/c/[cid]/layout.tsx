@@ -65,7 +65,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
         <NavLink href={`${b}/member-loans`}><HandCoins />Tagi kölcsön</NavLink>
 
         <div className="group">Tervezés</div>
-        <NavLink href={`${b}/forecast`}><TrendingUp />Forecast (3 forgatókönyv)</NavLink>
+        <NavLink href={`${b}/forecast`}><TrendingUp />Forecast</NavLink>
 
         <div className="group">Kimutatások</div>
         <NavLink href={`${b}/reports/statements`}><ChartNoAxesCombined />P&amp;L, cash-flow, mérleg</NavLink>

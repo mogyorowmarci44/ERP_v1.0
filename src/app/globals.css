@@ -413,3 +413,4 @@ button.chk:hover { border-color: var(--accent); }
   .mc-sheet a { color: inherit; }
 }
 .nowrap { white-space: nowrap; }
+.sc-line.dim { opacity: 0.35; stroke-width: 1.5; }

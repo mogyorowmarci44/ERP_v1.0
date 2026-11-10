@@ -89,6 +89,23 @@ describe("forecast – nyitott tételek", () => {
   });
 });
 
+describe("forecast – heti / havi / negyedéves bontás", () => {
+  it("az összesítések bontástól függetlenek, a kulcsok helyesek", () => {
+    const items: FcItem[] = [{ id: 1, category: "expense", description: "Könyvelés", net: 50_000, vatRate: 27, deductible: true, frequency: "monthly", startDate: "2026-11-15", payment: "bank" }];
+    const inp = { opening, plans: [stockPlan], items, settings };
+    const m = runForecast(inp, "base", "month"), w = runForecast(inp, "base", "week"), q = runForecast(inp, "base", "quarter");
+    for (const r of [w, q]) {
+      expect(r.totals.preTax).toBe(m.totals.preTax);
+      expect(r.totals.endBank).toBe(m.totals.endBank);
+      expect(r.totals.minTotal).toBe(m.totals.minTotal);
+    }
+    expect(q.months[0].month).toBe("2026-Q4");
+    expect(q.months.length).toBe(5); // 2026 Q4 … 2027 Q4 (a horizont okt. végéig tart)
+    expect(w.months[0].month).toBe("2026-11-09"); // a 2026.11.10-i hét hétfője
+    expect(w.months.find((x) => x.carsSold === 1)!.month).toBe("2026-11-30"); // 12.05. eladás → a nov. 30-i héten
+  });
+});
+
 describe("forecast – segédek", () => {
   it("ÁFA esedékesség", () => {
     expect(vatDueDate("2026-11-10", "monthly")).toBe("2026-12-20");

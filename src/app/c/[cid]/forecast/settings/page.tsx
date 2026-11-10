@@ -24,7 +24,7 @@ export default async function ForecastSettingsPage({ params, searchParams }: { p
 
   return (
     <div className="viz-sc">
-      <h1>Tervezés</h1>
+      <h1>Forecast</h1>
       <ForecastTabs cid={cid} active="settings" />
       <Flash error={sp.error} ok={sp.ok} />
 

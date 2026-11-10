@@ -33,7 +33,7 @@ export function ScenarioSwitch({ href, active }: { href: (sc: Scenario) => strin
 }
 
 /** Pénzeszközök (pénztár + bank) hó végi egyenlege a három forgatókönyvben: vonalak, közvetlen címkék, hover tooltip. */
-export function ScenarioChart({ series }: { series: Array<{ scenario: Scenario; points: Array<{ label: string; value: number; min: number }> }> }) {
+export function ScenarioChart({ series, caption = "Pénztár + bank időszak végi egyenlege (Ft)", highlight }: { series: Array<{ scenario: Scenario; points: Array<{ label: string; value: number; min: number }> }>; caption?: string; highlight?: Scenario }) {
   const W = 760, H = 230, L = 64, R = 96, T = 14, B = 26;
   const all = series.flatMap((s) => s.points.flatMap((p) => [p.value, p.min]));
   if (!all.length) return null;
@@ -53,7 +53,7 @@ export function ScenarioChart({ series }: { series: Array<{ scenario: Scenario; 
   for (let i = 1; i < ends.length; i++) if (ends[i].yy - ends[i - 1].yy < 14) ends[i].yy = ends[i - 1].yy + 14;
   return (
     <figure className="sc-chart">
-      <figcaption className="muted">Pénztár + bank hó végi egyenlege (Ft)</figcaption>
+      <figcaption className="muted">{caption}</figcaption>
       <div className="sc-legend">
         {series.map((s) => <span key={s.scenario} className={`sc-${s.scenario}`}><span className="sc-dot" aria-hidden />{SCENARIO_LABEL[s.scenario]}</span>)}
       </div>
@@ -65,7 +65,7 @@ export function ScenarioChart({ series }: { series: Array<{ scenario: Scenario; 
           </g>
         ))}
         {series.map((s) => (
-          <path key={s.scenario} className={`sc-line sc-${s.scenario}`} d={s.points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ")} />
+          <path key={s.scenario} className={`sc-line sc-${s.scenario}${highlight && highlight !== s.scenario ? " dim" : ""}`} d={s.points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ")} />
         ))}
         {series.map((s) => s.points.map((p, i) => p.min < 0 && <circle key={`${s.scenario}${i}`} cx={x(i)} cy={y(p.value)} r={4} className="ml-neg" />))}
         {series[0].points.map((p, i) => (

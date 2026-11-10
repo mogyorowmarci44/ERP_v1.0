@@ -129,8 +129,49 @@ export function vatDueDate(date: string, period: FcOpening["vatPeriod"]): string
 // Kimenet
 // ---------------------------------------------------------------------------
 
+export type Granularity = "week" | "month" | "quarter";
+export const GRAN_HU: Record<Granularity, string> = { week: "Heti", month: "Havi", quarter: "Negyedéves" };
+const MONTHS_HU = ["jan.", "febr.", "márc.", "ápr.", "máj.", "jún.", "júl.", "aug.", "szept.", "okt.", "nov.", "dec."];
+
+/** Időszak kulcs (lexikografikusan rendezhető): hét = hétfő dátuma, hónap = ÉÉÉÉ-HH, negyedév = ÉÉÉÉ-Qn. */
+export function periodKey(d: string, g: Granularity): string {
+  if (g === "month") return d.slice(0, 7);
+  if (g === "quarter") return `${d.slice(0, 4)}-Q${Math.ceil(Number(d.slice(5, 7)) / 3)}`;
+  const t = new Date(d + "T00:00:00Z");
+  const dow = (t.getUTCDay() + 6) % 7; // hétfő = 0
+  return addDays(d, -dow);
+}
+/** Időszakok a kezdőnaptól a horizont végéig. */
+export function periodList(from: string, to: string, g: Granularity): Array<{ key: string; start: string; end: string; label: string }> {
+  const out: Array<{ key: string; start: string; end: string; label: string }> = [];
+  if (g === "week") {
+    let prevYear = "";
+    for (let st = periodKey(from, "week"); st <= to; st = addDays(st, 7)) {
+      const en = addDays(st, 6);
+      const y = st.slice(0, 4);
+      // az évet az első héten és évváltáskor írjuk ki
+      out.push({ key: st, start: st, end: en, label: `${y !== prevYear ? `${y}. ` : ""}${MONTHS_HU[Number(st.slice(5, 7)) - 1]} ${Number(st.slice(8))}.` });
+      prevYear = y;
+    }
+  } else if (g === "month") {
+    for (let m = from.slice(0, 7); m <= to.slice(0, 7); m = addMonths(m, 1))
+      out.push({ key: m, start: `${m}-01`, end: lastDay(m), label: `${m.slice(0, 4)}. ${MONTHS_HU[Number(m.slice(5)) - 1].replace(".", "")}` });
+  } else {
+    const q0 = Math.ceil(Number(from.slice(5, 7)) / 3);
+    for (let m = `${from.slice(0, 4)}-${String(q0 * 3 - 2).padStart(2, "0")}`; m <= to.slice(0, 7); m = addMonths(m, 3)) {
+      const q = Math.ceil(Number(m.slice(5)) / 3);
+      out.push({ key: `${m.slice(0, 4)}-Q${q}`, start: `${m}-01`, end: lastDay(addMonths(m, 2)), label: `${m.slice(0, 4)}. Q${q}` });
+    }
+  }
+  return out;
+}
+
 export type FcMonth = {
+  /** Időszak kulcs (havi bontásnál ÉÉÉÉ-HH). */
   month: string;
+  label: string;
+  start: string;
+  end: string;
   revenue: number; // nettó árbevétel (különbözeti ÁFA nélkül)
   cogs: number; // ELÁBÉ
   grossMargin: number;
@@ -182,18 +223,21 @@ type Ev = { date: string; channel: Channel | null; amount: number; kind: "sale" 
 export function runForecast(
   input: { opening: FcOpening; plans: FcPlan[]; items: FcItem[]; settings: ForecastSettings },
   scenario: Scenario,
+  gran: Granularity = "month",
 ): FcResult {
   const { opening, settings } = input;
   const p = scenarioParams(settings, scenario);
-  const start = ym(opening.asOf);
-  const months = Array.from({ length: settings.horizonMonths }, (_, i) => addMonths(start, i));
-  const horizonEnd = lastDay(months[months.length - 1]);
+  const horizonEnd = lastDay(addMonths(ym(opening.asOf), settings.horizonMonths - 1));
+  const periods = periodList(opening.asOf, horizonEnd, gran);
+  const months = periods.map((x) => x.key);
+  const start = months[0];
+  const kOf = (d: string) => periodKey(d, gran);
   const warnings: string[] = [];
   const M = new Map<string, FcMonth>();
-  for (const m of months)
-    M.set(m, { month: m, revenue: 0, cogs: 0, grossMargin: 0, vehicleCosts: 0, fixedCosts: 0, preTax: 0, salesGross: 0, carsSold: 0, marginVat: 0, inputVat: 0,
+  for (const per of periods)
+    M.set(per.key, { month: per.key, label: per.end > horizonEnd ? `${per.label}*` : per.label, start: per.start, end: per.end, revenue: 0, cogs: 0, grossMargin: 0, vehicleCosts: 0, fixedCosts: 0, preTax: 0, salesGross: 0, carsSold: 0, marginVat: 0, inputVat: 0,
       vatBalance: 0, vatPaid: 0, taxPaid: 0, cashIn: 0, cashOut: 0, endCash: 0, endBank: 0, minCash: 0, minBank: 0, minCashDate: "", minBankDate: "" });
-  const bucket = (d: string) => M.get(ym(d < opening.asOf ? opening.asOf : d));
+  const bucket = (d: string) => M.get(kOf(d < opening.asOf ? opening.asOf : d));
   const events: Ev[] = [];
   const atLeastToday = (d: string) => (d < opening.asOf ? opening.asOf : d);
   // ÁFA időszakok: (esedékesség) → egyenleg
@@ -350,11 +394,12 @@ export function runForecast(
   let minTotal = cash + bank;
   let minTotalDate = opening.asOf;
   let ei = 0;
+  let prevCashNeg = opening.cash < 0, prevBankNeg = opening.bank < 0;
   for (const m of months) {
     const b = M.get(m)!;
     b.minCash = cash; b.minBank = bank;
-    b.minCashDate = b.minBankDate = m === start ? opening.asOf : `${m}-01`;
-    for (; ei < events.length && ym(events[ei].date) <= m; ei++) {
+    b.minCashDate = b.minBankDate = m === start ? opening.asOf : b.start;
+    for (; ei < events.length && kOf(events[ei].date) <= m; ei++) {
       const e = events[ei];
       if (e.channel === "cash") cash += e.amount;
       else bank += e.amount;
@@ -370,8 +415,10 @@ export function runForecast(
     b.grossMargin = b.revenue - b.cogs;
     b.preTax = b.grossMargin - b.vehicleCosts - b.fixedCosts;
     b.vatBalance = b.marginVat - b.inputVat;
-    if (b.minCash < 0) warnings.push(`${m}: a pénztár mínuszba megy (${fmt(b.minCash)} Ft, ${b.minCashDate})`);
-    if (b.minBank < 0) warnings.push(`${m}: a bankszámla mínuszba megy (${fmt(b.minBank)} Ft, ${b.minBankDate})`);
+    // csak az új mínuszba fordulást jelezzük (folyamatos mínusznál nem minden időszakban)
+    if (b.minCash < 0 && !prevCashNeg) warnings.push(`${b.label.replace("*", "")}: a pénztár mínuszba megy (${fmt(b.minCash)} Ft, ${b.minCashDate})${b.endCash < 0 ? " és az időszak végén is mínuszban marad" : ""}`);
+    if (b.minBank < 0 && !prevBankNeg) warnings.push(`${b.label.replace("*", "")}: a bankszámla mínuszba megy (${fmt(b.minBank)} Ft, ${b.minBankDate})${b.endBank < 0 ? " és az időszak végén is mínuszban marad" : ""}`);
+    prevCashNeg = b.endCash < 0; prevBankNeg = b.endBank < 0;
   }
   for (const s of sales) if (!s.inHorizon) warnings.push(`${s.label}: a tervezett eladás (${s.saleDate}) a tervezési horizonton túl van`);
 
