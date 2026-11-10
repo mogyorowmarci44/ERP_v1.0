@@ -461,7 +461,7 @@ export async function postInvoice(companyId: number, invoiceId: number, userId?:
       const soldIds = lines.filter((l) => l.vehicleId).map((l) => l.vehicleId!);
       if (soldIds.length) {
         const sold = await tx.select().from(vehicles).where(and(inArray(vehicles.id, soldIds), eq(vehicles.status, "sold")));
-        if (sold.length) throw new Error(`A gépkocsi már el van adva: ${sold.map((v) => `${v.make} ${v.model} ${v.plate ?? ""}`).join(", ")}`);
+        if (sold.length) throw new Error(`A gépkocsi már el van adva: ${sold.map((v) => `${v.make} ${v.model} ${v.plate || v.vin || ""}`).join(", ")}`);
       }
     }
 

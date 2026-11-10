@@ -7,6 +7,7 @@ import { invoiceOpenAmount } from "@/lib/ledger";
 import { invoicePayments } from "@/lib/reports";
 import { postInvoiceAction, cancelInvoiceAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction } from "../../actions";
 import { invoiceAudit } from "@/lib/invoice-audit";
+import { vehicleIdent, vehicleTitle } from "@/lib/vehicle-id";
 import { PaymentForm } from "@/components/PaymentForm";
 import { Flash } from "@/components/Flash";
 import { fmtHuf, fmtMoney } from "@/lib/money";
@@ -69,7 +70,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         <div className="row no-print">
           <Link className="btn" href={`/c/${cid}/invoices?dir=${inv.direction}`}>← Lista</Link>
           {[...new Set(lines.filter((x) => x.vat.kind === "margin" && x.veh).map((x) => x.veh!.id))].map((vid) => (
-            <Link key={vid} className="btn" href={`/c/${cid}/vehicles/${vid}/karton`}>Különbözeti ÁFA karton{lines.filter((x) => x.veh).length > 1 ? ` (${lines.find((x) => x.veh?.id === vid)?.veh?.plate ?? vid})` : ""}</Link>
+            <Link key={vid} className="btn" href={`/c/${cid}/vehicles/${vid}/karton`}>Különbözeti ÁFA karton{lines.filter((x) => x.veh).length > 1 ? ` (${vehicleIdent(lines.find((x) => x.veh?.id === vid)!.veh!) || vid})` : ""}</Link>
           ))}
           {canWrite && inv.status === "draft" && (
             <>
@@ -149,7 +150,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
             <tr key={l.id}>
               <td>{l.position}</td>
               <td>{l.description}{l.marginPurchaseHuf !== null && <div className="muted" style={{ fontSize: 12 }}>beszerzési ár (különbözeti alap): {fmtHuf(l.marginPurchaseHuf)} Ft · árrés: {fmtHuf(Number(l.grossHuf) - Number(l.marginPurchaseHuf))} Ft</div>}</td>
-              <td>{veh ? `${veh.make} ${veh.model} ${veh.plate ?? ""}` : ""}</td>
+              <td>{veh ? vehicleTitle(veh) : ""}</td>
               <td className="num">{l.quantity}</td>
               <td className="num">{fmtMoney(l.unitPrice, inv.currency)}</td>
               <td>{vat.code}</td>

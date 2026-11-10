@@ -55,7 +55,7 @@ export async function invoiceAudit(companyId: number, opts: { from?: string; to?
   const out: AuditInvoice[] = head.map((h) => {
     const lines: AuditLine[] = lineRows.filter((r) => r.l.invoiceId === h.inv.id).map((r) => ({
       position: r.l.position, description: r.l.description, accountCode: r.code, accountName: r.aName, vatCode: r.vCode, vatKind: r.vKind, vatRate: Number(r.vRate),
-      vehicle: r.make ? `${r.make} ${r.model}${r.plate ? ` ${r.plate}` : ""}${r.vin ? ` (${r.vin})` : ""}` : null, vehicleId: r.l.vehicleId,
+      vehicle: r.make ? `${r.make} ${r.model}${r.plate || r.vin ? ` ${r.plate || r.vin}` : ""}` : null, vehicleVin: r.vin ?? null, vehicleId: r.l.vehicleId,
       quantity: Number(r.l.quantity), unitPrice: Number(r.l.unitPrice), netHuf: Number(r.l.netHuf), vatHuf: Number(r.l.vatHuf), grossHuf: Number(r.l.grossHuf),
       marginPurchaseHuf: r.l.marginPurchaseHuf === null ? null : Number(r.l.marginPurchaseHuf),
     }));

@@ -139,7 +139,8 @@ export async function buildInvoiceWorkbook(companyId: number, opts: { from: stri
     const chk = a.check.checked ? `✓ ${a.check.by ?? ""} ${a.check.at ? a.check.at.toISOString().slice(0, 10) : ""}` : a.check.stale ? "módosult" : "";
     const lines = a.lines.length ? a.lines : [null];
     lines.forEach((l, li) => {
-      const [veh, vin] = (l?.vehicle ?? "").split(" (");
+      const veh = l?.vehicle ?? "";
+      const vin = l?.vehicleVin ?? "";
       const row = ws2.addRow({
         dir: a.inv.direction === "in" ? "Sz" : "V", num: a.inv.invoiceNumber, partner: a.partnerName,
         ful: d(a.inv.fulfillmentDate), due: d(a.inv.dueDate), pm: PAY[a.inv.paymentMethod] ?? a.inv.paymentMethod,
@@ -147,7 +148,7 @@ export async function buildInvoiceWorkbook(companyId: number, opts: { from: stri
         net: l?.netHuf ?? null, vatHuf: l?.vatHuf ?? null, gross: l?.grossHuf ?? null,
         fxInfo: fx && li === 0 ? `${Number(a.inv.grossFx).toLocaleString("hu-HU")} ${a.inv.currency} × ${Number(a.inv.exchangeRate).toLocaleString("hu-HU")}` : "",
         pays: li === 0 ? pays : "", open: li === 0 ? (Math.round(a.openHuf) || null) : null, flags: li === 0 ? flags : "", ok: "", note: li === 0 ? a.check.note ?? "" : "",
-        iss: d(a.inv.issueDate), tax: a.partnerTax ?? (a.partnerPrivate ? "magánszemély" : ""), vin: vin ? vin.replace(/\)$/, "") : "", st: STATUS[a.inv.status],
+        iss: d(a.inv.issueDate), tax: a.partnerTax ?? (a.partnerPrivate ? "magánszemély" : ""), vin, st: STATUS[a.inv.status],
         mbase: l?.marginPurchaseHuf ?? null, invGross: Number(a.inv.grossHuf), chk, doc: a.check.docUrl ? { text: "megnyitás", hyperlink: a.check.docUrl } : "",
       });
       if (a.flags.some((f) => f.level === "warn")) row.getCell("flags").font = { color: { argb: "FFB4471A" } };
@@ -178,7 +179,7 @@ export async function buildInvoiceWorkbook(companyId: number, opts: { from: stri
       .where(and(eq(journalEntries.companyId, companyId), inArray(journalEntries.sourceId, ids), or(eq(journalEntries.sourceType, "invoice"), eq(journalEntries.sourceType, "payment"), eq(journalEntries.sourceType, "storno"))))
       .orderBy(asc(journalEntries.date), asc(journalEntries.id));
     const elines = entries.length ? await db
-      .select({ l: journalLines, code: accounts.code, name: accounts.name, plate: vehicles.plate, model: vehicles.model })
+      .select({ l: journalLines, code: accounts.code, name: accounts.name, plate: vehicles.plate, vin: vehicles.vin, model: vehicles.model })
       .from(journalLines).innerJoin(accounts, eq(accounts.id, journalLines.accountId)).leftJoin(vehicles, eq(vehicles.id, journalLines.vehicleId))
       .where(inArray(journalLines.entryId, entries.map((e) => e.id))).orderBy(asc(journalLines.entryId), asc(journalLines.id)) : [];
     const byId = new Map(list.map((a) => [a.inv.id, a]));
@@ -188,7 +189,7 @@ export async function buildInvoiceWorkbook(companyId: number, opts: { from: stri
         for (const r of elines.filter((x) => x.l.entryId === e.id)) {
           ws3.addRow({ num: a.inv.invoiceNumber, partner: byId.get(a.inv.id)!.partnerName, entry: e.number, date: d(e.date), src: srcHu[e.sourceType ?? ""] ?? e.sourceType,
             desc: e.description, acc: r.code, accName: r.name, dr: Number(r.l.debit) || null, cr: Number(r.l.credit) || null,
-            fx: r.l.amountFx ? Number(r.l.amountFx) : null, veh: r.plate ?? r.model ?? "", rev: e.reversedById ? "igen" : "" });
+            fx: r.l.amountFx ? Number(r.l.amountFx) : null, veh: r.plate || r.vin || r.model || "", rev: e.reversedById ? "igen" : "" });
         }
       }
     }

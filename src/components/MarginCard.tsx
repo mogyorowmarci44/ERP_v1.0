@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { MarginCard as Card, CardDoc } from "@/lib/margin-card";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
+import { vehicleIdent } from "@/lib/vehicle-id";
 
 const Ft = ({ v, strong }: { v: number | null | undefined; strong?: boolean }) =>
   v === null || v === undefined ? <span className="muted">–</span> : <span className={strong ? "strong" : undefined}>{fmtHuf(v)} Ft</span>;
@@ -44,7 +45,7 @@ export function MarginCardSheet({ card, cid, printedAt }: { card: Card; cid: num
       <section className="mc-vehicle">
         <dl>
           <div><dt>Gépkocsi</dt><dd>{v.make} {v.model}{v.year ? ` (${v.year})` : ""}</dd></div>
-          <div><dt>Rendszám</dt><dd className="mono">{v.plate ?? "–"}</dd></div>
+          <div><dt>{v.plate?.trim() ? "Rendszám" : "Azonosító (alvázszám – nincs rendszám)"}</dt><dd className="mono">{vehicleIdent(v) || "–"}</dd></div>
           <div><dt>Alvázszám</dt><dd className="mono">{v.vin ?? "–"}</dd></div>
           <div><dt>Beszerzés</dt><dd>{fmtDate(v.purchaseDate) || "–"}</dd></div>
           <div><dt>Eladás</dt><dd>{s ? fmtDate(card.sales[0].date) : "–"}</dd></div>
@@ -95,7 +96,7 @@ export function MarginCardSheet({ card, cid, printedAt }: { card: Card; cid: num
       })()}
 
       <h2>4. Tájékoztatásul – bekerülési érték és eredmény</h2>
-      <p className="mc-note">Az alábbi tételek a gépkocsi bekerülési értékét (ELÁBÉ) növelik, de a különbözeti ÁFA alapjába nem számítanak bele (pl. honosítás, fuvar, aukciós díj, javítás). Az áfás tételek ÁFA-ja a normál szabályok szerint levonható.</p>
+      <p className="mc-note">A bekerülési értéket (ELÁBÉ) növelik, de a különbözeti ÁFA alapjába nem számítanak (honosítás, fuvar, javítás …); ÁFA-juk a normál szabályok szerint kezelendő.</p>
       <table className="mc-table">
         <thead><tr><th>Teljesítés</th><th>Bizonylat</th><th>Szállító</th><th>Megnevezés</th><th className="num">ÁFA</th><th className="num">Bruttó</th></tr></thead>
         <tbody>
@@ -112,6 +113,7 @@ export function MarginCardSheet({ card, cid, printedAt }: { card: Card; cid: num
         </tbody>
       </table>
 
+      <div className="mc-end">
       {card.checks.length > 0 && (
         <ul className="mc-checks">
           {card.checks.map((c, i) => <li key={i} className={c.ok ? "ok" : "warn"}>{c.ok ? "✓" : "⚠"} {c.text}</li>)}
@@ -123,6 +125,7 @@ export function MarginCardSheet({ card, cid, printedAt }: { card: Card; cid: num
         <div className="mc-sign"><span>Ellenőrizte</span></div>
         <div className="mc-meta">Készült: {printedAt} · MM ERP</div>
       </footer>
+      </div>
     </article>
   );
 }

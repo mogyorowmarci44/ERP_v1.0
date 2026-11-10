@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { vehicleIdent } from "@/lib/vehicle-id";
 import { requireCompany } from "@/lib/auth";
 import { trialBalance, openItems, vehicleStock, vatAnalytics } from "@/lib/reports";
 import { fmtHuf } from "@/lib/money";
@@ -45,7 +46,7 @@ export default async function Dashboard({ params }: { params: Promise<{ cid: str
         <thead><tr><th>Gépkocsi</th><th>Rendszám</th><th>Adózás</th><th className="num">Könyv szerinti érték</th></tr></thead>
         <tbody>
           {inStock.map((v) => (
-            <tr key={v.id}><td><Link href={`/c/${cid}/vehicles?edit=${v.id}`}>{v.make} {v.model} {v.year ?? ""}</Link></td><td className="mono">{v.plate}</td><td>{v.vatTreatment === "margin" ? "különbözeti" : "normál"}</td><td className="num">{fmtHuf(v.bookValue)}</td></tr>
+            <tr key={v.id}><td><Link href={`/c/${cid}/vehicles?edit=${v.id}`}>{v.make} {v.model} {v.year ?? ""}</Link></td><td className="mono">{vehicleIdent(v)}</td><td>{v.vatTreatment === "margin" ? "különbözeti" : "normál"}</td><td className="num">{fmtHuf(v.bookValue)}</td></tr>
           ))}
           {inStock.length === 0 && <tr><td colSpan={4} className="muted">Nincs készleten gépkocsi.</td></tr>}
         </tbody>

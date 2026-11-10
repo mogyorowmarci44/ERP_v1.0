@@ -6,6 +6,7 @@ import { marginPurchaseBase, vehicleBookValues } from "./ledger";
 import { fiscalYearStart, openItems } from "./reports";
 import { today, addDaysIso } from "./dates";
 import { round2 } from "./money";
+import { vehicleTitle } from "./vehicle-id";
 import {
   normalizeSettings, calibrate, quantile, MIN_CALIBRATION_SALES,
   type FcOpening, type FcPlan, type FcItem, type SoldHistory, type Channel,
@@ -116,7 +117,7 @@ export async function loadPlans(companyId: number) {
   return { stock, planned, closed };
 }
 
-export const vehicleLabel = (v: { make: string; model: string; plate: string | null }) => `${v.make} ${v.model}${v.plate ? ` (${v.plate})` : ""}`;
+export const vehicleLabel = (v: { make: string; model: string; plate: string | null; vin?: string | null }) => vehicleTitle(v);
 
 /** A számításhoz szükséges teljes bemenet. */
 export async function loadForecastInput(companyId: number) {

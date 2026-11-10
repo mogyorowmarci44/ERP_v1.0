@@ -25,7 +25,7 @@ export async function formOptions(cid: number, includeVehicleIds: number[] = [])
     if (v.status === "sold" && !includeVehicleIds.includes(v.id)) continue;
     vehicleOpts.push({
       id: v.id,
-      label: `${v.make} ${v.model}${v.plate ? ` (${v.plate})` : ""}${v.vin ? ` …${v.vin.slice(-6)}` : ""}`,
+      label: v.plate ? `${v.make} ${v.model} (${v.plate})${v.vin ? ` …${v.vin.slice(-6)}` : ""}` : `${v.make} ${v.model}${v.vin ? ` (${v.vin})` : ""}`,
       vatTreatment: v.vatTreatment,
       marginBase: await marginPurchaseBase(db, cid, v.id),
     });

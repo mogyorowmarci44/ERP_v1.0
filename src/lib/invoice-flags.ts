@@ -15,6 +15,7 @@ export type AuditLine = {
   vatKind: string;
   vatRate: number;
   vehicle: string | null;
+  vehicleVin?: string | null;
   vehicleId: number | null;
   quantity: number;
   unitPrice: number;

@@ -54,7 +54,7 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
           {show.map((v) => (
             <tr key={v.id}>
               <td>{v.make} {v.model} {v.year ?? ""}</td>
-              <td className="mono">{v.plate}</td>
+              <td className="mono">{v.plate || <span className="muted" title="Nincs rendszám – az alvázszám az azonosító">(alvázszám)</span>}</td>
               <td className="mono">{v.vin}</td>
               <td>{v.vatTreatment === "margin" ? "különbözeti" : "normál"}</td>
               <td>{fmtDate(v.purchaseDate)}</td>
