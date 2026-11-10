@@ -19,7 +19,10 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
     <>
       <div className="topbar">
         <h1>Gépkocsi készlet</h1>
-        <Link className="btn" href={`/c/${cid}/vehicles${sp.all ? "" : "?all=1"}`}>{sp.all ? "Csak készleten" : "Eladottakkal együtt"}</Link>
+        <div className="row">
+          <Link className="btn" href={`/c/${cid}/vehicles/kartonok`}>Különbözeti ÁFA kartonok (időszak)</Link>
+          <Link className="btn" href={`/c/${cid}/vehicles${sp.all ? "" : "?all=1"}`}>{sp.all ? "Csak készleten" : "Eladottakkal együtt"}</Link>
+        </div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
       <form action={saveVehicleAction} className="card form-grid" key={edit?.id ?? "new"}>
@@ -60,7 +63,10 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
               <td className="num">{fmtHuf(v.bookValue)}</td>
               <td className="num">{v.revenue ? fmtHuf(v.revenue) : ""}</td>
               <td className="num">{v.status === "sold" ? fmtHuf(v.revenue - v.totalCost) : ""}</td>
-              <td><Link href={`/c/${cid}/vehicles?edit=${v.id}`}>szerk.</Link></td>
+              <td className="nowrap">
+                <Link href={`/c/${cid}/vehicles?edit=${v.id}`}>szerk.</Link>
+                {v.vatTreatment === "margin" && <> · <Link href={`/c/${cid}/vehicles/${v.id}/karton`}>karton</Link></>}
+              </td>
             </tr>
           ))}
           {show.length === 0 && <tr><td colSpan={11} className="muted">Nincs gépkocsi.</td></tr>}

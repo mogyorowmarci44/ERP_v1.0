@@ -68,6 +68,9 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         <h1>{inv.direction === "out" ? "Vevőszámla" : "Szállítói számla"} {inv.invoiceNumber} <span className={`badge ${inv.status}`}>{statusHu[inv.status]}</span></h1>
         <div className="row no-print">
           <Link className="btn" href={`/c/${cid}/invoices?dir=${inv.direction}`}>← Lista</Link>
+          {[...new Set(lines.filter((x) => x.vat.kind === "margin" && x.veh).map((x) => x.veh!.id))].map((vid) => (
+            <Link key={vid} className="btn" href={`/c/${cid}/vehicles/${vid}/karton`}>Különbözeti ÁFA karton{lines.filter((x) => x.veh).length > 1 ? ` (${lines.find((x) => x.veh?.id === vid)?.veh?.plate ?? vid})` : ""}</Link>
+          ))}
           {canWrite && inv.status === "draft" && (
             <>
               <Link className="btn" href={`/c/${cid}/invoices/${id}/edit`}>Szerkesztés</Link>
