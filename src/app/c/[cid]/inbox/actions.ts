@@ -11,7 +11,6 @@ import { parseNumber } from "@/lib/money";
 import { isDate } from "@/lib/dates";
 import { encryptSecret } from "@/lib/inbox/secret";
 import { pingRemote } from "@/lib/inbox/connector";
-import { extractionAvailable } from "@/lib/inbox/extract";
 import { addDocument, getInboxSettings, saveInboxSettings, runSync, processDocument, bookInvoiceProposal, bookStatementRows, loadProposeCtx, propose } from "@/lib/inbox/service";
 
 const { inboxDocuments } = schema;
@@ -53,7 +52,7 @@ export async function uploadAction(fd: FormData) {
       if (id) ids.push(id);
     }
     let msg = `${ids.length} fájl feltöltve.`;
-    if (extractionAvailable()) {
+    {
       const { settings } = await getInboxSettings(cid);
       let booked = 0, review = 0;
       for (const id of ids) {
@@ -65,7 +64,7 @@ export async function uploadAction(fd: FormData) {
         }
       }
       msg += ` Lekönyvelve: ${booked}, jóváhagyásra vár: ${review}.`;
-    } else msg += " A kiolvasáshoz be kell állítani az ANTHROPIC_API_KEY-t.";
+    }
     refresh(cid);
     return `${base(cid)}?ok=${encodeURIComponent(msg)}`;
   });
@@ -161,6 +160,7 @@ export async function bookInvoiceAction(fd: FormData) {
     const lines: NonNullable<InboxProposal["invoice"]>["lines"] = [];
     for (let i = 0; i < n; i++) {
       if (fd.get(`l${i}_del`) === "on") continue;
+      if (!str(fd, `l${i}_desc`) && !parseNumber(fd.get(`l${i}_unit`))) continue; // üres pótsor
       const veh = str(fd, `l${i}_vehicle`);
       lines.push({
         description: str(fd, `l${i}_desc`) || "Tétel",

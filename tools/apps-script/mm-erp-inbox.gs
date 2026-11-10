@@ -9,6 +9,8 @@
  *  2. Az alábbi KULCS helyére írd be az ERP-ben (Beérkező bizonylatok → Beállítások) generált kulcsot.
  *  3. Telepítés → Új telepítés → Típus: Webes alkalmazás → Végrehajtás mint: Én → Hozzáférés: Bárki → Telepítés.
  *     (Első futáskor engedélyezni kell a Gmail és Drive olvasását.)
+ *  Szkennelt / fotózott számlákhoz: a szerkesztő bal oldalán Szolgáltatások (+) → Drive API → Hozzáadás.
+ *  Ezzel a Google ingyenes szövegfelismerése (OCR) olvassa ki a képeket – AI és díj nélkül.
  *  4. A kapott „…/exec” webcímet másold be az ERP beállításaiba.
  */
 const KULCS = 'IDE_JON_AZ_ERP_KULCS';
@@ -20,6 +22,7 @@ function doPost(e) {
     if (req.action === 'ping') return out_({ ok: true, account: Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() });
     if (req.action === 'list') return out_({ ok: true, items: list_(req) });
     if (req.action === 'get') return out_(Object.assign({ ok: true }, get_(req.ref)));
+    if (req.action === 'ocr') return out_({ ok: true, text: ocr_(req) });
     return out_({ ok: false, error: 'Ismeretlen művelet: ' + req.action });
   } catch (err) {
     return out_({ ok: false, error: String(err && err.message || err) });
@@ -30,8 +33,8 @@ function out_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
-const OK_TYPE = /pdf|image\/|xml/i;
-const OK_NAME = /\.(pdf|jpe?g|png|webp|heic|heif|xml)$/i;
+const OK_TYPE = /pdf|image\/|xml|csv|spreadsheet|ms-excel/i;
+const OK_NAME = /\.(pdf|jpe?g|png|webp|heic|heif|xml|csv|xlsx)$/i;
 
 function list_(req) {
   const known = {};
@@ -101,4 +104,16 @@ function get_(ref) {
 
 function blob_(b, name, mime) {
   return { data: Utilities.base64Encode(b.getBytes()), mime: mime || b.getContentType(), filename: name };
+}
+
+/** Szövegfelismerés: ideiglenes Google-dokumentum OCR-rel, a szöveg kiolvasása, majd a dokumentum törlése. */
+function ocr_(req) {
+  if (typeof Drive === 'undefined') throw new Error('A szövegfelismeréshez kapcsold be a szkriptben: Szolgáltatások (+) → Drive API → Hozzáadás, majd telepítsd újra (Telepítések kezelése → Új verzió).');
+  const blob = Utilities.newBlob(Utilities.base64Decode(req.data), req.mime || 'application/pdf', req.filename || 'bizonylat');
+  const file = Drive.Files.create({ name: 'MM ERP OCR ' + (req.filename || ''), mimeType: 'application/vnd.google-apps.document' }, blob, { ocrLanguage: 'hu', fields: 'id' });
+  try {
+    return DocumentApp.openById(file.id).getBody().getText();
+  } finally {
+    try { DriveApp.getFileById(file.id).setTrashed(true); } catch (e) { /* a lomtárba helyezés nem kritikus */ }
+  }
 }

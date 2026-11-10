@@ -1,7 +1,7 @@
 /**
  * Beérkező bizonylatok – „Beolvasás és könyvelés”:
  *  1. új tételek lekérése a Google-szkriptből (Gmail + Drive), a már ismertek kihagyásával,
- *  2. kiolvasás (Claude API), 3. javaslat (szabályok + korábbi könyvelés), 4. könyvelés, ha minden ellenőrzés rendben.
+ *  2. kiolvasás (ingyenes: PDF-szöveg / CSV / Google OCR + szabályok; opcionálisan Claude), 3. javaslat (szabályok + korábbi könyvelés), 4. könyvelés, ha minden ellenőrzés rendben.
  */
 import { createHash } from "node:crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
@@ -11,7 +11,7 @@ import { saveInvoiceDraft, postInvoice, payInvoice, manualEntry, accountIdByCode
 import { openItems } from "../reports";
 import { today } from "../dates";
 import { listRemote, fetchRemote } from "./connector";
-import { extractDocument, extractionAvailable } from "./extract";
+import { readDocument } from "./read";
 import { proposeInvoice, proposeStatement, type ProposeCtx } from "./propose";
 
 const { inboxDocuments, inboxSettings, companies, partners, invoices, invoiceLines, accounts, vatCodes, vehicles, invoiceChecks } = schema;
@@ -83,7 +83,7 @@ export async function loadProposeCtx(companyId: number): Promise<ProposeCtx> {
 }
 
 export function propose(ctx: ProposeCtx, kind: string, x: ExtractedDoc): InboxProposal {
-  if (x.docType === "bank_statement" || kind === "statement") return x.statement ? proposeStatement(ctx, x) : { kind: "none", issues: ["Nem bankkivonat."] };
+  if (x.docType === "bank_statement" || (kind === "statement" && !x.lines?.length)) return x.statement ? proposeStatement(ctx, x) : { kind: "none", issues: [x.notes || "Nincs kiolvasható tranzakció a kivonaton."] };
   return proposeInvoice(ctx, x, today());
 }
 
@@ -183,12 +183,18 @@ export async function processDocument(companyId: number, docId: number, userId: 
   const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
   let x = doc.extracted;
   if (!x) {
-    x = await extractDocument({ data: doc.data, mime: doc.mime, filename: doc.filename }, { name: company.name, taxNumber: company.taxNumber }, { kind: doc.kind, subject: doc.emailSubject, from: doc.emailFrom });
+    const { settings } = await getInboxSettings(companyId);
+    x = await readDocument({ data: doc.data, mime: doc.mime, filename: doc.filename }, { name: company.name, taxNumber: company.taxNumber }, { kind: doc.kind, subject: doc.emailSubject, from: doc.emailFrom }, settings);
     await db.update(inboxDocuments).set({ extracted: x, status: "extracted" }).where(eq(inboxDocuments.id, docId));
   }
   const ctx = opts.ctx ?? (await loadProposeCtx(companyId));
   const prop = propose(ctx, doc.kind, x);
   const url = doc.sourceUrl ?? `/c/${companyId}/inbox/${docId}/file`;
+  if (prop.kind === "none" && (x.confidence ?? 1) === 0) {
+    // nem sikerült kiolvasni → kézi kitöltésre vár, nem hagyjuk el
+    await db.update(inboxDocuments).set({ proposal: prop, status: "review", processedAt: new Date() }).where(eq(inboxDocuments.id, docId));
+    return "review";
+  }
   if (prop.kind === "none") {
     const dup = prop.issues.some((i) => i.startsWith("Már könyvelve"));
     await db.update(inboxDocuments).set({ proposal: prop, status: dup ? "duplicate" : "ignored", processedAt: new Date() }).where(eq(inboxDocuments.id, docId));
@@ -196,8 +202,14 @@ export async function processDocument(companyId: number, docId: number, userId: 
   }
   await db.update(inboxDocuments).set({ proposal: prop, status: "review" }).where(eq(inboxDocuments.id, docId));
   if (prop.kind === "invoice" && opts.autoPost && prop.issues.length === 0) {
-    await bookInvoiceProposal(companyId, docId, prop.invoice!, userId, url);
-    return "booked";
+    try {
+      await bookInvoiceProposal(companyId, docId, prop.invoice!, userId, url);
+      return "booked";
+    } catch (e) {
+      // pl. MNB-árfolyam nem érhető el – marad jóváhagyásra, a hibaüzenettel
+      await db.update(inboxDocuments).set({ status: "review", error: (e as Error).message }).where(eq(inboxDocuments.id, docId));
+      return "review";
+    }
   }
   if (prop.kind === "statement" && opts.autoPost) {
     const p2 = await bookStatementRows(companyId, docId, prop, userId);
@@ -224,11 +236,6 @@ export async function runSync(companyId: number, userId: number | undefined): Pr
       if (items.length > 60) sum.errors.push(`Még ${items.length - 60} tétel vár – nyomd meg újra a gombot.`);
       await db.update(inboxSettings).set({ lastSyncAt: new Date() }).where(eq(inboxSettings.companyId, companyId));
     } catch (e) { sum.errors.push((e as Error).message); }
-  }
-  if (!extractionAvailable()) {
-    const pending = await db.select({ id: inboxDocuments.id }).from(inboxDocuments).where(and(eq(inboxDocuments.companyId, companyId), eq(inboxDocuments.status, "new")));
-    if (pending.length) sum.errors.push(`${pending.length} bizonylat vár kiolvasásra, de nincs beállítva az ANTHROPIC_API_KEY.`);
-    return sum;
   }
   const todo = await db.select({ id: inboxDocuments.id, kind: inboxDocuments.kind }).from(inboxDocuments)
     .where(and(eq(inboxDocuments.companyId, companyId), inArray(inboxDocuments.status, ["new", "extracted"])))

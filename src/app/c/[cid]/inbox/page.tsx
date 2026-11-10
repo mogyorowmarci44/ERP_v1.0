@@ -5,7 +5,6 @@ import { requireCompany } from "@/lib/auth";
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getInboxSettings, type SyncSummary } from "@/lib/inbox/service";
-import { extractionAvailable } from "@/lib/inbox/extract";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
 import { syncAction, uploadAction, ignoreDocAction } from "./actions";
@@ -56,7 +55,6 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
             {". "}{settings.autoPost !== false ? "Az egyértelműeket magától lekönyveli." : "Minden a jóváhagyási listába kerül."}
             {lastSyncAt && <> · utoljára: {lastSyncAt.toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</>}
           </p>
-          {!extractionAvailable() && <p className="neg" style={{ margin: "6px 0 0" }}>Az ANTHROPIC_API_KEY nincs beállítva a Renderen – a fájlok beolvasódnak, de a kiolvasás nem fut le.</p>}
         </div>
         {canWrite && (
           <form action={syncAction}>
@@ -77,8 +75,8 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
       {canWrite && (
         <form action={uploadAction} className="card row" style={{ marginBottom: 14, alignItems: "end" }}>
           <input type="hidden" name="cid" value={cid} />
-          <label style={{ flex: 1 }}>Kézi feltöltés (PDF, fotó – telefonról közvetlenül is)
-            <input type="file" name="files" multiple accept="application/pdf,image/*" capture="environment" />
+          <label style={{ flex: 1 }}>Kézi feltöltés (PDF, fotó, bankkivonat CSV / Excel – telefonról fotózva is)
+            <input type="file" name="files" multiple accept="application/pdf,image/*,.csv,.xlsx,.xml,text/csv" />
           </label>
           <label>Típus
             <select name="kind" defaultValue="invoice"><option value="invoice">számla / nyugta / adásvételi</option><option value="statement">bankkivonat</option></select>

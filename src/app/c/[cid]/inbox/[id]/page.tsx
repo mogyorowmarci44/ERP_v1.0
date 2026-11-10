@@ -27,6 +27,10 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
   const opts = await formOptions(cid, inv?.lines.map((l) => l.vehicleId ?? 0).filter(Boolean) ?? []);
   const fileUrl = `/c/${cid}/inbox/${d.id}/file`;
   const isImg = d.mime.startsWith("image/");
+  const blank = { description: "", quantity: 1, unitPrice: 0, accountCode: inv?.direction === "out" ? "911" : "529", vatCode: "27", vehicleId: null, newVehicle: false };
+  // két üres sor, hogy hiányzó tételt is fel lehessen venni
+  const rows = inv ? [...inv.lines, ...(canWrite && d.status !== "booked" ? [blank, blank] : [])] : [];
+  const METHOD_HU: Record<string, string> = { table: "bankkivonat-export (CSV / Excel)", text: "PDF szövege, szabályok alapján", ocr: "Google szövegfelismerés + szabályok", ai: "AI (Claude)", none: "nem olvasható – kézi kitöltés" };
   const editable = canWrite && !["booked"].includes(d.status);
   const [openIn, openOut] = prop?.statement ? await Promise.all([openItems(cid, "in"), openItems(cid, "out")]) : [[], []];
 
@@ -44,7 +48,7 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
 
       <div className="inbox-split">
         <div className="preview">
-          {isImg ? <img src={fileUrl} alt={d.filename} /> : <iframe src={fileUrl} title={d.filename} />}
+          {isImg ? <img src={fileUrl} alt={d.filename} /> : /\.(csv|xlsx|xls)$/i.test(d.filename) ? <div className="card"><p style={{ marginTop: 0 }}>Táblázatos bankkivonat-export.</p><a className="btn" href={fileUrl} download={d.filename}>Letöltés</a></div> : <iframe src={fileUrl} title={d.filename} />}
           <p className="muted" style={{ fontSize: 12 }}>{d.filename}{d.emailSubject ? ` · ${d.emailSubject}` : ""}{d.emailFrom ? ` · ${d.emailFrom}` : ""}</p>
         </div>
 
@@ -56,12 +60,12 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
               <ul>{prop.issues.map((i, k) => <li key={k}>{i}</li>)}</ul>
             </div>
           )}
-          {prop?.basis && <p className="muted">Javaslat alapja: {prop.basis}{x?.confidence != null ? ` · kiolvasás biztonsága: ${Math.round(x.confidence * 100)}%` : ""}</p>}
+          {prop?.basis && <p className="muted">Javaslat alapja: {prop.basis}{x?.method ? ` · kiolvasás: ${METHOD_HU[x.method] ?? x.method}` : ""}{x?.confidence != null ? ` · biztonság: ${Math.round(x.confidence * 100)}%` : ""}</p>}
 
           {inv && (
             <form action={bookInvoiceAction} className="card">
               <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={d.id} />
-              <input type="hidden" name="lineCount" value={inv.lines.length} />
+              <input type="hidden" name="lineCount" value={rows.length} />
               <div className="form-grid">
                 <label>Irány<select name="direction" defaultValue={inv.direction} disabled={!editable}><option value="in">szállítói (bejövő)</option><option value="out">vevő (kimenő)</option></select></label>
                 <label>Partner
@@ -84,31 +88,31 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
               </div>
 
               <table className="lines-edit" style={{ marginTop: 12 }}>
-                <thead><tr><th>Tétel</th><th className="num">Menny.</th><th className="num">Egységár (nettó)</th><th>Számla</th><th>ÁFA</th><th>Gépkocsi</th><th>Törlés</th></tr></thead>
+                <thead><tr><th>Tétel</th><th className="num">Menny.</th><th className="num" title="Nettó egységár">Egységár</th><th>Számla</th><th>ÁFA</th><th>Gépkocsi</th><th title="Törlés">✕</th></tr></thead>
                 <tbody>
-                  {inv.lines.map((l, i) => (
+                  {rows.map((l, i) => (
                     <tr key={i}>
                       <td><input name={`l${i}_desc`} defaultValue={l.description} disabled={!editable} /></td>
-                      <td style={{ width: 60 }}><input name={`l${i}_qty`} className="num" defaultValue={l.quantity} disabled={!editable} /></td>
-                      <td style={{ width: 120 }}><input name={`l${i}_unit`} className="num" defaultValue={l.unitPrice} disabled={!editable} /></td>
-                      <td style={{ width: 150 }}>
+                      <td><input name={`l${i}_qty`} className="num" defaultValue={l.quantity} disabled={!editable} /></td>
+                      <td><input name={`l${i}_unit`} className="num" defaultValue={l.unitPrice} disabled={!editable} /></td>
+                      <td>
                         <select name={`l${i}_acc`} defaultValue={l.accountCode} disabled={!editable}>
                           {opts.accounts.map((a) => <option key={a.id} value={a.code}>{a.code} {a.name}</option>)}
                         </select>
                       </td>
-                      <td style={{ width: 110 }}>
+                      <td>
                         <select name={`l${i}_vat`} defaultValue={l.vatCode} disabled={!editable}>
                           {opts.vatCodes.map((v) => <option key={v.id} value={v.code}>{v.code}</option>)}
                         </select>
                       </td>
-                      <td style={{ width: 200 }}>
+                      <td>
                         <select name={`l${i}_vehicle`} defaultValue={l.newVehicle ? "new" : l.vehicleId ? String(l.vehicleId) : ""} disabled={!editable}>
                           <option value="">–</option>
                           <option value="new">+ új gépkocsi (alább)</option>
                           {opts.vehicles.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
                         </select>
                       </td>
-                      <td style={{ width: 50, textAlign: "center" }}><input type="checkbox" name={`l${i}_del`} disabled={!editable} aria-label="Tétel törlése" /></td>
+                      <td style={{ textAlign: "center" }}><input type="checkbox" name={`l${i}_del`} disabled={!editable} aria-label="Tétel törlése" /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -188,15 +192,21 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
           {editable && (
             <div className="row" style={{ marginTop: 12 }}>
               <form action={reprocessAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={d.id} /><button>Javaslat újraszámolása</button></form>
-              <form action={reprocessAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={d.id} /><input type="hidden" name="reread" value="1" /><button>Újraolvasás (AI)</button></form>
+              <form action={reprocessAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={d.id} /><input type="hidden" name="reread" value="1" /><button>Újraolvasás</button></form>
               <form action={ignoreDocAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={d.id} /><button className="link">kihagyás</button></form>
             </div>
           )}
 
           {x && (
             <details className="fc-more" style={{ marginTop: 14 }}>
-              <summary>Kiolvasott nyers adatok</summary>
-              <pre style={{ fontSize: 11.5, whiteSpace: "pre-wrap", background: "var(--surface-2)", padding: 10, borderRadius: 6 }}>{JSON.stringify(x, null, 2)}</pre>
+              <summary>Kiolvasott adatok</summary>
+              <pre style={{ fontSize: 11.5, whiteSpace: "pre-wrap", background: "var(--surface-2)", padding: 10, borderRadius: 6 }}>{JSON.stringify({ ...x, rawText: undefined }, null, 2)}</pre>
+            </details>
+          )}
+          {x?.rawText && (
+            <details className="fc-more" style={{ marginTop: 8 }}>
+              <summary>A bizonylat szövege</summary>
+              <pre style={{ fontSize: 11.5, whiteSpace: "pre-wrap", background: "var(--surface-2)", padding: 10, borderRadius: 6 }}>{x.rawText}</pre>
             </details>
           )}
         </div>

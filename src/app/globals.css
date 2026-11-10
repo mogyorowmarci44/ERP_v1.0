@@ -424,10 +424,20 @@ table.statement th.k-mixed { box-shadow: inset 0 -2px 0 var(--accent); }
 button.big { padding: 12px 22px; font-size: 15px; }
 .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.inbox-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; align-items: start; }
+.inbox-split { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.25fr); gap: 16px; align-items: start; }
 .inbox-split .preview { position: sticky; top: 12px; }
 .inbox-split .preview iframe, .inbox-split .preview img { width: 100%; height: 78vh; border: 1px solid var(--line); border-radius: var(--r-md, 8px); background: #fff; object-fit: contain; }
 @media (max-width: 1100px) { .inbox-split { grid-template-columns: 1fr; } .inbox-split .preview { position: static; } }
 table.lines-edit input, table.lines-edit select { width: 100%; min-width: 0; }
+.inbox-split table.lines-edit { table-layout: fixed; width: 100%; }
+.inbox-split table.lines-edit th, .inbox-split table.lines-edit td { padding: 4px 3px; }
+.inbox-split table.lines-edit input, .inbox-split table.lines-edit select { padding-left: 6px; padding-right: 2px; font-size: 13px; }
+.inbox-split table.lines-edit th:nth-child(1) { width: 31%; }
+.inbox-split table.lines-edit th:nth-child(2) { width: 8%; }
+.inbox-split table.lines-edit th:nth-child(3) { width: 14%; }
+.inbox-split table.lines-edit th:nth-child(4) { width: 17%; }
+.inbox-split table.lines-edit th:nth-child(5) { width: 11%; }
+.inbox-split table.lines-edit th:nth-child(6) { width: 15%; }
+.inbox-split table.lines-edit th:nth-child(7) { width: 4%; }
 .code-block { font-size: 11.5px; white-space: pre; overflow: auto; max-height: 480px; background: var(--surface-2); padding: 12px; border-radius: 8px; border: 1px solid var(--line); user-select: all; }
 .setup-steps li { margin-bottom: 6px; }

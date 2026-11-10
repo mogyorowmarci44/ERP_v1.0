@@ -545,6 +545,10 @@ export type ExtractedDoc = {
   } | null;
   confidence?: number | null;
   notes?: string | null;
+  /** Honnan jött az adat: table = CSV/Excel export, text = PDF-szövegréteg, ocr = Google Drive OCR, ai = Claude, none = kézi. */
+  method?: "table" | "text" | "ocr" | "ai" | "none" | null;
+  /** A kinyert nyers szöveg (ellenőrzéshez, újraolvasáshoz). */
+  rawText?: string | null;
 };
 
 /** Könyvelési javaslat (amit a rendszer a kiolvasott adatból és a korábbi könyvelésekből összerakott). */

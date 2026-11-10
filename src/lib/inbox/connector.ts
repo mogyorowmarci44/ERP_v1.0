@@ -54,3 +54,9 @@ export async function fetchRemote(s: InboxSettings, ref: string): Promise<{ data
 export async function pingRemote(s: InboxSettings): Promise<{ account: string }> {
   return call<{ account: string }>(s, { action: "ping" });
 }
+
+/** Szkennelt PDF / fotó szövege a Google Drive ingyenes szövegfelismerésével (a szkript ideiglenes Google-dokumentumot készít, majd törli). */
+export async function ocrRemote(s: InboxSettings, file: { data: string; mime: string; filename: string }): Promise<string> {
+  const r = await call<{ text: string }>(s, { action: "ocr", data: file.data, mime: file.mime, filename: file.filename });
+  return r.text ?? "";
+}
