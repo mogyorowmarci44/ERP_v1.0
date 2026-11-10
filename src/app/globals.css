@@ -352,3 +352,12 @@ details.fc-more summary { cursor: pointer; color: var(--accent); font-size: 13px
 table.statement tr.k-head td { font-weight: 600; color: var(--muted); background: var(--surface-2); text-transform: uppercase; font-size: 12px; letter-spacing: 0.04em; }
 button.link { background: none; border: none; padding: 0; color: var(--accent); font-size: 13px; cursor: pointer; box-shadow: none; }
 button.link:hover { text-decoration: underline; }
+button.chk { width: 26px; height: 26px; padding: 0; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); font-weight: 700; color: var(--warn); line-height: 1; }
+button.chk.on { background: var(--pos); border-color: var(--pos); color: #fff; }
+button.chk:hover { border-color: var(--accent); }
+.check-panel { border-left: 3px solid var(--warn); }
+.check-panel.ok { border-left-color: var(--pos); }
+.flag-list { margin: 8px 0 0; padding-left: 0; list-style: none; font-size: 13.5px; }
+.flag-list li { padding: 2px 0; }
+.flag-list li.warn { color: var(--warn); }
+.flag-list li.info { color: var(--muted); }

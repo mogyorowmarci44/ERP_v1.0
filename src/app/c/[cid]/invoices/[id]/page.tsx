@@ -5,7 +5,8 @@ import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { invoiceOpenAmount } from "@/lib/ledger";
 import { invoicePayments } from "@/lib/reports";
-import { postInvoiceAction, cancelInvoiceAction, reversePaymentAction } from "../../actions";
+import { postInvoiceAction, cancelInvoiceAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction } from "../../actions";
+import { invoiceAudit } from "@/lib/invoice-audit";
 import { PaymentForm } from "@/components/PaymentForm";
 import { Flash } from "@/components/Flash";
 import { fmtHuf, fmtMoney } from "@/lib/money";
@@ -58,6 +59,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
     .from(schema.accounts)
     .where(and(eq(schema.accounts.companyId, cid), like(schema.accounts.code, "38%"), eq(schema.accounts.isPosting, true)))
     .orderBy(asc(schema.accounts.code));
+  const [audit] = await invoiceAudit(cid, { ids: [id] });
   const isMarginSale = inv.direction === "out" && lines.some((x) => x.vat.kind === "margin");
 
   return (
@@ -76,6 +78,38 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         </div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
+
+      {audit && (
+        <div className={`card check-panel${audit.check.checked ? " ok" : ""}`} style={{ marginBottom: 14 }}>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <strong>
+              {audit.check.checked ? `✓ Ellenőrizve – ${audit.check.by ?? ""}, ${audit.check.at ? fmtDate(audit.check.at.toISOString().slice(0, 10)) : ""}`
+                : audit.check.stale ? "Az ellenőrzés óta módosult – nézd át újra" : "Nincs ellenőrizve"}
+            </strong>
+            {canWrite && inv.status !== "cancelled" && (
+              <form action={toggleInvoiceCheckAction} className="no-print">
+                <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} /><input type="hidden" name="back" value={`/c/${cid}/invoices/${id}`} />
+                <input type="hidden" name="on" value={audit.check.checked ? "0" : "1"} />
+                <button className={audit.check.checked ? undefined : "primary"}>{audit.check.checked ? "Pipa visszavonása" : "Megjelölés ellenőrzöttként"}</button>
+              </form>
+            )}
+          </div>
+          {audit.flags.length > 0 && (
+            <ul className="flag-list">
+              {audit.flags.map((f) => <li key={f.code + f.text} className={f.level}>{f.level === "warn" ? "⚠ " : "ℹ "}{f.text}</li>)}
+            </ul>
+          )}
+          {canWrite ? (
+            <form action={saveInvoiceCheckNoteAction} className="form-grid no-print" style={{ marginTop: 10 }}>
+              <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} />
+              <label>Bizonylat hivatkozás (Gmail / Drive / számlázz.hu)<input name="docUrl" defaultValue={audit.check.docUrl ?? ""} placeholder="https://…" /></label>
+              <label style={{ gridColumn: "span 2" }}>Ellenőrzési megjegyzés<input name="note" defaultValue={audit.check.note ?? ""} placeholder="pl. számla bekérve" /></label>
+              <div style={{ alignSelf: "end" }}><button>Mentés</button></div>
+            </form>
+          ) : audit.check.note ? <p>{audit.check.note}</p> : null}
+          {audit.check.docUrl && <p style={{ margin: "8px 0 0" }}><a href={audit.check.docUrl} target="_blank" rel="noreferrer">Eredeti bizonylat megnyitása ↗</a></p>}
+        </div>
+      )}
 
       <div className="grid cols-3">
         <div className="card">

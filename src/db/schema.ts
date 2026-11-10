@@ -479,3 +479,17 @@ export const forecastItems = pgTable(
   },
   (t) => [index("forecast_items_company").on(t.companyId)],
 );
+
+/** Számla-ellenőrzés: ki, mikor pipálta ki, és milyen állapotban volt akkor a számla (ujjlenyomat). */
+export const invoiceChecks = pgTable("invoice_checks", {
+  invoiceId: integer("invoice_id").primaryKey().references(() => invoices.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  checkedAt: timestamp("checked_at", { withTimezone: true }),
+  checkedBy: integer("checked_by").references(() => users.id),
+  /** A számla állapotának ujjlenyomata a kipipáláskor – ha azóta módosult, a pipa érvényét veszti. */
+  fingerprint: varchar("fingerprint", { length: 64 }),
+  note: text("note"),
+  /** Hivatkozás az eredeti bizonylatra (Gmail, Drive, számlázz.hu …). */
+  docUrl: text("doc_url"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

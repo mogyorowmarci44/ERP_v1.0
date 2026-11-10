@@ -25,6 +25,7 @@ import { addDays } from "@/lib/fx";
 import { PRESETS, isHex } from "@/lib/themes";
 import { importBundle, importLoanTermsOnly, wipeCompanyData, type ImportBundle, type ImportReport } from "@/lib/importer";
 import { recordMemberLoan, setLoanDueDate } from "@/lib/member-loans";
+import { invoiceAudit } from "@/lib/invoice-audit";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
@@ -413,5 +414,42 @@ export async function wipeCompanyAction(fd: FormData) {
     await wipeCompanyData(cid);
     revalidatePath(`/c/${cid}`, "layout");
     return `/c/${cid}/import?ok=${encodeURIComponent("A cég könyvelési adatai törölve. Most újra importálhatsz.")}`;
+  });
+}
+
+// --- Számla-ellenőrzés --------------------------------------------------------
+
+/** Ellenőrizve pipa be/ki – a pipa a számla aktuális ujjlenyomatával mentődik. */
+export async function toggleInvoiceCheckAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const back = str(fd, "back") || `/c/${cid}/invoices`;
+  await runOrRedirect(back, async () => {
+    const id = Number(fd.get("id"));
+    const [a] = await invoiceAudit(cid, { ids: [id] });
+    if (!a) throw new Error("A számla nem található.");
+    const on = str(fd, "on") === "1";
+    const values = { companyId: cid, checkedAt: on ? new Date() : null, checkedBy: on ? user.id : null, fingerprint: on ? a.fingerprint : null, updatedAt: new Date() };
+    await db.insert(schema.invoiceChecks).values({ invoiceId: id, ...values }).onConflictDoUpdate({ target: schema.invoiceChecks.invoiceId, set: values });
+    revalidatePath(`/c/${cid}/invoices`, "layout");
+    return back;
+  });
+}
+
+/** Ellenőrzési megjegyzés és bizonylat-hivatkozás mentése. */
+export async function saveInvoiceCheckNoteAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  const id = Number(fd.get("id"));
+  const back = `/c/${cid}/invoices/${id}`;
+  await runOrRedirect(back, async () => {
+    const [inv] = await db.select().from(schema.invoices).where(and(eq(schema.invoices.id, id), eq(schema.invoices.companyId, cid)));
+    if (!inv) throw new Error("A számla nem található.");
+    const docUrl = optStr(fd, "docUrl");
+    if (docUrl && !/^https?:\/\//i.test(docUrl)) throw new Error("A bizonylat hivatkozása http(s):// címmel kezdődjön.");
+    const values = { companyId: cid, note: optStr(fd, "note"), docUrl, updatedAt: new Date() };
+    await db.insert(schema.invoiceChecks).values({ invoiceId: id, ...values }).onConflictDoUpdate({ target: schema.invoiceChecks.invoiceId, set: values });
+    revalidatePath(`/c/${cid}/invoices`, "layout");
+    return `${back}?ok=${encodeURIComponent("Ellenőrzési adatok mentve.")}`;
   });
 }

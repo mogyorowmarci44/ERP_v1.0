@@ -43,6 +43,13 @@
       "when": 1794299617758,
       "tag": "0005_forecast",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794300645409,
+      "tag": "0006_invoice_checks",
+      "breakpoints": true
     }
   ]
 }

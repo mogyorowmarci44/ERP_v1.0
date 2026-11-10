@@ -105,14 +105,12 @@ for d, amt, ref, txt in [("2026-10-15", 200000, "OTP 003", "Pénztári készpén
 # ======================================================================================
 # Ügyvéd – cégalapítás (bankszámla még nem volt → a tag fizette)
 inv("Drive szamla.pdf", "in", "Dr. Horváth Anna", "DH-2026-93", "2026-08-01",
-    [("Cégalapítás ügyvédi munkadíj (alanyi adómentes)", 50000, "AM", "529")], dueDate="2026-08-11")
-ent("Drive szamla.pdf", "PE", "2026-08-11", "DH-2026-93", "Ügyvédi díj kifizetése készpénzben (a rendelkezésre bocsátott tőkéből)",
-    [("454", 50000, 0, "Dr. Horváth Anna"), ("381", 0, 50000)])
+    [("Cégalapítás ügyvédi munkadíj (alanyi adómentes)", 50000, "AM", "529")], [("2026-08-11", "381", 50000)], dueDate="2026-08-11",
+    note="Készpénzben fizetve a rendelkezésre bocsátott tőkéből")
 # Bélyegző – webshop bankkártya 08.04. (a cégszámla csak 08.24-én indult → a tag kártyája)
 inv("Drive eszamla_b26_3180", "in", "TAZO Kft. (PrintPix)", "B26/3180", "2026-08-04",
-    [("C40-es bélyegző", 6488.20, "27", "513"), ("Házhozszállítás", 1567.00, "27", "513")], pm="card")
-ent("Drive eszamla_b26_3180", "PE", "2026-08-04", "B26/3180", "Bélyegző kifizetése készpénzből (a rendelkezésre bocsátott tőkéből)",
-    [("454", 10230, 0, "TAZO Kft. (PrintPix)"), ("381", 0, 10230)])
+    [("C40-es bélyegző", 6488.20, "27", "513"), ("Házhozszállítás", 1567.00, "27", "513")], [("2026-08-04", "381", 10230)], pm="card",
+    note="Készpénzből fizetve a rendelkezésre bocsátott tőkéből")
 # Szendi Colt – KAH (különbözeti) beszerzés, készpénz
 inv("Gmail 1-2026-2", "in", "Szendi Sándor", "1-2026-2", "2026-08-27",
     [("Mitsubishi Colt XMCXNZ33A9F055883 – különbözeti, használt cikk", 680000, "KÜL27", "261", "COLT-055883")],
