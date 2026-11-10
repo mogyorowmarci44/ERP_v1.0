@@ -12,9 +12,9 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else "/home/claude/mmct/mmct-import.json"
 # None → a gépkocsi beszerzése kimarad a csomagból (és figyelmeztetés kerül a logba)
 LANCER_SWJ_PURCHASE = {"date": "2026-08-30", "partner": "Ismeretlen eladó (Lancer SWJ-792)", "price": 1850000, "account": "381",
                        "number": "AV-2026-08-30-LANCER", "src": "felhasználó (2026.11.10.)"}
-# FELTÉTELEZETT: a 10 000 EUR tagi kölcsönből (08.15.), ára 10 000 EUR – megerősítendő
+# 10 000 EUR készpénz, a 08.15-i EUR tagi kölcsönből (megerősítve 2026.11.10.)
 MAZDA_PURCHASE = {"date": "2026-08-15", "partner": "Ismeretlen eladó (Mazda CX-5)", "priceFx": 10000.0, "currency": "EUR", "account": "3811",
-                  "number": "AV-2026-08-15-MAZDA", "src": "felhasználó (2026.11.10.) – ár FELTÉTELEZETT"}
+                  "number": "AV-2026-08-15-MAZDA", "src": "felhasználó (2026.11.10.)"}
 
 TAG = "Mogyorósi Bálint Gábor"
 partners = {}
@@ -131,8 +131,8 @@ for num, d, paid in [("A2003-2026-289", "2026-09-04", "2026-09-04"), ("A2003-202
 inv("Gmail E-KBOSS-2026-661866", "in", "KBOSS.hu Kft.", "E-KBOSS-2026-661866", "2026-10-11",
     [("Számlázz.hu rendszerhasználat #start, 2026.10.11–2027.10.10", 20280, "27", "529")], [("2026-10-12", "384", 25756)])
 # Bitu-express – honosítás (hatósági díjak TAH + műszaki vizsga 27%)
-ent("felhasználó (2026.11.10.)", "PE", "2026-10-08", "TK-2026-10-08", f"Tagi kölcsön készpénzben – {TAG} (a pénztár hiánya a honosítás kifizetésekor; FELTÉTELEZETT)",
-    [("381", 54393, 0, TAG), ("4791", 0, 54393, TAG)])
+ent("felhasználó (2026.11.10.)", "PE", "2026-10-01", "TK-2026-10-01", f"Tagi kölcsön készpénzben – {TAG}",
+    [("381", 100000, 0, TAG), ("4791", 0, 100000, TAG)])
 inv("Drive IMG_5375/5734", "in", "Bitu-express Kft.", "SZA01841/2026", "2026-10-08",
     [("Honosítás hatósági díjai (Áfa tv. hatályán kívül)", 37800, "TAH", "261", "LANCER-SWJ792"),
      ("Honosítási eljárás előzetes átvizsgálás (M1)", 20758, "27", "261", "LANCER-SWJ792")], [("2026-10-08", "381", 64163)], pm="cash",
@@ -218,8 +218,7 @@ inv("szamlazz MM-2026-2", "out", "Berkes Mónika", "MM-2026-2", "2026-10-29",
 log += [
     ["Jegyzett tőke 3 000 000: Bálint 2 570 000 kp (08.01.) + 400 000 bank (08.25.), Márton 30 000 kp (08.01.) – 99%/1%"],
     ["PLACEHOLDER: Egzakt 2003 2×63 500 = 50 000 + 27% ÁFA könyvelési díj – számlák bekérendők"],
-    ["FELTÉTELEZETT: 10.08. tagi kölcsön 54 393 Ft – különben a pénztár mínuszba menne a Bitu-számla kifizetésekor"],
-    ["FELTÉTELEZETT: Mazda CX-5 beszerzés 10 000 EUR, 2026.08.15., a tagi kölcsönből (EUR pénztár)"],
+    ["Mazda CX-5 beszerzés 10 000 EUR készpénz, 2026.08.15., Bálint EUR tagi kölcsönéből; Bálint 100 000 Ft tagi kölcsön kp 10.01."],
     ["Berkes Mónika 450 000 foglaló 10.22. – a számla előtt érkezett; előlegszámla nem készült"],
     ["Évvégén: KBOSS előfizetés 2027-re eső része, KGFB elhatárolás, MacBook értékcsökkenés (143)"],
 ]
