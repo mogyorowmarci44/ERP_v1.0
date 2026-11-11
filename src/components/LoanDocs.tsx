@@ -45,13 +45,13 @@ function Parties({ company, member }: { company: DocCompany; member: DocMember }
   );
 }
 
-function Foot({ left, right, place, date, docId }: { left: [string, string]; right: [string, string]; place: string | null; date: string; docId: string }) {
+function Foot({ left, company, place, date, docId }: { left: [string, string]; company: DocCompany; place: string | null; date: string; docId: string }) {
   return (
     <>
       <p className="ld-kelt">Kelt: {place ? place : <Blank w={110} />}, {longDate(date)}</p>
       <footer className="mc-foot">
         <div className="mc-sign">{left[0]}<br />{left[1]}</div>
-        <div className="mc-sign">{right[0]}<br />{right[1]}</div>
+        <div className="mc-sign">{company.name}, {company.representativeTitle ?? "ügyvezető"}</div>
         <div className="mc-meta">{docId} · készült az MM ERP-ben</div>
       </footer>
     </>
@@ -86,7 +86,7 @@ export function ContractSheet({ company, member, loan, moneyKind }: { company: D
         <li><strong>Hosszabbítás.</strong> A lejárat a Felek írásbeli megállapodásával (sorszámozott szerződésmódosítás) meghosszabbítható; a módosítás a szerződés elválaszthatatlan része.</li>
         <li><strong>Egyéb.</strong> A szerződésben nem szabályozott kérdésekben a Polgári Törvénykönyvről szóló 2013. évi V. törvény kölcsönszerződésre vonatkozó rendelkezései az irányadók. A szerződés két egyező példányban készült.</li>
       </ol>
-      <Foot left={[member.name, "kölcsönadó"]} right={[company.name, `képviseletében: ${repName(company)}`]} place={company.signPlace} date={loan.date} docId={loan.contractNo ?? ""} />
+      <Foot left={[member.name, "kölcsönadó"]} company={company} place={company.signPlace} date={loan.date} docId={loan.contractNo ?? ""} />
     </article>
   );
 }
@@ -128,7 +128,7 @@ export function AmendmentSheet({ company, member, loan, ext }: { company: DocCom
           ))}
         </tbody>
       </table>
-      <Foot left={[member.name, "kölcsönadó"]} right={[company.name, `képviseletében: ${repName(company)}`]} place={company.signPlace} date={ext.extendedOn} docId={ext.docNo} />
+      <Foot left={[member.name, "kölcsönadó"]} company={company} place={company.signPlace} date={ext.extendedOn} docId={ext.docNo} />
     </article>
   );
 }
@@ -184,7 +184,7 @@ export function RepaymentSheet({ company, member, rep, loans, moneyKind }: { com
         Alulírott {member.name} igazolom, hogy a(z) {company.name}-tól {longDate(rep.date)} napján {rep.currency ? fmtMoney(rep.amountFx, rep.currency) : `${fmtHuf(rep.amount)} Ft`}, azaz {inWords(rep.amount, rep.currency, rep.amountFx)} összeget
         {moneyKind === "cash" ? " készpénzben átvettem" : " átutalással megkaptam"} a fenti tagi kölcsön(ök) visszafizetéseként.
       </p>
-      <Foot left={[member.name, "átvevő (kölcsönadó)"]} right={[company.name, `kifizető: ${repName(company)}`]} place={company.signPlace} date={rep.date} docId={rep.docNo ?? ""} />
+      <Foot left={[member.name, "átvevő (kölcsönadó)"]} company={company} place={company.signPlace} date={rep.date} docId={rep.docNo ?? ""} />
     </article>
   );
 }
@@ -236,7 +236,7 @@ export function StatementSheet({ company, member, rows, asOf, balance, fx }: { c
         </tbody>
       </table>
       <p className="ld-text">Kérjük, hogy az egyenleget aláírásával igazolja, vagy eltérés esetén azt 8 napon belül jelezze.</p>
-      <Foot left={[member.name, "a tag aláírása"]} right={[company.name, `képviseletében: ${repName(company)}`]} place={company.signPlace} date={asOf} docId={`Egyenlegközlő ${fmtDate(asOf)}`} />
+      <Foot left={[member.name, "a tag aláírása"]} company={company} place={company.signPlace} date={asOf} docId={`Egyenlegközlő ${fmtDate(asOf)}`} />
     </article>
   );
 }
