@@ -213,7 +213,20 @@ inv("szamlazz MM-2026-2", "out", "Berkes Mónika", "MM-2026-2", "2026-10-29",
     [("2026-10-29", "384", 450000), ("2026-10-30", "384", 3500000)], vehicle="MAZDA-CX5", dueDate="2026-10-31",
     note="450 000 foglaló 10.22-én érkezett (előleg), 3 500 000 vételárrész 10.30-án")
 
+# ======================================================================================
+# Ügyvezető (társas vállalkozó tag) minimum közterhei – 2026.11.01-től (addig másik jogviszonya volt)
+# Alap: minimálbér 322 800 Ft; tb-járulék 18,5% (a cég viseli, 551), szocho 13% (561) – 2026-tól nincs 112,5%-os szorzó.
+# ======================================================================================
+NAV = P("Nemzeti Adó- és Vámhivatal")
+for month in ("2026-11",):
+    end = {"02": "28", "04": "30", "06": "30", "09": "30", "11": "30"}.get(month[5:], "31")
+    ent("felhasználó (2026.11.11.)", "VN", f"{month}-{end}", f"{month} TB", f"Ügyvezető (társas vállalkozó) tb-járuléka 18,5% – {month}, alap: 322 800 Ft",
+        [("551", round(322800 * 0.185), 0), ("463", 0, round(322800 * 0.185), NAV)])
+    ent("felhasználó (2026.11.11.)", "VN", f"{month}-{end}", f"{month} SZOCHO", f"Ügyvezető (társas vállalkozó) szociális hozzájárulási adója 13% – {month}, alap: 322 800 Ft",
+        [("561", round(322800 * 0.13), 0), ("463", 0, round(322800 * 0.13), NAV)])
+
 log += [
+    ["Ügyvezető közterhei 2026.11.01-től: havi 59 718 Ft tb-járulék (551) + 41 964 Ft szocho (561), 08-as bevallás a tárgyhót követő hó 12-éig"],
     ["Jegyzett tőke 3 000 000: Bálint 2 570 000 kp (08.01.) + 400 000 bank (08.25.), Márton 30 000 kp (08.01.) – 99%/1%"],
     ["PLACEHOLDER: Egzakt 2003 2×63 500 = 50 000 + 27% ÁFA könyvelési díj – számlák bekérendők"],
     ["Mazda CX-5 beszerzés 10 000 EUR készpénz, 2026.08.15., Bálint EUR tagi kölcsönéből; Bálint 100 000 Ft tagi kölcsön kp 10.01."],

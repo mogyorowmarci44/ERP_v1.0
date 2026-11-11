@@ -184,7 +184,7 @@ def convert():
             if r.doc == "PezCar - Évnyitás": continue
             if r.doc.startswith("Forecast"):
                 log.append(("KIHAGYVA", f"{year}:{r.row}", r.doc, "Tervezett (Forecast) eladás – nem valós gazdasági esemény")); continue
-            if r.date > CUTOFF:
+            if r.date > CUTOFF and not (r.memo in ("CEO TB", "CEO SZOCHO") and r.date <= "2026-11-30"):  # a novemberi ügyvezetői közteher már ismert kötelezettség
                 log.append(("KIHAGYVA", f"{year}:{r.row}", r.doc, f"Jövőbeli dátum ({r.date}) – előre rögzített tétel, {r.memo}, {r.net:.0f} Ft")); continue
             if r.memo == "Nem levonható ÁFA - átvezetés":
                 log.append(("KIHAGYVA", f"{year}:{r.row}", r.doc, f"Év végi átvezetés a 466-ról a készletre ({r.net:.0f} Ft) – az új könyvelésben a nem levonható ÁFA már eleve a költség / készlet része")); continue
@@ -352,6 +352,20 @@ def convert():
                         log.append(("JAVÍTÁS", f"{year}:{x.row}", x.doc, f"Foglaló {x.net:.0f} Ft → {vs[vk]['label']} beszerzési értéke ({pdate})"))
                 if x.memo == "BALANCING" or x.partner == "BALANCING":
                     log.append(("FIGYELEM", f"{year}:{x.row}", x.doc, f"„BALANCING” egyeztető tétel ({x.net:.0f} Ft, {x.td}/{x.kd}) – átvéve, de ellenőrizd a bankkivonattal"))
+                if x.memo in ("CEO TB", "CEO SZOCHO") and x.td == "872" and x.kd == "476":
+                    # Ügyvezető (társas vállalkozó tag) minimum közterhei 2026-tól: alap a minimálbér (322 800 Ft);
+                    # a tb-járulékot a cég viseli (551), a szocho 13% (561) – 2026-tól NINCS 112,5%-os szorzó.
+                    month = x.date[:7]
+                    end = {"02": "28", "04": "30", "06": "30", "09": "30", "11": "30"}.get(month[5:], "31")
+                    tb = x.memo == "CEO TB"
+                    amt = round(322800 * (0.185 if tb else 0.13)) if month >= "2026-01" else r2(x.net)
+                    if not tb and abs(amt - r2(x.net)) >= 1:
+                        log.append(("JAVÍTÁS", f"{year}:{x.row}", x.doc, f"Ügyvezető szocho {month}: {x.net:.0f} → {amt:.0f} Ft (2026-tól a minimálbér 100%-a az alap, nincs 112,5%-os szorzó)"))
+                    docs.append({"kind": "entry", "src": f"{year}:{x.row}", "journal": "VN", "date": f"{month}-{end}", "ref": f"{month} {'TB' if tb else 'SZOCHO'}",
+                                 "description": f"Ügyvezető (társas vállalkozó) {'tb-járuléka 18,5%' if tb else 'szociális hozzájárulási adója 13%'} – {month}, alap: 322 800 Ft",
+                                 "lines": [{"account": "551" if tb else "561", "debit": amt, "credit": 0},
+                                           {"account": "463", "debit": 0, "credit": amt, "partner": partner(x.partner)}]})
+                    continue
                 jn = "BA" if {"3841", "3842"} & {x.td, x.kd} else "PE" if {"381", "382"} & {x.td, x.kd} else "VN"
                 docs.append({"kind": "entry", "src": f"{year}:{x.row}", "journal": jn, "date": x.date, "ref": x.doc, "description": f"{x.memo} – {x.partner}".strip(" –"),
                              "lines": [{"account": cost if x.td == "281" else acc(x.td, x.memo), "debit": r2(x.net), "credit": 0, "partner": partner(x.partner), "vehicle": vk if x.td == "281" and cost == "261" else None},
@@ -388,17 +402,10 @@ if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "stats":
     for l in log: print(" ", l)
 
 
-def member_loan_terms():
-    """Tagi kölcsön lejáratok a 2026-os nyilvántartásból (a 2025-ös sorokat is tartalmazza)."""
-    out = []
-    for r in list(csv.reader(open("/home/claude/pezcar-csv/2026/Tagi_Kölcsön_Nyilvántartás.csv")))[1:]:
-        r += [""] * 12
-        if "befizetés" not in r[2]: continue
-        due = r[7] if re.fullmatch(r"\d{4}-\d{2}-\d{2}", r[7]) else r[5] if re.fullmatch(r"\d{4}-\d{2}-\d{2}", r[5]) else None
-        if not due: continue
-        note = "; ".join(x for x in (r[7], r[8], r[9]) if x and not re.fullmatch(r"[-\dIN/A]*|\d{4}-\d{2}-\d{2}|Készpénz|Átutalás|Bank|TKV?-\d{4}-\d{3}", x))
-        out.append({"date": r[0], "amount": num(r[3]), "partner": r[4].strip(), "dueDate": due, "ref": r[1] or None, "note": None})  # a forrás megjegyzés-oszlopai elcsúsztak
-    return out
+def member_loan_data():
+    """Tagi kölcsön TK / TKV adatok a 2025-ös és 2026-os nyilvántartásból (lásd loan_docs.py)."""
+    import loan_docs
+    return loan_docs.build()
 
 def build_bundle():
     vs, partners, docs, log = convert()
@@ -429,7 +436,8 @@ def build_bundle():
         "partners": sorted(partners.values(), key=lambda p: p["name"]),
         "vehicles": [vout(v) for v in vs.values()],
         "documents": docs,
-        "memberLoanTerms": member_loan_terms(),
+        "memberLoanTerms": member_loan_data()[0],
+        "memberLoanRepayments": member_loan_data()[1],
         "log": [list(l) for l in log],
     }
 
