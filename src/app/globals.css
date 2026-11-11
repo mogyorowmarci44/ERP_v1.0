@@ -451,6 +451,7 @@ table.lines-edit input, table.lines-edit select { width: 100%; min-width: 0; }
 .ld-kelt { margin: 16px 0 0; }
 .ld-current td { font-weight: 600; }
 .ld-sheet .mc-foot { margin-top: 40px; }
+.ld-sheet .mc-foot { align-items: start; }
 .ld-sheet .mc-sign { text-align: center; }
 @media print { .ld-points li { margin-bottom: 3px; line-height: 1.4; } .ld-sheet .mc-foot { margin-top: 30px; } }
 

@@ -50,7 +50,7 @@ function Foot({ left, company, place, date, docId }: { left: [string, string]; c
     <>
       <p className="ld-kelt">Kelt: {place ? place : <Blank w={110} />}, {longDate(date)}</p>
       <footer className="mc-foot">
-        <div className="mc-sign">{left[0]}<br />{left[1]}</div>
+        <div className="mc-sign">{left[0]}, {left[1]}</div>
         <div className="mc-sign">{company.name}, {company.representativeTitle ?? "ügyvezető"}</div>
         <div className="mc-meta">{docId} · készült az MM ERP-ben</div>
       </footer>
@@ -184,7 +184,7 @@ export function RepaymentSheet({ company, member, rep, loans, moneyKind }: { com
         Alulírott {member.name} igazolom, hogy a(z) {company.name}-tól {longDate(rep.date)} napján {rep.currency ? fmtMoney(rep.amountFx, rep.currency) : `${fmtHuf(rep.amount)} Ft`}, azaz {inWords(rep.amount, rep.currency, rep.amountFx)} összeget
         {moneyKind === "cash" ? " készpénzben átvettem" : " átutalással megkaptam"} a fenti tagi kölcsön(ök) visszafizetéseként.
       </p>
-      <Foot left={[member.name, "átvevő (kölcsönadó)"]} company={company} place={company.signPlace} date={rep.date} docId={rep.docNo ?? ""} />
+      <Foot left={[member.name, "kölcsönadó"]} company={company} place={company.signPlace} date={rep.date} docId={rep.docNo ?? ""} />
     </article>
   );
 }
@@ -236,7 +236,7 @@ export function StatementSheet({ company, member, rows, asOf, balance, fx }: { c
         </tbody>
       </table>
       <p className="ld-text">Kérjük, hogy az egyenleget aláírásával igazolja, vagy eltérés esetén azt 8 napon belül jelezze.</p>
-      <Foot left={[member.name, "a tag aláírása"]} company={company} place={company.signPlace} date={asOf} docId={`Egyenlegközlő ${fmtDate(asOf)}`} />
+      <Foot left={[member.name, "tag"]} company={company} place={company.signPlace} date={asOf} docId={`Egyenlegközlő ${fmtDate(asOf)}`} />
     </article>
   );
 }
