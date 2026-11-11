@@ -9,12 +9,12 @@ const { journalEntries, journalLines, accounts, vehicles, companies } = schema;
 const DIR = { in: "Szállítói", out: "Vevő" } as const;
 const STATUS = { draft: "piszkozat", posted: "könyvelt", cancelled: "sztornózott" } as const;
 const PAY = { transfer: "átutalás", cash: "készpénz", card: "kártya" } as Record<string, string>;
-const HUF = '#,##0;[Red]-#,##0';
-const FX = '#,##0.00;[Red]-#,##0.00';
-const d = (s: string | null | undefined) => (s ? new Date(s + "T00:00:00Z") : null);
+export const HUF = '#,##0;[Red]-#,##0';
+export const FX = '#,##0.00;[Red]-#,##0.00';
+export const d = (s: string | null | undefined) => (s ? new Date(s + "T00:00:00Z") : null);
 
-type Col = { header: string; key: string; width: number; fmt?: string; date?: boolean };
-type Pal = { head: string; headInk: string; band: string; total: string; rule: string };
+export type Col = { header: string; key: string; width: number; fmt?: string; date?: boolean };
+export type Pal = { head: string; headInk: string; band: string; total: string; rule: string };
 const argb = (hex: string) => "FF" + hex.replace("#", "").toUpperCase();
 /** Hex szín keverése fehérrel (t = a szín aránya). */
 function tint(hex: string, t: number) {
@@ -22,11 +22,11 @@ function tint(hex: string, t: number) {
   const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(255 - (255 - v) * t));
   return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("");
 }
-function palette(accent: string): Pal {
+export function palette(accent: string): Pal {
   return { head: accent, headInk: inkOn(accent), band: tint(accent, 0.06), total: tint(accent, 0.14), rule: tint(accent, 0.45) };
 }
 
-function sheet(wb: ExcelJS.Workbook, name: string, title: string, cols: Col[], opts: { company: string; period: string; pal: Pal }) {
+export function sheet(wb: ExcelJS.Workbook, name: string, title: string, cols: Col[], opts: { company: string; period: string; pal: Pal }) {
   const ws = wb.addWorksheet(name, {
     pageSetup: {
       paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0,
@@ -61,7 +61,7 @@ function alignOf(c: Col): Partial<ExcelJS.Alignment> {
   if (c.date) return { horizontal: "center" };
   return { horizontal: "left", indent: 1 };
 }
-function finish(ws: ExcelJS.Worksheet, pal: Pal, cols: Col[], zebraKey?: (row: ExcelJS.Row) => string | number) {
+export function finish(ws: ExcelJS.Worksheet, pal: Pal, cols: Col[], zebraKey?: (row: ExcelJS.Row) => string | number) {
   const ncols = cols.length;
   let last: string | number | undefined;
   let band = false;
@@ -82,7 +82,7 @@ function finish(ws: ExcelJS.Worksheet, pal: Pal, cols: Col[], zebraKey?: (row: E
   });
 }
 /** Összesítő sor: halvány témaszínű háttér, vastag betű, vékony témaszínű vonal felül – csak a használt oszlopokon. */
-function totalRow(ws: ExcelJS.Worksheet, row: ExcelJS.Row, pal: Pal, ncols: number) {
+export function totalRow(ws: ExcelJS.Worksheet, row: ExcelJS.Row, pal: Pal, ncols: number) {
   for (let c = 1; c <= ncols; c++) {
     const cell = row.getCell(c);
     cell.font = { bold: true, size: 9 };

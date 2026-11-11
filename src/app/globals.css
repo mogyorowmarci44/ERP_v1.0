@@ -441,3 +441,37 @@ table.lines-edit input, table.lines-edit select { width: 100%; min-width: 0; }
 .inbox-split table.lines-edit th:nth-child(7) { width: 4%; }
 .code-block { font-size: 11.5px; white-space: pre; overflow: auto; max-height: 480px; background: var(--surface-2); padding: 12px; border-radius: 8px; border: 1px solid var(--line); user-select: all; }
 .setup-steps li { margin-bottom: 6px; }
+
+/* ---------- Tagi kölcsön okiratok (a különbözeti ÁFA karton arculatával) ---------- */
+.ld-points { padding-left: 18px; margin: 4px 0 0; }
+.ld-points li { margin-bottom: 5px; line-height: 1.5; text-align: justify; }
+.ld-text { line-height: 1.5; text-align: justify; margin: 4px 0 0; }
+.ld-parties td { width: 50%; white-space: normal !important; }
+.ld-blank { display: inline-block; border-bottom: 1px dotted #8a96a6; height: 1em; vertical-align: baseline; max-width: 100%; }
+.ld-kelt { margin: 16px 0 0; }
+.ld-current td { font-weight: 600; }
+.ld-sheet .mc-foot { margin-top: 40px; }
+.ld-sheet .mc-sign { text-align: center; }
+@media print { .ld-points li { margin-bottom: 3px; line-height: 1.4; } .ld-sheet .mc-foot { margin-top: 30px; } }
+
+/* ---------- Tagi kölcsön áttekintés ---------- */
+.small { font-size: 12px; }
+.ml-members { gap: 12px; }
+.ml-member { display: block; color: var(--ink); text-decoration: none; border: 1px solid var(--line); transition: border-color .15s; }
+.ml-member:hover { text-decoration: none; border-color: var(--accent); }
+.ml-member.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.ml-name { font-weight: 600; }
+.ml-bal { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 4px 0; }
+.ml-bal small { font-size: 13px; color: var(--muted); font-weight: 400; }
+.ml-meta { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--muted); }
+.ml-extend { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.ml-table td { vertical-align: top; }
+.ml-table td:first-child, .ml-table td:nth-child(2), .ml-table td:nth-child(5) { white-space: nowrap; }
+.ml-extend input[type="number"] { width: 62px; padding-left: 8px; padding-right: 4px; }
+.ml-extend input[type="date"] { width: 132px; padding-left: 8px; padding-right: 4px; }
+.ml-extend button { padding-left: 10px; padding-right: 10px; }
+.lc-bar { fill: var(--accent); }
+.lc-bar.over { fill: var(--neg); }
+.lc-bar:hover { opacity: .85; }
+.lc-val { fill: var(--ink); font-variant-numeric: tabular-nums; }
+.lc-over { fill: var(--neg); font-weight: 600; }

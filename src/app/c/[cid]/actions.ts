@@ -24,7 +24,7 @@ import { getMnbRate, storeRates, fetchMnbRates } from "@/lib/fx-service";
 import { addDays } from "@/lib/fx";
 import { PRESETS, isHex } from "@/lib/themes";
 import { importBundle, importLoanTermsOnly, wipeCompanyData, type ImportBundle, type ImportReport } from "@/lib/importer";
-import { recordMemberLoan, setLoanDueDate } from "@/lib/member-loans";
+import { extendLoan, recordMemberLoan, revalueMemberLoans, setLoanDueDate, undoLastExtension } from "@/lib/member-loans";
 import { invoiceAudit } from "@/lib/invoice-audit";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
@@ -221,9 +221,11 @@ export async function updateCompanyAction(fd: FormData) {
   const { role } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/settings`, async () => {
     if (role !== "owner") throw new Error("Csak tulajdonos módosíthatja a cégadatokat.");
+    const [cur] = await db.select({ settings: schema.companies.settings }).from(schema.companies).where(eq(schema.companies.id, cid));
     await db
       .update(schema.companies)
       .set({
+        settings: { ...cur.settings, representative: optStr(fd, "representative"), representativeTitle: optStr(fd, "representativeTitle"), signPlace: optStr(fd, "signPlace") },
         name: str(fd, "name"),
         taxNumber: optStr(fd, "taxNumber"),
         euVatNumber: optStr(fd, "euVatNumber"),
@@ -363,22 +365,24 @@ export async function memberLoanAction(fd: FormData) {
     const kind = str(fd, "kind") === "repayment" ? "repayment" : "loan";
     const date = str(fd, "date");
     if (!isDate(date)) throw new Error("Hibás dátum.");
-    await recordMemberLoan(
+    const entry = await recordMemberLoan(
       cid,
       {
         partnerId: Number(fd.get("partnerId")),
         kind,
         date,
-        amount: parseNumber(fd.get("amount")),
+        amount: parseNumber(fd.get("amount")) || null,
         moneyAccountId: Number(fd.get("moneyAccountId")),
         amountFx: parseNumber(fd.get("amountFx")) || null,
         dueDate: kind === "loan" ? str(fd, "dueDate") : null,
         note: optStr(fd, "note"),
+        targetLoanEntryId: kind === "repayment" ? Number(fd.get("targetLoanEntryId")) || null : null,
       },
       user.id,
     );
     revalidatePath(`/c/${cid}`, "layout");
-    return `/c/${cid}/member-loans?ok=${encodeURIComponent(kind === "loan" ? "Befizetés könyvelve." : "Visszafizetés könyvelve.")}`;
+    // rögtön a nyomtatható okirat: befizetésnél a szerződés (TK), visszafizetésnél a bizonylat (TKV)
+    return `/c/${cid}/member-loans/${entry.id}${kind === "loan" ? "?doc=contract" : ""}`;
   });
 }
 
@@ -386,14 +390,53 @@ export async function extendLoanAction(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/member-loans`, async () => {
-    const due = str(fd, "dueDate");
-    if (!isDate(due)) throw new Error("Hibás lejárat.");
-    await setLoanDueDate(cid, Number(fd.get("entryId")), due, optStr(fd, "note"));
-    return `/c/${cid}/member-loans?ok=${encodeURIComponent("Lejárat módosítva.")}`;
+    const days = Number(str(fd, "days"));
+    const on = str(fd, "extendedOn") || today();
+    if (!isDate(on)) throw new Error("Hibás dátum.");
+    const entryId = Number(fd.get("entryId"));
+    const r = await extendLoan(cid, entryId, { days, extendedOn: on, note: optStr(fd, "note") });
+    revalidatePath(`/c/${cid}`, "layout");
+    // az automatikusan elkészült szerződésmódosítás
+    return `/c/${cid}/member-loans/${entryId}?doc=M${r.seq}`;
   });
 }
 
-export async function importLoanTermsAction(cid: number, json: string): Promise<{ error?: string; added?: number; warnings?: string[] }> {
+export async function setLoanDueAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/member-loans`, async () => {
+    const due = str(fd, "dueDate");
+    if (!isDate(due)) throw new Error("Hibás lejárat.");
+    await setLoanDueDate(cid, Number(fd.get("entryId")), due);
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/member-loans?ok=${encodeURIComponent("Lejárat megadva – a szerződés elkészült.")}`;
+  });
+}
+
+export async function undoExtensionAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/member-loans`, async () => {
+    await undoLastExtension(cid, Number(fd.get("entryId")));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/member-loans?ok=${encodeURIComponent("Az utolsó hosszabbítás visszavonva.")}`;
+  });
+}
+
+export async function revalueMemberLoansAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/member-loans`, async () => {
+    const date = str(fd, "date");
+    if (!isDate(date)) throw new Error("Hibás dátum.");
+    const done = await revalueMemberLoans(cid, date, user.id);
+    revalidatePath(`/c/${cid}`, "layout");
+    const msg = done.length ? done.map((x) => `${x.member}: ${x.diff > 0 ? "+" : ""}${x.diff.toLocaleString("hu-HU")} Ft (${x.currency} ${x.rate})`).join("; ") : "Nincs könyvelendő különbözet.";
+    return `/c/${cid}/member-loans?ok=${encodeURIComponent("Átértékelés: " + msg)}`;
+  });
+}
+
+export async function importLoanTermsAction(cid: number, json: string): Promise<{ error?: string; added?: number; extensions?: number; repayments?: number; warnings?: string[] }> {
   const { role } = await requireCompany(cid, { write: true });
   if (role !== "owner") return { error: "Ezt csak a cég tulajdonosa teheti meg." };
   try {

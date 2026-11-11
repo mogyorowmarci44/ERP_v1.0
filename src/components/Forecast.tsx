@@ -93,7 +93,7 @@ export function ScenarioChart({ series, caption = "Pénztár + bank időszak vé
   );
 }
 
-function niceTicks(min: number, max: number, count: number) {
+export function niceTicks(min: number, max: number, count: number) {
   const span = max - min;
   const raw = span / count;
   const mag = Math.pow(10, Math.floor(Math.log10(raw)));

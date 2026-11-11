@@ -79,6 +79,10 @@ export type CompanySettings = {
   fxGain: string; // 976
   fxLoss: string; // 876
   roundingAccount: string; // kerekítési különbözet
+  /** Szerződésekhez: a cég képviselője (ügyvezető), beosztása, a szerződéskötés helye. */
+  representative?: string | null;
+  representativeTitle?: string | null;
+  signPlace?: string | null;
 };
 
 export type CompanyTheme = { preset: string; accent: string; sidebar: string; mode: "light" | "dark" };
@@ -375,9 +379,57 @@ export const payments = pgTable(
 export const memberLoanTerms = pgTable("member_loan_terms", {
   entryId: integer("entry_id").primaryKey().references(() => journalEntries.id, { onDelete: "cascade" }),
   companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  /** Jelenlegi (a hosszabbítások utáni) lejárat. */
   dueDate: date("due_date").notNull(),
+  /** Az eredeti szerződés szerinti lejárat (hosszabbítás előtt). Üres = megegyezik a jelenlegivel. */
+  originalDueDate: date("original_due_date"),
+  /** Szerződésszám, pl. TK-2026-003. */
+  contractNo: varchar("contract_no", { length: 30 }),
+  /** Devizás kölcsön: a kölcsön devizája és összege (a 4791 forintban, könyv szerinti értéken). */
+  currency: varchar("currency", { length: 3 }),
+  amountFx: money("amount_fx"),
   note: text("note"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Tagi kölcsön hosszabbítások – mindegyikhez szerződésmódosító okirat készül. */
+export const memberLoanExtensions = pgTable(
+  "member_loan_extensions",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    entryId: integer("entry_id").notNull().references(() => journalEntries.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    /** A módosítás kelte. */
+    extendedOn: date("extended_on").notNull(),
+    days: integer("days").notNull(),
+    fromDue: date("from_due").notNull(),
+    toDue: date("to_due").notNull(),
+    docNo: varchar("doc_no", { length: 40 }).notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("member_loan_ext_seq").on(t.entryId, t.seq)],
+);
+
+/** Tagi kölcsön visszafizetés (TKV): bizonylatszám és – ha megadták – melyik kölcsön(ök)et törleszti. Megadás nélkül FIFO. */
+export const memberLoanRepayments = pgTable("member_loan_repayments", {
+  entryId: integer("entry_id").primaryKey().references(() => journalEntries.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  docNo: varchar("doc_no", { length: 30 }).notNull(),
+  /** Kifejezett párosítás: [{ loanEntryId, amount }] (forint; devizásnál devizában). */
+  allocations: jsonb("allocations").$type<Array<{ loanEntryId: number; amount: number }>>(),
+  note: text("note"),
+});
+
+/** Devizás tagi kölcsön mozgások (visszafizetés devizában, fordulónapi átértékelés) devizaadatai. */
+export const memberLoanFx = pgTable("member_loan_fx", {
+  entryId: integer("entry_id").primaryKey().references(() => journalEntries.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  kind: varchar("kind", { length: 12 }).notNull(), // repayment | reval
+  currency: varchar("currency", { length: 3 }).notNull(),
+  amountFx: money("amount_fx").notNull().default(0),
+  rate: rate("rate"),
 });
 
 // ---------------------------------------------------------------------------

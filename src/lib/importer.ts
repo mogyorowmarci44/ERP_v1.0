@@ -3,8 +3,9 @@
  * vegyes tételek, partnerek és gépkocsik betöltése EGYETLEN tranzakcióban (vagy minden bekerül, vagy semmi).
  * A könyvelés a normál szolgáltatásokon keresztül történik, így minden szabály (egyensúly, ÁFA, ELÁBÉ) érvényes.
  */
-import { and, eq, sql } from "drizzle-orm";
-import { db, schema, type Tx } from "@/db";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { db, schema, type Tx, type DbOrTx } from "@/db";
+import { addDaysIso } from "./dates";
 import { saveInvoiceDraft, postInvoice, payInvoice, manualEntry, invoiceOpenAmount, type InvoiceInput } from "./ledger";
 import { round2 } from "./money";
 import { getMnbRate } from "./fx-service";
@@ -25,6 +26,73 @@ type BundleDoc =
   | { kind: "sale_payment"; src: string; date: string; ref: string; vehicle?: string | null; saleInvoice?: string | null; account: string; amount: number; partner?: string }
   | { kind: "cogs_ref"; src: string; ref: string; amount: number; vehicle?: string | null };
 
+/** Tagi kölcsön szerződés-adatok: eredeti lejárat + hosszabbítások (a jelenlegi lejárat ezekből számolódik). */
+export type LoanTermsInput = {
+  date: string; amount: number; partner: string;
+  /** Jelenlegi lejárat – ha vannak hosszabbítások, azokból számolódik (eredeti + napok). */
+  dueDate: string;
+  originalDueDate?: string | null;
+  contractNo?: string | null;
+  currency?: string | null;
+  amountFx?: number | null;
+  ref?: string | null;
+  note?: string | null;
+  extensions?: Array<{ extendedOn: string; days: number; note?: string | null }>;
+};
+
+export type LoanRepaymentInput = { date: string; amount: number; partner: string; docNo: string; allocations?: Array<{ contractNo: string; amount: number }> | null; note?: string | null };
+
+/** Visszafizetések (TKV) párosítása a napló tartozik-tételeihez és a TK szerződésekhez. */
+async function writeLoanRepayments(tx: DbOrTx, companyId: number, reps: LoanRepaymentInput[], warnings: string[]) {
+  if (!reps.length) return 0;
+  const [acc] = await tx.select().from(schema.accounts).where(and(eq(schema.accounts.companyId, companyId), eq(schema.accounts.code, "4791")));
+  if (!acc) return 0;
+  const rows = await tx
+    .select({ entryId: schema.journalEntries.id, date: schema.journalEntries.date, debit: schema.journalLines.debit, partner: schema.partners.name })
+    .from(schema.journalLines)
+    .innerJoin(schema.journalEntries, eq(schema.journalEntries.id, schema.journalLines.entryId))
+    .leftJoin(schema.partners, eq(schema.partners.id, schema.journalLines.partnerId))
+    .where(and(eq(schema.journalLines.accountId, acc.id), sql`${schema.journalLines.debit} > 0`, isNull(schema.journalEntries.reversedById), isNull(schema.journalEntries.reversalOfId), sql`coalesce(${schema.journalEntries.sourceType}, '') <> 'member_loan_reval'`));
+  const terms = await tx.select({ entryId: schema.memberLoanTerms.entryId, contractNo: schema.memberLoanTerms.contractNo }).from(schema.memberLoanTerms).where(eq(schema.memberLoanTerms.companyId, companyId));
+  const used = new Set<number>();
+  const days = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86400000;
+  let n = 0;
+  for (const r of reps) {
+    const c = rows
+      .filter((x) => !used.has(x.entryId) && Math.abs(Number(x.debit) - r.amount) < 1 && (!x.partner || x.partner === r.partner) && days(x.date, r.date) <= 70)
+      .sort((a, b) => days(a.date, r.date) - days(b.date, r.date))[0];
+    if (!c) { warnings.push(`Visszafizetés nem párosítható: ${r.docNo} ${r.date} ${r.amount} Ft`); continue; }
+    used.add(c.entryId);
+    if (c.date !== r.date) warnings.push(`${r.docNo}: a nyilvántartás ${r.date}, a napló ${c.date} – a napló szerinti tételhez rendelve`);
+    const allocations = (r.allocations ?? []).flatMap((a) => {
+      const t = terms.find((x) => x.contractNo === a.contractNo);
+      if (!t) { warnings.push(`${r.docNo}: ismeretlen szerződés ${a.contractNo}`); return []; }
+      return [{ loanEntryId: t.entryId, amount: a.amount }];
+    });
+    const values = { docNo: r.docNo, allocations: allocations.length ? allocations : null, note: r.note ?? null };
+    await tx.insert(schema.memberLoanRepayments).values({ entryId: c.entryId, companyId, ...values }).onConflictDoUpdate({ target: schema.memberLoanRepayments.entryId, set: values });
+    n++;
+  }
+  return n;
+}
+
+/** Szerződés-adatok írása egy befizetési tételhez (felülírja a meglévőt, a hosszabbításokat lecseréli). */
+async function writeLoanTerms(tx: DbOrTx, companyId: number, entryId: number, t: LoanTermsInput) {
+  const original = t.originalDueDate ?? t.dueDate;
+  let due = original;
+  const exts = (t.extensions ?? []).map((e, i) => {
+    const from = due;
+    due = addDaysIso(from, e.days);
+    return { companyId, entryId, seq: i + 1, extendedOn: e.extendedOn, days: e.days, fromDue: from, toDue: due, docNo: `${t.contractNo ?? `TK-${entryId}`}/M${i + 1}`, note: e.note ?? null };
+  });
+  if (!t.extensions?.length) due = t.dueDate;
+  const values = { dueDate: due, originalDueDate: original, contractNo: t.contractNo ?? null, currency: t.currency ?? null, amountFx: t.amountFx ?? null, note: t.note ?? null };
+  await tx.insert(schema.memberLoanTerms).values({ entryId, companyId, ...values }).onConflictDoUpdate({ target: schema.memberLoanTerms.entryId, set: { ...values, updatedAt: new Date() } });
+  await tx.delete(schema.memberLoanExtensions).where(eq(schema.memberLoanExtensions.entryId, entryId));
+  if (exts.length) await tx.insert(schema.memberLoanExtensions).values(exts);
+  return { due, extensions: exts.length };
+}
+
 export type ImportBundle = {
   format: "mm-erp-import/1";
   source?: string;
@@ -36,7 +104,9 @@ export type ImportBundle = {
     /** Devizás beszerzési ár (különbözeti adóalaphoz): forintra MNB-árfolyamon a megadott napon. */
     purchasePriceFx?: { currency: string; amount: number; date: string } | null }>;
   documents: BundleDoc[];
-  memberLoanTerms?: Array<{ date: string; amount: number; partner: string; dueDate: string; ref?: string | null; note?: string | null }>;
+  memberLoanTerms?: LoanTermsInput[];
+  /** Tagi kölcsön visszafizetések (TKV): bizonylatszám és párosítás a TK szerződésekhez. */
+  memberLoanRepayments?: LoanRepaymentInput[];
   log?: string[][];
 };
 
@@ -263,8 +333,13 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
       if (e && e.date !== t.date) report.warnings.push(`Tagi kölcsön ${t.ref ?? ""} ${t.amount} Ft: a nyilvántartás ${t.date}, a napló ${e.date} dátumot ír – a napló szerinti tételhez rendelve`);
       if (!e) { report.warnings.push(`Tagi kölcsön lejárat nem párosítható: ${t.date} ${t.amount} Ft (${t.ref ?? "bizonylatszám nélkül"})`); continue; }
       e.used = true;
-      await tx.insert(schema.memberLoanTerms).values({ entryId: e.entryId, companyId, dueDate: t.dueDate, note: t.note ?? null });
+      await writeLoanTerms(tx, companyId, e.entryId, t);
       count("tagi kölcsön lejárat");
+    }
+
+    if (bundle.memberLoanRepayments?.length) {
+      const n = await writeLoanRepayments(tx, companyId, bundle.memberLoanRepayments, report.warnings);
+      for (let i = 0; i < n; i++) count("tagi kölcsön visszafizetés");
     }
 
     // ELÁBÉ összevetés: a forrás számított ELÁBÉ-ja vs. az app könyv szerinti értéke
@@ -291,34 +366,40 @@ export function summarizeBundle(b: ImportBundle) {
   return { partners: b.partners.length, vehicles: b.vehicles.length, kinds, from: dates[0], to: dates[dates.length - 1], log: b.log ?? [] };
 }
 
-/** Már importált cégnél: csak a tagi kölcsön lejáratok pótlása a meglévő befizetési tételekhez. */
+/**
+ * Már importált cégnél: a tagi kölcsön szerződés-adatainak frissítése a meglévő befizetési tételekhez
+ * (lejárat, eredeti lejárat, szerződésszám, deviza, hosszabbítások). Más adat nem változik; a meglévőt felülírja.
+ */
 export async function importLoanTermsOnly(companyId: number, bundle: ImportBundle) {
   const terms = bundle.memberLoanTerms ?? [];
-  if (!terms.length) throw new Error("A csomag nem tartalmaz tagi kölcsön lejáratokat.");
+  if (!terms.length && !bundle.memberLoanRepayments?.length) throw new Error("A csomag nem tartalmaz tagi kölcsön adatokat.");
   const [acc] = await db.select().from(schema.accounts).where(and(eq(schema.accounts.companyId, companyId), eq(schema.accounts.code, "4791")));
   if (!acc) throw new Error("Hiányzik a 4791 Tagi kölcsön számla.");
   const rows = await db
-    .select({ entryId: schema.journalEntries.id, date: schema.journalEntries.date, credit: schema.journalLines.credit, partner: schema.partners.name, term: schema.memberLoanTerms.entryId })
+    .select({ entryId: schema.journalEntries.id, date: schema.journalEntries.date, credit: schema.journalLines.credit, partner: schema.partners.name })
     .from(schema.journalLines)
     .innerJoin(schema.journalEntries, eq(schema.journalEntries.id, schema.journalLines.entryId))
     .leftJoin(schema.partners, eq(schema.partners.id, schema.journalLines.partnerId))
-    .leftJoin(schema.memberLoanTerms, eq(schema.memberLoanTerms.entryId, schema.journalEntries.id))
-    .where(and(eq(schema.journalLines.accountId, acc.id), sql`${schema.journalLines.credit} > 0`));
+    .where(and(eq(schema.journalLines.accountId, acc.id), sql`${schema.journalLines.credit} > 0`, isNull(schema.journalEntries.reversedById), isNull(schema.journalEntries.reversalOfId)));
   const used = new Set<number>();
-  let added = 0;
+  let added = 0, extensions = 0, repayments = 0;
   const warnings: string[] = [];
   const days = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86400000;
-  for (const t of terms) {
-    const c = rows
-      .filter((r) => !used.has(r.entryId) && Math.abs(Number(r.credit) - t.amount) < 1 && (!r.partner || r.partner === t.partner) && days(r.date, t.date) <= 7)
-      .sort((a, b) => days(a.date, t.date) - days(b.date, t.date))[0];
-    if (!c) { warnings.push(`Nem párosítható: ${t.date} ${t.amount} Ft`); continue; }
-    used.add(c.entryId);
-    if (c.term) continue; // már van lejárata – nem írjuk felül
-    await db.insert(schema.memberLoanTerms).values({ entryId: c.entryId, companyId, dueDate: t.dueDate, note: t.note ?? null }).onConflictDoNothing();
-    added++;
-  }
-  return { added, warnings };
+  await db.transaction(async (tx) => {
+    for (const t of terms) {
+      const c = rows
+        .filter((r) => !used.has(r.entryId) && Math.abs(Number(r.credit) - t.amount) < 1 && (!r.partner || r.partner === t.partner) && days(r.date, t.date) <= 7)
+        .sort((a, b) => days(a.date, t.date) - days(b.date, t.date))[0];
+      if (!c) { warnings.push(`Nem párosítható: ${t.contractNo ?? ""} ${t.date} ${t.amount} Ft`); continue; }
+      used.add(c.entryId);
+      if (c.date !== t.date) warnings.push(`${t.contractNo ?? t.date}: a nyilvántartás ${t.date}, a napló ${c.date} – a napló szerinti tételhez rendelve`);
+      const r = await writeLoanTerms(tx, companyId, c.entryId, t);
+      added++;
+      extensions += r.extensions;
+    }
+    repayments = await writeLoanRepayments(tx, companyId, bundle.memberLoanRepayments ?? [], warnings);
+  });
+  return { added, extensions, repayments, warnings };
 }
 
 /** A cég összes könyvelési adatának törlése (számlák, tételek, partnerek, gépkocsik). A cég, a számlatükör és a beállítások maradnak. */
@@ -326,6 +407,9 @@ export async function wipeCompanyData(companyId: number) {
   await db.transaction(async (tx) => {
     await tx.delete(schema.payments).where(eq(schema.payments.companyId, companyId));
     await tx.delete(schema.invoices).where(eq(schema.invoices.companyId, companyId));
+    await tx.delete(schema.memberLoanExtensions).where(eq(schema.memberLoanExtensions.companyId, companyId));
+    await tx.delete(schema.memberLoanFx).where(eq(schema.memberLoanFx.companyId, companyId));
+    await tx.delete(schema.memberLoanRepayments).where(eq(schema.memberLoanRepayments.companyId, companyId));
     await tx.delete(schema.memberLoanTerms).where(eq(schema.memberLoanTerms.companyId, companyId));
     await tx.delete(schema.journalEntries).where(eq(schema.journalEntries.companyId, companyId));
     await tx.delete(schema.vehicles).where(eq(schema.vehicles.companyId, companyId));

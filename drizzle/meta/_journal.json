@@ -57,6 +57,20 @@
       "when": 1794318184275,
       "tag": "0007_inbox",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794390789852,
+      "tag": "0008_member_loans_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794391382479,
+      "tag": "0009_member_loan_repayments",
+      "breakpoints": true
     }
   ]
 }

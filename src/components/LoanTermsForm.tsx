@@ -10,8 +10,8 @@ export function LoanTermsForm({ cid }: { cid: number }) {
   const [pending, start] = useTransition();
   return (
     <div className="card grid" style={{ gap: 10 }}>
-      <strong>Tagi kölcsön lejáratok pótlása</strong>
-      <span className="muted">Ha a cégbe már importáltál, de a csomag újabb változata a tagi kölcsönök lejáratait is tartalmazza, itt csak azokat töltheted be. Más adat nem változik.</span>
+      <strong>Tagi kölcsön adatok frissítése</strong>
+      <span className="muted">Már importált cégnél a tagi kölcsönök szerződés-adatai (eredeti és jelenlegi lejárat, szerződésszám, hosszabbítások) tölthetők be / frissíthetők a csomagból. A meglévő adatot felülírja, más adat nem változik.</span>
       {msg?.error && <div className="flash error" style={{ margin: 0 }}>{msg.error}</div>}
       {msg?.ok && <div className="flash ok" style={{ margin: 0 }}>{msg.ok}{msg.warnings?.length ? ` Figyelmeztetés: ${msg.warnings.join("; ")}` : ""}</div>}
       <div className="row">
@@ -23,11 +23,11 @@ export function LoanTermsForm({ cid }: { cid: number }) {
           onClick={() =>
             start(async () => {
               const r = await importLoanTermsAction(cid, json!);
-              setMsg(r.error ? { error: r.error } : { ok: `${r.added} lejárat betöltve.`, warnings: r.warnings });
+              setMsg(r.error ? { error: r.error } : { ok: `${r.added} kölcsön (TK) frissítve, ${r.extensions ?? 0} hosszabbítás, ${r.repayments ?? 0} visszafizetés (TKV).`, warnings: r.warnings });
             })
           }
         >
-          Lejáratok betöltése
+          Frissítés
         </button>
       </div>
     </div>

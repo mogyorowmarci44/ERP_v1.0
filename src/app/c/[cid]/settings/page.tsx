@@ -34,6 +34,9 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           </select>
         </label>
         <label>Üzleti év kezdő hónapja<input name="fiscalYearStartMonth" type="number" min={1} max={12} defaultValue={company.fiscalYearStartMonth} /></label>
+        <label>Képviselő (szerződésekhez)<input name="representative" defaultValue={company.settings.representative ?? ""} placeholder="pl. Gálos Kristóf" /></label>
+        <label>Beosztás<input name="representativeTitle" defaultValue={company.settings.representativeTitle ?? "ügyvezető"} /></label>
+        <label>Szerződéskötés helye<input name="signPlace" defaultValue={company.settings.signPlace ?? ""} placeholder="pl. Mór" /></label>
         <div style={{ alignSelf: "end" }}><button className="primary" disabled={role !== "owner"}>Mentés</button></div>
       </form>
 
