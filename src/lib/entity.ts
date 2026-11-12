@@ -60,6 +60,7 @@ export const PRIVATE_COA: CoaRow[] = [
   ["511", "Anyagok, tisztítószerek, tisztasági csomag", "expense"],
   ["512", "Vendégellátás (élelmiszer, ital, kávé)", "expense"],
   ["513", "Kisértékű eszközök (200 ezer Ft alatt)", "expense"],
+  ["514", "Berendezés, eszköz beszerzés (dézsa stb.)", "expense"],
   ["521", "Platform jutalék (Airbnb, Booking)", "expense"],
   ["522", "Rezsi – villany", "expense"],
   ["5221", "Rezsi – gáz, fűtés", "expense"],

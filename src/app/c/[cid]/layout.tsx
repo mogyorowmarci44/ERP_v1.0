@@ -24,6 +24,8 @@ import {
   Inbox,
   Landmark,
   NotebookTabs,
+  CalendarDays,
+  ReceiptText,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
 import { APP_VERSION } from "@/lib/version";
@@ -61,37 +63,28 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <>
           <NavLink href={b} exact><LayoutDashboard />Áttekintés</NavLink>
 
-          <div className="group">Bevételek és kiadások</div>
+          <div className="group">Elemzés</div>
+          <NavLink href={`${b}/gh/pnl`}><ChartNoAxesCombined />Eredmény (P&amp;L)</NavLink>
+          <NavLink href={`${b}/gh/cashflow`}><Wallet />Cash flow</NavLink>
+          <NavLink href={`${b}/gh/payback`}><TrendingUp />Megtérülés</NavLink>
+          <NavLink href={`${b}/gh/bookings`}><CalendarDays />Foglalások</NavLink>
+
+          <div className="group">Rögzítés</div>
+          <NavLink href={`${b}/gh/costs`}><ReceiptText />Költség rögzítése</NavLink>
           <NavLink href={`${b}/inbox`}><Inbox />Beérkező bizonylatok</NavLink>
           <NavLink href={`${b}/invoices?dir=out`} exact><FileOutput />Bevételi bizonylatok</NavLink>
           <NavLink href={`${b}/invoices?dir=in`} exact><FileInput />Kiadási bizonylatok</NavLink>
-          <NavLink href={`${b}/invoices/new?dir=out`} exact><FilePlus2 />Új bevétel (számla / nyugta)</NavLink>
-          <NavLink href={`${b}/invoices/new?dir=in`} exact><FilePlus2 />Új kiadás</NavLink>
-          <NavLink href={`${b}/journal/new`} exact><BookPlus />Bank / pénztár / magán tétel</NavLink>
-
-          <div className="group">Pénzügy</div>
-          <NavLink href={`${b}/money`}><Wallet />Pénztár és bank</NavLink>
+          <NavLink href={`${b}/reports/open-items`}><Clock />Nyitott tételek</NavLink>
 
           <div className="group">Adók</div>
-          <NavLink href={`${b}/taxes`}><Landmark />SZJA, tételes adó, ÁFA</NavLink>
-          <NavLink href={`${b}/reports/vat`}><Percent />ÁFA analitika</NavLink>
+          <NavLink href={`${b}/taxes`}><Landmark />Adók (TFH, IFA, tételes, ÁFA-keret)</NavLink>
           <NavLink href={`${b}/reports/cashbook`}><NotebookTabs />Bevételi-kiadási nyilvántartás</NavLink>
 
-          <div className="group">Kimutatások</div>
-          <NavLink href={`${b}/reports/trial-balance`}><Scale />Főkönyvi kivonat</NavLink>
-          <NavLink href={`${b}/reports/open-items`}><Clock />Nyitott tételek</NavLink>
-          <NavLink href={`${b}/journal`} exact><BookOpen />Napló</NavLink>
-          <NavLink href={`${b}/reports/ledger`}><FileSpreadsheet />Számlakarton</NavLink>
-
-          <div className="group">Törzsadatok</div>
-          <NavLink href={`${b}/partners`}><Users />Partnerek</NavLink>
-          <NavLink href={`${b}/accounts`}><ListTree />Számlatükör</NavLink>
-          <NavLink href={`${b}/fx`}><Coins />Árfolyamok (MNB)</NavLink>
-
           <div className="group">Rendszer</div>
+          <NavLink href={`${b}/partners`}><Users />Partnerek</NavLink>
           <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
           <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
-              <NavLink href={`${b}/import`}><Upload />Adatimport</NavLink>
+          <NavLink href={`${b}/import`}><Upload />Adatimport</NavLink>
           </>
         ) : (
           <>

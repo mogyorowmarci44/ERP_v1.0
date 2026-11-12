@@ -79,3 +79,16 @@ Minden `main`-re pusholt commit automatikusan deployol.
 - A gépkocsi könyv szerinti értéke a 261-es számla gépkocsihoz rendelt tételeiből adódik. A különbözeti ÁFA alapja csak a beszerzési ár (a javítás ÁFÁ-ja levonható, nem része az alapnak) – a gépkocsin kézzel felülírható.
 
 > A könyvelési szabályokat egyeztesd a könyvelőddel – különösen az EU-s gépkocsi beszerzéseknél (különbözeti vs. KBB), és a devizás számlák ÁFA-árfolyamánál.
+
+### v2.0 – Vendégház elemzés (adószámos magánszemély)
+
+A vendégház nézet P&L- és cash flow-fókuszú; a könyvelési (főkönyvi) nézetek nem szerepelnek a menüben.
+
+- **Áttekintés** – heti / havi / éves mutatók az előző és a tavalyi azonos időszakkal (folyamatban lévő időszaknál azonos hosszon): bevétel, eredmény, árrés, cash flow, kihasználtság, ADR, RevPAR, átlagos tartózkodás, közvetlen arány, Airbnb jutalék %, ROAS, költség/éj; fedezeti pont (utolsó 12 hó), megtérülés, ÁFA-keret, szezonalitási hőtérkép.
+- **Eredmény (P&L)** – teljesítés szerint (szállásdíj a vendégéjszakákra, havi tételek a hónap napjaira, rezsi a számlázási időszakra), heti / havi / éves.
+- **Cash flow** – tényleges pénzmozgás (bank + magánpénz), számított adók esedékesség szerint, halmozott görbe.
+- **Megtérülés** – vételár + illeték diszkontált és nominális megtérülése (havi / negyedéves / éves / LTD), állítható diszkontráta, előrejelzés az utolsó 12 hónap alapján.
+- **Foglalások** – naptár, foglaláslista előidővel, közvetlen foglalás rögzítése.
+- **Költség rögzítése** – gyors űrlap, havi ismétléssel, sztornóval.
+
+Számítás: `src/lib/gh-calc.ts` (tiszta függvények, tesztek: `tests/gh-calc.test.ts`), adatbetöltés: `src/lib/guesthouse.ts`.

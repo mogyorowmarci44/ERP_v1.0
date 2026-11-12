@@ -258,13 +258,16 @@ export async function setPnlTaxIncludeAction(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
   const year = str(fd, "year");
-  await runOrRedirect(`/c/${cid}/taxes?year=${year}`, async () => {
+  const rawBack = str(fd, "back");
+  const back = rawBack === `/c/${cid}` || rawBack.startsWith(`/c/${cid}/`) || rawBack.startsWith(`/c/${cid}?`) ? rawBack : "";
+  await runOrRedirect(back || `/c/${cid}/taxes?year=${year}`, async () => {
     if (!isPrivate(company)) throw new Error("Csak adószámos magánszemélynél.");
     const inc = str(fd, "include");
     if (!["both", "platform", "direct", "none"].includes(inc)) throw new Error("Ismeretlen beállítás.");
     const profile = { ...(company.taxProfile ?? DEFAULT_TAX_PROFILE), pnlTaxInclude: inc as "both" | "platform" | "direct" | "none" };
     await db.update(schema.companies).set({ taxProfile: profile }).where(eq(schema.companies.id, cid));
     revalidatePath(`/c/${cid}`, "layout");
+    if (back) return back;
     return `/c/${cid}/taxes?year=${year}#pnl`;
   });
 }
