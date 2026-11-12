@@ -129,7 +129,7 @@ export function PropertySection({ cid, view, pr, base, t0, asOf }: { cid: number
             <label>Ingatlan típusa (adózás)
               <select name="kind" defaultValue={kind}>
                 <option value="residential">Lakóingatlan (5 év után adómentes)</option>
-                <option value="other">Egyéb (pl. gazdasági épület – 15 éves sáv)</option>
+                <option value="other">Egyéb – pl. zártkert, „kivett gazdasági épület” (15 éves sáv)</option>
               </select>
             </label>
             <label>Közvetítői díj (%, ÁFA nélkül)<input name="agentPct" className="num" defaultValue={prop.agentPct !== null && prop.agentPct !== undefined ? String(+(prop.agentPct * 100).toFixed(2)) : ""} placeholder={String(SALE_DEFAULTS.agentPct * 100)} /></label>
