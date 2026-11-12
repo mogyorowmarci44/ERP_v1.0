@@ -4,7 +4,8 @@ import { requireCompany } from "@/lib/auth";
 import { isPrivate, PNL_INCLUDE_LABEL } from "@/lib/entity";
 import { fmtDate } from "@/lib/dates";
 import { fmtHuf } from "@/lib/money";
-import { loadGuesthouse } from "@/lib/guesthouse";
+import { loadGuesthouse, propertyReturn } from "@/lib/guesthouse";
+import { PropertySection } from "../PropertySection";
 import { CF_LINES, cfOf, paybackFlows, paybackSummary, periodKey, periodKeys, periodLabel, type Gran } from "@/lib/gh-calc";
 import { fmtPct } from "@/lib/gh-view";
 import { Flash } from "@/components/Flash";
@@ -36,6 +37,7 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
   const flows = paybackFlows(d.days, d.include, t0, d.df, d.asOf);
   const s = paybackSummary(flows, d.base, d.df, d.asOf);
   const infl = cumulativeInflation(t0.slice(0, 7), CPI_LAST_ACTUAL, d.longRun);
+  const pr = propertyReturn(d);
 
   // időszakos tábla
   const g: Gran = view === "ltd" ? "year" : view;
@@ -102,6 +104,9 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
         <Seg items={(["month", "quarter", "year", "ltd"] as View[]).map((v) => ({ href: `${base}?g=${v}`, label: VIEW_LABEL[v], on: view === v }))} />
       </div>
 
+      {pr ? <PropertySection cid={cid} view={view} pr={pr} base={d.base} t0={t0} /> : null}
+
+      <h2>Megtérülés a működésből</h2>
       <div className="grid cols-4">
         <div className="card kpi">
           <div className="label">Megtérült (reálértéken, 2021-es forintban)</div>

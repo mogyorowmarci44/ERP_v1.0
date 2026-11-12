@@ -4,7 +4,7 @@ import type { TaxProfile } from "@/db/schema";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
 import { PNL_INCLUDE_LABEL, flatRateSchedule, vatExemptThreshold } from "@/lib/entity";
-import { loadGuesthouse } from "@/lib/guesthouse";
+import { loadGuesthouse, propertyReturn } from "@/lib/guesthouse";
 import { addDays, breakEven, groupBy, kpis, paybackFlows, paybackSummary, periodKey, periodLabel, periodRange, prevPeriod, sumRange, type Gran } from "@/lib/gh-calc";
 import { accommodationStart, availableDays, comparison, fmtNum, fmtPct, parseGran } from "@/lib/gh-view";
 import { IncludeToggle, Kpi, Meter, Seg, ScopeNav } from "@/components/gh/GhUi";
@@ -35,6 +35,8 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
 
   // megtérülés
   const pb = d.t0 && d.base > 0 ? paybackSummary(paybackFlows(d.days, d.include, d.t0, d.df, asOf), d.base, d.df, asOf) : null;
+
+  const pr = propertyReturn(d);
 
   // ÁFA-keret és tételes adó (tárgyév)
   const year = Number(asOf.slice(0, 4));
@@ -85,7 +87,7 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
         <Kpi label="Foglalásonkénti költség / éj" value={fmtHuf(cur.varPerNight)} unit="Ft" cur={cur.varPerNight} prev={prev.varPerNight} ly={ly.varPerNight} invert hint="takarítás + anyag + tűzifa" />
       </div>
 
-      <div className="grid cols-3" style={{ marginTop: 14 }}>
+      <div className="grid cols-4" style={{ marginTop: 14 }}>
         <div className="card kpi">
           <div className="label">Fedezeti pont (utolsó 12 hónap alapján)</div>
           <div className="value">{be.nightsPerMonth !== null ? fmtNum(be.nightsPerMonth, 1) : "–"}<small>éj / hó</small></div>
@@ -99,6 +101,13 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
           {pb ? <Meter pct={pb.recoveredPct} label="Megtérült hányad" /> : null}
           <div className="hint">{pb ? (pb.reachedDiscounted ? `Megtérült: ${fmtDate(pb.reachedDiscounted)}` : pb.projectedDiscounted ? `Várható megtérülés: ${pb.projectedDiscounted.slice(0, 7).replace("-", ". ")}.` : "A mostani tempóval nem térül meg") : "Nincs ingatlan bekerülési érték (12x számla)."}</div>
         </Link>
+        {pr ? (
+          <Link href={`${base}/gh/payback#piaci-ertek`} className="card kpi" style={{ color: "inherit", textDecoration: "none" }}>
+            <div className="label">Ingatlan becsült piaci értéke</div>
+            <div className="value">{fmtNum(pr.v.value / 1e6, 1)}<small>M Ft</small></div>
+            <div className="hint">vételár + illeték: {fmtNum(d.base / 1e6, 1)} M Ft · teljes hozam: {pr.totalNominal >= 0 ? "+" : ""}{fmtNum(pr.totalNominal / 1e6, 1)} M Ft · IRR {fmtPct(pr.irrNominal, 1)} (reál {fmtPct(pr.irrReal, 1)})</div>
+          </Link>
+        ) : null}
         <div className="card kpi">
           <div className="label">Alanyi ÁFA-mentességi keret ({year})</div>
           <div className="value">{fmtPct(yr.revenue / threshold)}<small>· {fmtHuf(yr.revenue)} / {fmtHuf(threshold)} Ft</small></div>

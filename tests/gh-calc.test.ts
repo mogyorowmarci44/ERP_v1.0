@@ -142,3 +142,18 @@ describe("KSH-infláció", () => {
     expect(1 / a).toBeCloseTo(1.031, 3);
   });
 });
+
+describe("ingatlan értékbecslés", () => {
+  it("súlyozott terület, módszerek, IRR", async () => {
+    const { valuate, weightedArea, irr, hpiFactorSince } = await import("@/lib/valuation");
+    const p = { floorM2: 36, galleryM2: 12, terraceM2: 30, priceM2: 300000, capRate: 0.1 };
+    expect(weightedArea(p)).toBe(52);
+    expect(hpiFactorSince("2021-09-01")).toBeCloseTo(1.9283, 3);
+    const v = valuate(p, 1_000_000, 10_000_000, "2021-09-01");
+    expect(v.comparable).toBe(15_600_000);
+    expect(v.income).toBe(10_000_000);
+    expect(v.indexed).toBeCloseTo(19_283_000, -3);
+    expect(v.value).toBeCloseTo(0.4 * 15.6e6 + 0.4 * 10e6 + 0.2 * 19.283e6, -3);
+    expect(irr([{ date: "2020-01-01", amount: -100 }, { date: "2021-01-01", amount: 110 }])).toBeCloseTo(0.1, 2);
+  });
+});

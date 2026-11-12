@@ -9,6 +9,10 @@ import { today } from "./dates";
 import {
   Daily,
   addDays,
+  cfOf,
+  paybackFlows,
+  paybackSummary,
+  sumRange,
   addTaxes,
   daysBetween,
   bookingCode,
@@ -23,6 +27,7 @@ import {
   type Deflator,
 } from "./gh-calc";
 import { CPI_LONG_RUN, makeCpiDeflator } from "./cpi";
+import { irr, valuate } from "./valuation";
 
 export type Stay = {
   code: string;
@@ -235,5 +240,40 @@ export async function loadGuesthouse(companyId: number, profile: TaxProfile | nu
     t0,
     stays: [...stays.values()].sort((a, b) => (a.from < b.from ? 1 : -1)),
     profile: p,
+  };
+}
+
+/** Ingatlan becsült piaci értéke és a teljes (piaci értékkel számolt) hozam a vásárlás óta. */
+export function propertyReturn(d: GhData) {
+  if (!d.t0 || d.base <= 0) return null;
+  const t0 = d.t0;
+  const ttmFrom = addDays(d.asOf, -364);
+  const ttm = cfOf(sumRange(d.days, ttmFrom, d.asOf), d.include);
+  // NOI: működési pénzáram jövedelemadó (tételes adó) nélkül
+  const noi = ttm.operating - ttm.flat;
+  const purchase = Math.round(d.base / 1.04);
+  const prop = d.profile.property ?? {};
+  const v = valuate(prop, noi, purchase, t0);
+  const flows = paybackFlows(d.days, d.include, t0, d.df, d.asOf);
+  const s = paybackSummary(flows, d.base, d.df, d.asOf);
+  const dfNow = d.df(d.asOf);
+  const totalNominal = s.cumNominal + v.value - d.base;
+  const totalReal = s.cumDiscounted + v.value * dfNow - d.base;
+  const nomFlows = [{ date: t0, amount: -d.base }, ...flows.map((f) => ({ date: f.date, amount: f.nominal })), { date: d.asOf, amount: v.value }];
+  const realFlows = [{ date: t0, amount: -d.base }, ...flows.map((f) => ({ date: f.date, amount: f.discounted })), { date: d.asOf, amount: v.value * dfNow }];
+  return {
+    prop,
+    v,
+    noi,
+    purchase,
+    summary: s,
+    dfNow,
+    totalNominal,
+    totalReal,
+    multiple: (s.cumNominal + v.value) / d.base,
+    irrNominal: irr(nomFlows),
+    irrReal: irr(realFlows),
+    gainNominal: v.value - d.base,
+    gainReal: v.value * dfNow - d.base,
   };
 }

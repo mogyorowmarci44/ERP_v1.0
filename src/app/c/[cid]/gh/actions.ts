@@ -148,3 +148,36 @@ export async function saveDiscountRateAction(fd: FormData) {
     return `${back}${back.includes("?") ? "&" : "?"}ok=${encodeURIComponent("Hosszú távú inflációs feltevés mentve.")}`;
   });
 }
+
+/** Ingatlan adatai és értékbecslési feltevések (fajlagos ár, tőkésítési ráta, berendezések értéke). */
+export async function savePropertyAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { company } = await requireCompany(cid, { write: true });
+  const back = `/c/${cid}/gh/payback?g=${/^(month|quarter|year|ltd)$/.test(str(fd, "g")) ? str(fd, "g") : "year"}`;
+  await runOrRedirect(back, async () => {
+    if (!isPrivate(company)) throw new Error("Csak vendégháznál.");
+    const num = (k: string, max: number) => {
+      const raw = str(fd, k).replace(/\s/g, "");
+      if (raw === "") return null;
+      const v = parseNumber(raw);
+      if (!Number.isFinite(v) || v < 0 || v > max) throw new Error(`Hibás érték: ${k}.`);
+      return v;
+    };
+    const cap = num("capRate", 50);
+    const property = {
+      address: str(fd, "address") || null,
+      hrsz: str(fd, "hrsz") || null,
+      plotM2: num("plotM2", 1e6),
+      floorM2: num("floorM2", 1e4),
+      galleryM2: num("galleryM2", 1e4),
+      terraceM2: num("terraceM2", 1e4),
+      priceM2: num("priceM2", 1e8),
+      capRate: cap === null ? null : cap / 100,
+      equipmentValue: num("equipmentValue", 1e10),
+    };
+    const profile = { ...(company.taxProfile ?? DEFAULT_TAX_PROFILE), property };
+    await db.update(schema.companies).set({ taxProfile: profile }).where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `${back}&ok=${encodeURIComponent("Ingatlan adatai mentve.")}#piaci-ertek`;
+  });
+}

@@ -117,6 +117,8 @@ export type TaxProfile = {
   discountRate?: number | null;
   /** Megtérülés: hosszú távú inflációs feltevés az MNB-előrejelzés utáni évekre (pl. 0.025). */
   inflationLongRun?: number | null;
+  /** Ingatlan adatai a piaci érték becsléséhez (cím, hrsz, telek, alapterület, galéria, terasz, fajlagos ár, tőkésítési ráta). */
+  property?: import("@/lib/valuation").PropertyInfo;
 };
 
 export type CompanyTheme = { preset: string; accent: string; sidebar: string; mode: "light" | "dark" };

@@ -108,6 +108,8 @@ export type ImportBundle = {
   /** Tagi kölcsön visszafizetések (TKV): bizonylatszám és párosítás a TK szerződésekhez. */
   memberLoanRepayments?: LoanRepaymentInput[];
   log?: string[][];
+  /** v2.0 – magánszemély (vendégház) adózási profiljának kiegészítése, pl. az ingatlan adatai. Csak a megadott kulcsok íródnak felül. */
+  taxProfilePatch?: Partial<import("@/db/schema").TaxProfile>;
 };
 
 export type ImportReport = {
@@ -125,6 +127,14 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
 
     const report: ImportReport = { counts: {}, warnings: [], vatDiffs: [], cogsDiffs: [] };
     const count = (k: string) => (report.counts[k] = (report.counts[k] ?? 0) + 1);
+
+    if (bundle.taxProfilePatch) {
+      const [c] = await tx.select({ entityType: schema.companies.entityType, taxProfile: schema.companies.taxProfile }).from(schema.companies).where(eq(schema.companies.id, companyId));
+      if (c?.entityType === "private_taxpayer" && c.taxProfile) {
+        await tx.update(schema.companies).set({ taxProfile: { ...c.taxProfile, ...bundle.taxProfilePatch } }).where(eq(schema.companies.id, companyId));
+        count("adózási profil kiegészítés");
+      } else report.warnings.push("Az adózási profil kiegészítése csak adószámos magánszemélynél alkalmazható – kihagyva.");
+    }
 
     // --- Számlák, ÁFA-kódok -------------------------------------------------
     for (const a of bundle.accounts ?? []) {
