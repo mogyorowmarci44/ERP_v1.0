@@ -30,6 +30,13 @@ export default async function CashflowPage({ params, searchParams }: { params: P
   const outLines = CF_LINES.filter(([k]) => !k.startsWith("rev_"));
   // halmozott pénzállás a kezdettől az időszak végéig
   const cum = (end: string) => cfOf(sumRange(d.days, "0000-01-01", end), d.include).net;
+  // a nézet első oszlopától 0-ról induló futó összeg
+  let run0 = 0;
+  const viewCum = cols.map((c) => {
+    if (c.end < periodRange(c.key, g).from) return null;
+    run0 += c.c.net;
+    return run0;
+  });
   const rows: StRow[] = [
     { label: "Bevételek", values: [], kind: "head" },
     ...inLines.map(([k, l]) => line(l, lineOf(k), { indent: true })),
@@ -44,6 +51,7 @@ export default async function CashflowPage({ params, searchParams }: { params: P
     line("Ingatlan (vételár, illeték)", (c) => c.property, { indent: true }),
     line("Egyéb tárgyi eszköz", (c) => c.invOther, { indent: true }),
     line("Nettó cash flow", (c) => c.net, { kind: "total" }),
+    { label: "Halmozott a nézetben (0-ról indulva)", values: viewCum, total: viewCum.filter((x): x is number => x !== null).at(-1) ?? 0, kind: "kpi" },
     { label: "Halmozott cash flow (kezdettől, az időszak végén)", values: cols.map((c) => (c.end < periodRange(c.key, g).from ? null : cum(c.end))), total: cum(to), kind: "kpi" },
   ];
   const shown = rows.filter((r) => (r.kind ? true : r.values.some((v) => v && Math.abs(v) >= 0.5) || Math.abs(r.total ?? 0) >= 0.5));
