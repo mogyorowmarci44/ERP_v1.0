@@ -2,7 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
-import { createCompanyAction, createPrivateTaxpayerAction, logoutAction, changePasswordAction } from "./auth-actions";
+import { createCompanyAction, createPrivateTaxpayerAction, logoutAction, changePasswordAction, deleteCompanyAction } from "./auth-actions";
 import { TaxProfileFields } from "@/components/TaxProfileFields";
 import { ENTITY_LABEL } from "@/lib/entity";
 import { APP_VERSION } from "@/lib/version";
@@ -106,6 +106,26 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         <label>Új jelszó<input name="password" type="password" minLength={10} required /></label>
         <div style={{ alignSelf: "end" }}><button>Módosítás</button></div>
       </form>
+
+      {list.some((x) => x.role === "owner") && (
+        <>
+          <h2>Cég törlése</h2>
+          <form action={deleteCompanyAction} className="card form-grid">
+            <label>Törlendő cég
+              <select name="companyId" defaultValue="" required>
+                <option value="" disabled>– válassz –</option>
+                {list.filter((x) => x.role === "owner").map(({ c }) => (
+                  <option key={c.id} value={c.id}>{c.name} ({ENTITY_LABEL[c.entityType]})</option>
+                ))}
+              </select>
+            </label>
+            <label>Jelszavad<input name="password" type="password" autoComplete="current-password" required /></label>
+            <label className="check"><input type="checkbox" name="understand" required /> Tudomásul veszem, hogy a törlés végleges</label>
+            <div style={{ alignSelf: "end" }}><button className="danger">Végleges törlés</button></div>
+          </form>
+          <p className="muted">A cég minden adata (számlák, könyvelési tételek, partnerek, számlatükör, beállítások) visszavonhatatlanul törlődik. Csak a tulajdonos törölhet.</p>
+        </>
+      )}
     </div>
   );
 }
