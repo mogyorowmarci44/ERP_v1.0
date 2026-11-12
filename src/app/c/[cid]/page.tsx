@@ -3,12 +3,15 @@ import { vehicleIdent } from "@/lib/vehicle-id";
 import { requireCompany } from "@/lib/auth";
 import { trialBalance, openItems, vehicleStock, vatAnalytics } from "@/lib/reports";
 import { fmtHuf } from "@/lib/money";
-import { monthEnd, monthStart, today, yearStart } from "@/lib/dates";
+import { fmtDate, monthEnd, monthStart, today, yearStart } from "@/lib/dates";
+import type { TaxProfile } from "@/db/schema";
+import { DEFAULT_TAX_PROFILE, SZJA_METHOD_LABEL, flatRateSchedule, isPrivate, noInputVatDeduction, revenueAndCosts, vatExemptThreshold } from "@/lib/entity";
 
 export default async function Dashboard({ params }: { params: Promise<{ cid: string }> }) {
   const cid = Number((await params).cid);
-  await requireCompany(cid);
+  const { company } = await requireCompany(cid);
   const t = today();
+  if (isPrivate(company)) return <PrivateDashboard cid={cid} company={company} t={t} />;
   const [tb, recv, pay, stock, vat] = await Promise.all([
     trialBalance(cid, yearStart(t), t),
     openItems(cid, "out"),
@@ -51,6 +54,49 @@ export default async function Dashboard({ params }: { params: Promise<{ cid: str
           {inStock.length === 0 && <tr><td colSpan={4} className="muted">Nincs készleten gépkocsi.</td></tr>}
         </tbody>
       </table>
+    </>
+  );
+}
+
+/** v2.0 – Áttekintés adószámos magánszemélynek (vendégház). */
+async function PrivateDashboard({ cid, company, t }: { cid: number; company: { name: string; entityType: string; taxProfile: TaxProfile | null }; t: string }) {
+  const p = company.taxProfile ?? DEFAULT_TAX_PROFILE;
+  const year = Number(t.slice(0, 4));
+  const [tb, recv, pay, vatYear, vatMonth] = await Promise.all([
+    trialBalance(cid, yearStart(t), t),
+    openItems(cid, "out"),
+    openItems(cid, "in"),
+    vatAnalytics(cid, yearStart(t), `${year}-12-31`, { noInputVatDeduction: noInputVatDeduction(company) }),
+    vatAnalytics(cid, monthStart(t), monthEnd(t), { noInputVatDeduction: noInputVatDeduction(company) }),
+  ]);
+  const cash = tb.filter((r) => r.code.startsWith("38")).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
+  const { revenue, costs } = revenueAndCosts(tb);
+  const openHuf = (rows: typeof recv) => rows.reduce((s, r) => s + (r.currency === "HUF" ? r.openFx : (r.openFx * Number(r.grossHuf)) / Number(r.grossFx || 1)), 0);
+  const sched = flatRateSchedule(p.rooms, p.flatRatePerRoom, year);
+  const next = sched.installments.find((i) => i.due >= t);
+  const sales = vatYear.rows.filter((r) => r.direction === "out").reduce((s, r) => s + Number(r.grossHuf), 0);
+  const threshold = vatExemptThreshold(year);
+  return (
+    <>
+      <div className="topbar">
+        <h1>Áttekintés</h1>
+        <Link className="btn" href={`/c/${cid}/taxes`}>Adók</Link>
+      </div>
+      <p className="muted" style={{ marginTop: 0 }}>{SZJA_METHOD_LABEL[p.szjaMethod]} · {p.vatExempt ? "alanyi ÁFA-mentes" : "ÁFA-körös"} · {p.rooms} szoba{p.settlement ? ` · ${p.settlement}` : ""}</p>
+      <div className="grid cols-4">
+        <div className="card stat primary"><div className="label">Pénzeszközök (bank + pénztár)</div><div className="value">{fmtHuf(cash)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Szállásbevétel (év)</div><div className="value">{fmtHuf(revenue)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Költségek (év)</div><div className="value">{fmtHuf(costs)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Eredmény (év, adó előtt)</div><div className="value">{fmtHuf(revenue - costs)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Függő bevétel (vendég / platform)</div><div className="value">{fmtHuf(openHuf(recv))}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Nyitott kiadások</div><div className="value">{fmtHuf(openHuf(pay))}<small>Ft</small></div></div>
+        {p.szjaMethod === "flat_rate_room" ? (
+          <div className="card stat"><div className="label">Következő tételes adó részlet</div><div className="value">{next ? fmtHuf(next.amount) : "–"}<small>{next ? `Ft · ${fmtDate(next.due)}` : ""}</small></div></div>
+        ) : (
+          <div className="card stat"><div className="label">Fordított ÁFA (tárgyhó)</div><div className="value">{fmtHuf(vatMonth.payable)}<small>Ft</small></div></div>
+        )}
+        <div className="card stat"><div className="label">Alanyi mentesség keret</div><div className="value">{Math.round((sales / threshold) * 100)}<small>% · {fmtHuf(threshold)} Ft</small></div></div>
+      </div>
     </>
   );
 }

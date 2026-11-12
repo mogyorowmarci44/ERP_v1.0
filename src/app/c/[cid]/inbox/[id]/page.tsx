@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isPrivate, lineDefaults } from "@/lib/entity";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -17,7 +18,8 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
   const p = await params;
   const cid = Number(p.cid);
   const sp = await searchParams;
-  const { role } = await requireCompany(cid);
+  const { role, company } = await requireCompany(cid);
+  const ld = lineDefaults(company);
   const canWrite = role !== "viewer";
   const [d] = await db.select().from(schema.inboxDocuments).where(and(eq(schema.inboxDocuments.id, Number(p.id)), eq(schema.inboxDocuments.companyId, cid)));
   if (!d) notFound();
@@ -27,7 +29,7 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
   const opts = await formOptions(cid, inv?.lines.map((l) => l.vehicleId ?? 0).filter(Boolean) ?? []);
   const fileUrl = `/c/${cid}/inbox/${d.id}/file`;
   const isImg = d.mime.startsWith("image/");
-  const blank = { description: "", quantity: 1, unitPrice: 0, accountCode: inv?.direction === "out" ? "911" : "529", vatCode: "27", vehicleId: null, newVehicle: false };
+  const blank = { description: "", quantity: 1, unitPrice: 0, accountCode: inv?.direction === "out" ? (isPrivate(company) ? ld.outAcc : "911") : "529", vatCode: inv?.direction === "out" ? ld.outVat : ld.inVat, vehicleId: null, newVehicle: false };
   // két üres sor, hogy hiányzó tételt is fel lehessen venni
   const rows = inv ? [...inv.lines, ...(canWrite && d.status !== "booked" ? [blank, blank] : [])] : [];
   const METHOD_HU: Record<string, string> = { table: "bankkivonat-export (CSV / Excel)", text: "PDF szövege, szabályok alapján", ocr: "Google szövegfelismerés + szabályok", ai: "AI (Claude)", none: "nem olvasható – kézi kitöltés" };

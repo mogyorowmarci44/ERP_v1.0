@@ -22,6 +22,23 @@ Többcéges, kettős könyvviteli ERP használtautó-kereskedéshez és szervizh
 | Adatimport | Régi nyilvántartásból átalakított csomag betöltése üres cégbe, egy tranzakcióban (számlák, kiegyenlítések, gépkocsik, partnerek), egyeztető riporttal |
 | Megjelenés | Cégenkénti logó és téma (12 kész téma, köztük sötétek, vagy egyedi színek), mobilbarát felület |
 
+## v2.0 – Adószámos magánszemély (vendégház)
+
+Új cég felvételekor választható a jogi forma: **társaság (Bt/Kft/Zrt)** vagy **adószámos magánszemély**.
+A magánszemélynél is a kettős könyvelési motor fut a háttérben, de:
+
+| Terület | Funkció |
+|---|---|
+| Számlatükör | Szálláshely-szolgáltatásra szabott: szállásdíj csatornánként (Airbnb / platform / közvetlen), rezsi, platform jutalék, takarítás, beszedett IFA (4631), magánszféra befizetés / kivét (4191/4192) |
+| ÁFA | Alanyi mentes (AAM) kódok; alanyi mentesnél semmilyen beszerzési ÁFA nem vonható le – a fordított adózású platform-jutalék (FAD27) ÁFÁ-ja fizetendő (K 467), a költség része |
+| Adók oldal | Tételes átalányadó negyedéves részletei és határidői, SZJA-módok összehasonlítása (tételes / 10% költséghányad / tételes költségelszámolás) éves vetítéssel, alanyi mentesség értékhatár-figyelő (2026: 20 M, 2027: 22 M, 2028-tól 24 M Ft), havi fordított ÁFA, gyanús platform-számlák jelzése |
+| Bevételi-kiadási nyilvántartás | Pénzforgalmi nézet a bank / pénztár mozgásaiból, kategóriákkal, nyomtatható |
+| Felület | Saját menü és áttekintés; mérleg, tagi kölcsön, gépkocsi készlet, forecast elrejtve |
+
+Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / férőhelyek, település, NTAK-azonosító, tételes adó / szoba, IFA tarifa, csatornák.
+
+Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
+
 ## Ütemterv
 
 1. ~~Könyvelési mag~~ ✅

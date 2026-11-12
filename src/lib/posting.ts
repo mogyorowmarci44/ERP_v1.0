@@ -121,6 +121,8 @@ export type PostingAccounts = {
   outputVatId: number; // 467
   inventoryId: number; // 261
   cogsId: number; // 814
+  /** v2.0 – alanyi ÁFA-mentes: az előzetesen felszámított ÁFA (fordított adózásnál is) nem vonható le, a költség része. */
+  noInputVatDeduction?: boolean;
 };
 
 export type InvoiceForPosting = {
@@ -199,9 +201,13 @@ export function buildInvoicePosting(
           out.push({ ...base, vatCodeId: null, accountId: acc.inventoryId, debit: 0, credit: bv, description: `Készletcsökkenés: ${l.description}`, currency: null, amountFx: null, fxRate: null });
         }
       }
-    } else if (l.vatKind === "non_deductible") {
-      // Nem levonható ÁFA: a költség / készlet bekerülési értékének része (Szt. 47. §)
+    } else if (l.vatKind === "non_deductible" || (acc.noInputVatDeduction && a.vatHuf !== 0)) {
+      // Nem levonható ÁFA: a költség / készlet bekerülési értékének része (Szt. 47. §).
+      // Alanyi mentes adóalanynál ez minden beszerzésre igaz; fordított adózásnál az ÁFA ettől még fizetendő (K 467).
       out.push({ ...base, accountId: l.accountId, debit: a.netHuf + a.vatHuf, credit: 0, ...fxMeta(round2(a.netFx + a.vatFx)) });
+      if (selfAssessed) {
+        out.push({ ...base, vehicleId: null, accountId: acc.outputVatId, debit: 0, credit: a.vatHuf, ...fxMeta(a.vatFx) });
+      }
     } else {
       out.push({ ...base, accountId: l.accountId, debit: a.netHuf, credit: 0, ...fxMeta(a.netFx) });
       if (a.vatHuf !== 0) {

@@ -131,7 +131,7 @@ export async function journalList(companyId: number, from: string, to: string, j
 }
 
 /** ÁFA analitika: könyvelt számlák tételei teljesítési dátum szerint, ÁFA-kódonként összesítve. */
-export async function vatAnalytics(companyId: number, from: string, to: string) {
+export async function vatAnalytics(companyId: number, from: string, to: string, opts: { noInputVatDeduction?: boolean } = {}) {
   const rows = await db
     .select({
       direction: invoices.direction,
@@ -169,7 +169,10 @@ export async function vatAnalytics(companyId: number, from: string, to: string) 
   }
   const all = [...summary.values()];
   const payable = round2(all.filter((s) => s.direction === "out" || ["reverse_charge", "eu_acquisition"].includes(s.vatKind)).reduce((a, s) => a + s.vat, 0));
-  const deductible = round2(all.filter((s) => s.direction === "in" && s.vatKind !== "non_deductible").reduce((a, s) => a + s.vat, 0));
+  // Alanyi ÁFA-mentesnél (v2.0) nincs levonható ÁFA – a fordított adózás ÁFÁ-ja csak fizetendő.
+  const deductible = opts.noInputVatDeduction
+    ? 0
+    : round2(all.filter((s) => s.direction === "in" && s.vatKind !== "non_deductible").reduce((a, s) => a + s.vat, 0));
   return { rows, summary: all, payable, deductible, balance: round2(payable - deductible) };
 }
 

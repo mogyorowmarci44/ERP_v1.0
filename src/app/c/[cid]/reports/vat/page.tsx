@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireCompany } from "@/lib/auth";
 import { vatAnalytics } from "@/lib/reports";
+import { noInputVatDeduction } from "@/lib/entity";
 import { fmtHuf } from "@/lib/money";
 import { isDate, monthStart, monthEnd, today, fmtDate } from "@/lib/dates";
 
@@ -14,7 +15,7 @@ export default async function VatPage({ params, searchParams }: { params: Promis
   const { company } = await requireCompany(cid);
   const from = isDate(sp.from) ? sp.from : monthStart(today());
   const to = isDate(sp.to) ? sp.to : monthEnd(today());
-  const v = await vatAnalytics(cid, from, to);
+  const v = await vatAnalytics(cid, from, to, { noInputVatDeduction: noInputVatDeduction(company) });
   const margin = v.rows.filter((r) => r.vatKind === "margin" && r.direction === "out");
   return (
     <>

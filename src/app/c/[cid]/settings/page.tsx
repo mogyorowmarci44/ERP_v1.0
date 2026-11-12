@@ -1,7 +1,9 @@
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
-import { updateCompanyAction, lockPeriodAction } from "../actions";
+import { updateCompanyAction, lockPeriodAction, updateTaxProfileAction } from "../actions";
+import { TaxProfileFields } from "@/components/TaxProfileFields";
+import { ENTITY_LABEL, isPrivate } from "@/lib/entity";
 import { addMemberAction } from "@/app/auth-actions";
 import { Flash } from "@/components/Flash";
 import { today } from "@/lib/dates";
@@ -10,6 +12,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
   const cid = Number((await params).cid);
   const sp = await searchParams;
   const { company, role } = await requireCompany(cid);
+  const priv = isPrivate(company);
   const locks = await db.select().from(schema.periodLocks).where(eq(schema.periodLocks.companyId, cid)).orderBy(asc(schema.periodLocks.year), asc(schema.periodLocks.month));
   const members = await db
     .select({ name: schema.users.name, email: schema.users.email, role: schema.memberships.role })
@@ -20,25 +23,40 @@ export default async function SettingsPage({ params, searchParams }: { params: P
     <>
       <h1>Beállítások</h1>
       <Flash error={sp.error} ok={sp.ok} />
-      <h2>Cégadatok</h2>
+      <h2>{priv ? "Alapadatok" : "Cégadatok"} <span className="entity-tag">{ENTITY_LABEL[company.entityType]}</span></h2>
       <form action={updateCompanyAction} className="card form-grid">
         <input type="hidden" name="cid" value={cid} />
-        <label>Cégnév<input name="name" defaultValue={company.name} required /></label>
+        <label>{priv ? "Megnevezés" : "Cégnév"}<input name="name" defaultValue={company.name} required /></label>
         <label>Adószám<input name="taxNumber" defaultValue={company.taxNumber ?? ""} /></label>
         <label>Közösségi adószám<input name="euVatNumber" defaultValue={company.euVatNumber ?? ""} /></label>
-        <label>Cégjegyzékszám<input name="registrationNumber" defaultValue={company.registrationNumber ?? ""} /></label>
-        <label>Székhely<input name="address" defaultValue={company.address ?? ""} /></label>
+        {!priv && <label>Cégjegyzékszám<input name="registrationNumber" defaultValue={company.registrationNumber ?? ""} /></label>}
+        <label>{priv ? "Szálláshely címe" : "Székhely"}<input name="address" defaultValue={company.address ?? ""} /></label>
         <label>ÁFA időszak
           <select name="vatPeriod" defaultValue={company.vatPeriod}>
             <option value="monthly">havi</option><option value="quarterly">negyedéves</option><option value="yearly">éves</option>
           </select>
         </label>
-        <label>Üzleti év kezdő hónapja<input name="fiscalYearStartMonth" type="number" min={1} max={12} defaultValue={company.fiscalYearStartMonth} /></label>
-        <label>Képviselő (szerződésekhez)<input name="representative" defaultValue={company.settings.representative ?? ""} placeholder="pl. Gálos Kristóf" /></label>
-        <label>Beosztás<input name="representativeTitle" defaultValue={company.settings.representativeTitle ?? "ügyvezető"} /></label>
-        <label>Szerződéskötés helye<input name="signPlace" defaultValue={company.settings.signPlace ?? ""} placeholder="pl. Mór" /></label>
+        {!priv && <label>Üzleti év kezdő hónapja<input name="fiscalYearStartMonth" type="number" min={1} max={12} defaultValue={company.fiscalYearStartMonth} /></label>}
+        {!priv && (
+          <>
+            <label>Képviselő (szerződésekhez)<input name="representative" defaultValue={company.settings.representative ?? ""} placeholder="pl. Gálos Kristóf" /></label>
+            <label>Beosztás<input name="representativeTitle" defaultValue={company.settings.representativeTitle ?? "ügyvezető"} /></label>
+            <label>Szerződéskötés helye<input name="signPlace" defaultValue={company.settings.signPlace ?? ""} placeholder="pl. Mór" /></label>
+          </>
+        )}
         <div style={{ alignSelf: "end" }}><button className="primary" disabled={role !== "owner"}>Mentés</button></div>
       </form>
+
+      {priv && (
+        <>
+          <h2>Adózási profil</h2>
+          <form action={updateTaxProfileAction} className="card form-grid">
+            <input type="hidden" name="cid" value={cid} />
+            <TaxProfileFields p={company.taxProfile} />
+            <div style={{ alignSelf: "end" }}><button className="primary" disabled={role !== "owner"}>Mentés</button></div>
+          </form>
+        </>
+      )}
 
       <h2>Időszak zárás</h2>
       <p className="muted">Lezárt hónapba (pl. beadott ÁFA bevallás után) nem lehet könyvelni. Visszanyitni csak tulajdonos tud.</p>

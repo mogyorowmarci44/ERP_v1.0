@@ -35,6 +35,8 @@ export function InvoiceForm(props: {
   vehicles: VehicleOpt[];
   initial: InvoiceFormInitial;
   invoiceId?: number;
+  /** v2.0 – új sor alapértelmezései az entitás szerint (pl. magánszemélynél AAM / 27NL). */
+  defaults?: { outVat: string; inVat: string; outAcc: string; inAcc: string };
 }) {
   const { cid, direction, partners, accounts, vatCodes, vehicles } = props;
   const router = useRouter();
@@ -52,8 +54,8 @@ export function InvoiceForm(props: {
     description: "",
     quantity: "1",
     unitPrice: "",
-    vatCodeId: vatByCode("27"),
-    accountId: accByCode(direction === "out" ? "913" : "523"),
+    vatCodeId: vatByCode(direction === "out" ? (props.defaults?.outVat ?? "27") : (props.defaults?.inVat ?? "27")),
+    accountId: accByCode(direction === "out" ? (props.defaults?.outAcc ?? "913") : (props.defaults?.inAcc ?? "523")),
     vehicleId: null,
   });
 

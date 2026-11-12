@@ -26,6 +26,7 @@ import { PRESETS, isHex } from "@/lib/themes";
 import { importBundle, importLoanTermsOnly, wipeCompanyData, type ImportBundle, type ImportReport } from "@/lib/importer";
 import { extendLoan, recordMemberLoan, revalueMemberLoans, setLoanDueDate, undoLastExtension } from "@/lib/member-loans";
 import { invoiceAudit } from "@/lib/invoice-audit";
+import { DEFAULT_TAX_PROFILE, isPrivate, taxProfileFromForm } from "@/lib/entity";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
@@ -236,6 +237,19 @@ export async function updateCompanyAction(fd: FormData) {
       })
       .where(eq(schema.companies.id, cid));
     return `/c/${cid}/settings?ok=${encodeURIComponent("Cégadatok mentve.")}`;
+  });
+}
+
+/** v2.0 – Magánszemély adózási profiljának mentése. */
+export async function updateTaxProfileAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { role, company } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/settings`, async () => {
+    if (role !== "owner") throw new Error("Csak tulajdonos módosíthatja az adózási profilt.");
+    if (!isPrivate(company)) throw new Error("Adózási profil csak adószámos magánszemélynél van.");
+    const profile = taxProfileFromForm(fd, company.taxProfile ?? DEFAULT_TAX_PROFILE);
+    await db.update(schema.companies).set({ taxProfile: profile }).where(eq(schema.companies.id, cid));
+    return `/c/${cid}/settings?ok=${encodeURIComponent("Adózási profil mentve.")}`;
   });
 }
 

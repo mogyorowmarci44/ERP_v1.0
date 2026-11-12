@@ -5,6 +5,7 @@ import { eq, sql as dsql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { createSession, destroySession, hashPassword, verifyPassword, requireUser } from "@/lib/auth";
 import { createCompany } from "@/lib/ledger";
+import { taxProfileFromForm } from "@/lib/entity";
 import { runOrRedirect, str, optStr } from "@/lib/action-utils";
 
 export async function loginAction(fd: FormData) {
@@ -52,6 +53,25 @@ export async function createCompanyAction(fd: FormData) {
       vatPeriod: (str(fd, "vatPeriod") || "monthly") as "monthly" | "quarterly" | "yearly",
     });
     return `/c/${c.id}`;
+  });
+}
+
+/** v2.0 – Adószámos magánszemély (pl. vendégház) felvétele saját számlatükörrel és adózási profillal. */
+export async function createPrivateTaxpayerAction(fd: FormData) {
+  const user = await requireUser();
+  await runOrRedirect("/", async () => {
+    const name = str(fd, "name");
+    if (!name) throw new Error("A név kötelező (pl. „Vendégház – Szigetvár”).");
+    const c = await createCompany(user.id, {
+      name,
+      taxNumber: optStr(fd, "taxNumber"),
+      euVatNumber: optStr(fd, "euVatNumber"),
+      address: optStr(fd, "address"),
+      vatPeriod: (str(fd, "vatPeriod") || "quarterly") as "monthly" | "quarterly" | "yearly",
+      entityType: "private_taxpayer",
+      taxProfile: taxProfileFromForm(fd),
+    });
+    return `/c/${c.id}/taxes`;
   });
 }
 

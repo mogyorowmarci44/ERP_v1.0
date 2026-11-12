@@ -51,6 +51,8 @@ export const vatPeriodEnum = pgEnum("vat_period", ["monthly", "quarterly", "year
 export const roleEnum = pgEnum("member_role", ["owner", "accountant", "viewer"]);
 export const vehicleStatusEnum = pgEnum("vehicle_status", ["in_stock", "reserved", "sold"]);
 export const vehicleVatEnum = pgEnum("vehicle_vat", ["margin", "normal"]);
+/** v2.0 – Az entitás jogi formája: társaság (Bt/Kft/Zrt) vagy adószámos magánszemély. */
+export const entityTypeEnum = pgEnum("entity_type", ["company", "private_taxpayer"]);
 
 // ---------------------------------------------------------------------------
 // Felhasználók, cégek
@@ -85,6 +87,28 @@ export type CompanySettings = {
   signPlace?: string | null;
 };
 
+/** v2.0 – Adószámos magánszemély (pl. szálláshely-szolgáltatás) adózási profilja. */
+export type TaxProfile = {
+  /** Tevékenység: jelenleg szálláshely-szolgáltatás (egyéb szálláshely / magánszálláshely). */
+  activity: "accommodation";
+  /** Alanyi ÁFA-mentes (Áfa tv. XIII. fejezet) – a beszerzések ÁFÁ-ja nem vonható le. */
+  vatExempt: boolean;
+  /** SZJA: tételes átalányadó (szobánként) | 10% költséghányad | tételes költségelszámolás. */
+  szjaMethod: "flat_rate_room" | "cost_ratio_10" | "itemized";
+  rooms: number;
+  beds?: number | null;
+  /** Szálláshely település (IFA, tételes adó mértéke). */
+  settlement?: string | null;
+  /** Szálláshely nyilvántartási / NTAK azonosító (pl. MA…). */
+  ntakId?: string | null;
+  /** Tételes átalányadó évi összege szobánként (Ft) – 2 millió vendégéjszaka alatti településen 38 400 Ft. */
+  flatRatePerRoom: number;
+  /** Idegenforgalmi adó Ft / fő / vendégéjszaka (önkormányzati rendelet szerint). */
+  ifaPerNight?: number | null;
+  /** Értékesítési csatornák (Airbnb, közvetlen, weboldal…). */
+  channels?: string[];
+};
+
 export type CompanyTheme = { preset: string; accent: string; sidebar: string; mode: "light" | "dark" };
 
 export const companies = pgTable("companies", {
@@ -98,6 +122,10 @@ export const companies = pgTable("companies", {
   fiscalYearStartMonth: integer("fiscal_year_start_month").notNull().default(1),
   vatPeriod: vatPeriodEnum("vat_period").notNull().default("monthly"),
   settings: jsonb("settings").$type<CompanySettings>().notNull(),
+  /** v2.0 – jogi forma: company (Bt/Kft/Zrt) | private_taxpayer (adószámos magánszemély). */
+  entityType: entityTypeEnum("entity_type").notNull().default("company"),
+  /** v2.0 – magánszemély adózási profilja (társaságnál null). */
+  taxProfile: jsonb("tax_profile").$type<TaxProfile>(),
   /** Megjelenés: téma (preset + egyedi színek). */
   theme: jsonb("theme").$type<CompanyTheme>(),
   /** Céglogó base64-ben (a Render ingyenes példány fájlrendszere nem tartós). */

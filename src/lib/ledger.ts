@@ -4,7 +4,9 @@
  */
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema, type DbOrTx, type Tx } from "@/db";
-import { ACCOUNT_CURRENCY, DEFAULT_COA, DEFAULT_JOURNALS, DEFAULT_SETTINGS, DEFAULT_VAT_CODES, isPostingCode } from "./coa";
+import { ACCOUNT_CURRENCY, isPostingCode } from "./coa";
+import { entitySeed, noInputVatDeduction, type EntityType } from "./entity";
+import type { TaxProfile } from "@/db/schema";
 import {
   assertBalanced,
   buildInvoicePosting,
@@ -37,17 +39,21 @@ export type NewCompany = {
   address?: string | null;
   vatPeriod?: "monthly" | "quarterly" | "yearly";
   fiscalYearStartMonth?: number;
+  /** v2.0 – jogi forma; alapértelmezés: company. */
+  entityType?: EntityType;
+  taxProfile?: TaxProfile | null;
 };
 
 export async function createCompany(userId: number, data: NewCompany, outerTx?: Tx) {
+  const seed = entitySeed(data.entityType ?? "company");
   return inTx(outerTx, async (tx) => {
     const [c] = await tx
       .insert(companies)
-      .values({ ...data, settings: DEFAULT_SETTINGS })
+      .values({ ...data, settings: seed.settings })
       .returning();
     await tx.insert(memberships).values({ userId, companyId: c.id, role: "owner" });
     await tx.insert(accounts).values(
-      DEFAULT_COA.map(([code, name, type, reportLine]) => ({
+      seed.coa.map(([code, name, type, reportLine]) => ({
         companyId: c.id,
         code,
         name,
@@ -57,8 +63,8 @@ export async function createCompany(userId: number, data: NewCompany, outerTx?: 
         currency: ACCOUNT_CURRENCY[code] ?? "HUF",
       })),
     );
-    await tx.insert(vatCodes).values(DEFAULT_VAT_CODES.map((v) => ({ ...v, companyId: c.id })));
-    await tx.insert(journals).values(DEFAULT_JOURNALS.map((j) => ({ ...j, companyId: c.id })));
+    await tx.insert(vatCodes).values(seed.vatCodes.map((v) => ({ ...v, companyId: c.id })));
+    await tx.insert(journals).values(seed.journals.map((j) => ({ ...j, companyId: c.id })));
     return c;
   });
 }
@@ -311,6 +317,7 @@ async function loadPostingContext(tx: DbOrTx, companyId: number, partnerId: numb
       outputVatId: await accountIdByCode(tx, companyId, s.outputVat),
       inventoryId: await accountIdByCode(tx, companyId, s.inventoryGoods),
       cogsId: await accountIdByCode(tx, companyId, s.cogs),
+      noInputVatDeduction: noInputVatDeduction(company),
     },
   };
 }

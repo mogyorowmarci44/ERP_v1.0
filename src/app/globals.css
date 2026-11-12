@@ -476,3 +476,9 @@ table.lines-edit input, table.lines-edit select { width: 100%; min-width: 0; }
 .lc-bar:hover { opacity: .85; }
 .lc-val { fill: var(--ink); font-variant-numeric: tabular-nums; }
 .lc-over { fill: var(--neg); font-weight: 600; }
+
+/* v2.0 – jelölőnégyzet címke (adózási profil) */
+label.check { display: flex; align-items: center; gap: 8px; align-self: end; padding-bottom: 8px; color: var(--ink); }
+label.check input[type="checkbox"] { width: auto; }
+.version-tag { font-size: 11px; color: var(--muted); opacity: 0.8; }
+.entity-tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--surface-2, rgba(127,127,127,.12)); color: var(--muted); }

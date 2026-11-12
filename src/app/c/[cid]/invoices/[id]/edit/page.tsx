@@ -4,12 +4,13 @@ import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { formOptions } from "@/lib/options";
 import { InvoiceForm } from "@/components/InvoiceForm";
+import { lineDefaults } from "@/lib/entity";
 
 export default async function EditInvoicePage({ params }: { params: Promise<{ cid: string; id: string }> }) {
   const p = await params;
   const cid = Number(p.cid);
   const id = Number(p.id);
-  await requireCompany(cid, { write: true });
+  const { company } = await requireCompany(cid, { write: true });
   const [inv] = await db.select().from(schema.invoices).where(and(eq(schema.invoices.id, id), eq(schema.invoices.companyId, cid)));
   if (!inv) notFound();
   if (inv.status !== "draft") redirect(`/c/${cid}/invoices/${id}?error=${encodeURIComponent("Csak piszkozat szerkeszthető.")}`);
@@ -22,6 +23,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ ci
         cid={cid}
         direction={inv.direction}
         invoiceId={id}
+        defaults={lineDefaults(company)}
         {...o}
         initial={{
           partnerId: inv.partnerId,

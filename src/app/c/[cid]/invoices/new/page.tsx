@@ -3,11 +3,13 @@ import { requireCompany } from "@/lib/auth";
 import { formOptions } from "@/lib/options";
 import { InvoiceForm } from "@/components/InvoiceForm";
 import { today } from "@/lib/dates";
+import { lineDefaults } from "@/lib/entity";
 
 export default async function NewInvoicePage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
   const sp = await searchParams;
-  await requireCompany(cid, { write: true });
+  const { company } = await requireCompany(cid, { write: true });
+  const d = lineDefaults(company);
   const dir = sp.dir === "in" ? "in" : "out";
   const o = await formOptions(cid);
   const acc = (code: string) => o.accounts.find((a) => a.code === code)?.id ?? o.accounts[0]?.id ?? 0;
@@ -22,6 +24,7 @@ export default async function NewInvoicePage({ params, searchParams }: { params:
       <InvoiceForm
         cid={cid}
         direction={dir}
+        defaults={d}
         {...o}
         initial={{
           partnerId: null,
@@ -35,7 +38,7 @@ export default async function NewInvoicePage({ params, searchParams }: { params:
           rateManual: false,
           periodic: false,
           note: "",
-          lines: [{ description: "", quantity: "1", unitPrice: "", vatCodeId: vat("27"), accountId: acc(dir === "out" ? "913" : "523"), vehicleId: null }],
+          lines: [{ description: "", quantity: "1", unitPrice: "", vatCodeId: vat(dir === "out" ? d.outVat : d.inVat), accountId: acc(dir === "out" ? d.outAcc : d.inAcc), vehicleId: null }],
         }}
       />
     </>

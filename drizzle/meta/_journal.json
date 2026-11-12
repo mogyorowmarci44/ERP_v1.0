@@ -71,6 +71,13 @@
       "when": 1794391382479,
       "tag": "0009_member_loan_repayments",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794475592232,
+      "tag": "0010_v2_entity_type",
+      "breakpoints": true
     }
   ]
 }
