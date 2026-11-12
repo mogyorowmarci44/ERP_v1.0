@@ -113,8 +113,10 @@ export type TaxProfile = {
   ifaNights?: Record<string, { platform?: number | null; direct?: number | null }>;
   /** P&L: a TFH / IFA melyik csatornára számítva kerüljön az eredménybe. */
   pnlTaxInclude?: "both" | "platform" | "direct" | "none";
-  /** Megtérülés: éves diszkontráta (pl. 0.06 = 6%). */
+  /** (elavult) Megtérülés: állandó éves diszkontráta – helyette KSH-infláció. */
   discountRate?: number | null;
+  /** Megtérülés: hosszú távú inflációs feltevés az MNB-előrejelzés utáni évekre (pl. 0.025). */
+  inflationLongRun?: number | null;
 };
 
 export type CompanyTheme = { preset: string; accent: string; sidebar: string; mode: "light" | "dark" };

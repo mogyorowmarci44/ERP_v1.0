@@ -34,7 +34,7 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
   const be = breakEven(ttm, 12);
 
   // megtérülés
-  const pb = d.t0 && d.base > 0 ? paybackSummary(paybackFlows(d.days, d.include, d.t0, d.rate, asOf), d.base, d.t0, d.rate, asOf) : null;
+  const pb = d.t0 && d.base > 0 ? paybackSummary(paybackFlows(d.days, d.include, d.t0, d.df, asOf), d.base, d.df, asOf) : null;
 
   // ÁFA-keret és tételes adó (tárgyév)
   const year = Number(asOf.slice(0, 4));
@@ -94,7 +94,7 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
           </div>
         </div>
         <Link href={`${base}/gh/payback`} className="card kpi" style={{ color: "inherit", textDecoration: "none" }}>
-          <div className="label">Megtérülés (diszkontált, {fmtPct(d.rate, 1)})</div>
+          <div className="label">Megtérülés (inflációval diszkontálva)</div>
           <div className="value">{pb ? fmtPct(pb.recoveredPct) : "–"}<small>{pb ? `· ${fmtHuf(pb.cumDiscounted)} / ${fmtHuf(pb.base)} Ft` : ""}</small></div>
           {pb ? <Meter pct={pb.recoveredPct} label="Megtérült hányad" /> : null}
           <div className="hint">{pb ? (pb.reachedDiscounted ? `Megtérült: ${fmtDate(pb.reachedDiscounted)}` : pb.projectedDiscounted ? `Várható megtérülés: ${pb.projectedDiscounted.slice(0, 7).replace("-", ". ")}.` : "A mostani tempóval nem térül meg") : "Nincs ingatlan bekerülési érték (12x számla)."}</div>

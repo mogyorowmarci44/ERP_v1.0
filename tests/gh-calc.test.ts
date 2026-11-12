@@ -5,6 +5,7 @@ import {
   bookingCode,
   breakEven,
   cfKey,
+  constantRate,
   discountFactor,
   groupBy,
   isoWeek,
@@ -117,12 +118,27 @@ describe("megtérülés", () => {
     expect(discountFactor("2020-01-01", "2021-01-01", 0.1)).toBeCloseTo(1 / 1.1, 2);
     const d = new Daily();
     for (let m = 1; m <= 12; m++) d.add(`2025-${String(m).padStart(2, "0")}-15`, "cf_rev_direct", 100000);
-    const f = paybackFlows(d.days(), "both", "2025-01-01", 0);
-    const s = paybackSummary(f, 2400000, "2025-01-01", 0, "2025-12-31");
+    const df = constantRate("2025-01-01", 0);
+    const f = paybackFlows(d.days(), "both", "2025-01-01", df);
+    const s = paybackSummary(f, 2400000, df, "2025-12-31");
     expect(s.cumNominal).toBe(1200000);
     expect(s.recoveredPct).toBe(0.5);
     expect(s.projectedNominal).toBe("2026-12-31");
-    const s2 = paybackSummary(f, 1000000, "2025-01-01", 0, "2025-12-31");
+    const s2 = paybackSummary(f, 1000000, df, "2025-12-31");
     expect(s2.reachedDiscounted).toBe("2025-10-15");
+  });
+});
+
+describe("KSH-infláció", () => {
+  it("árszint-deflátor és előrejelzés", async () => {
+    const { makeCpiDeflator, cumulativeInflation } = await import("@/lib/cpi");
+    const df = makeCpiDeflator("2021-09-01");
+    expect(df("2021-09-20")).toBe(1);
+    expect(df("2021-10-15")).toBeCloseTo(1 / 1.011, 6);
+    // 2022 teljes éve: dec./dec. ≈ 24,6%
+    expect(cumulativeInflation("2021-12", "2022-12")).toBeCloseTo(0.246, 2);
+    // előrejelzett hónap: 2027 havi szorzója (1,031)^(1/12)
+    const a = makeCpiDeflator("2026-12-01")("2027-12-01");
+    expect(1 / a).toBeCloseTo(1.031, 3);
   });
 });

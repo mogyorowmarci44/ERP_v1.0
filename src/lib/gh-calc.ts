@@ -395,24 +395,29 @@ export function breakEven(k: Kpis, months: number): { fixedPerMonth: number; con
 // Diszkontált megtérülés
 // ---------------------------------------------------------------------------
 
+/** Diszkonttényező: a dátum pénzének értéke a kiinduló (vásárlási) árszinten. */
+export type Deflator = (date: string) => number;
+
+/** Állandó éves rátával (tesztekhez, összevetéshez). */
 export const discountFactor = (t0: string, d: string, rate: number) => Math.pow(1 + rate, -daysBetween(t0, d) / 365.25);
+export const constantRate = (t0: string, rate: number): Deflator => (d) => discountFactor(t0, d, rate);
 
 export type PaybackPoint = { date: string; nominal: number; discounted: number };
 
 /** A megtérülést szolgáló napi pénzáramok (minden pénzmozgás, kivéve magát az ingatlanvásárlást), diszkontálva. */
-export function paybackFlows(days: Day[], inc: PnlTaxInclude, t0: string, rate: number, asOf = "9999-12-31"): PaybackPoint[] {
+export function paybackFlows(days: Day[], inc: PnlTaxInclude, t0: string, df: Deflator, asOf = "9999-12-31"): PaybackPoint[] {
   const out: PaybackPoint[] = [];
   for (const d of days) {
     if (d.date < t0 || d.date > asOf) continue;
     const cf = cfOf(d.v, inc);
     const n = cf.operating + cf.invOther;
     if (!n) continue;
-    out.push({ date: d.date, nominal: n, discounted: n * discountFactor(t0, d.date, rate) });
+    out.push({ date: d.date, nominal: n, discounted: n * df(d.date) });
   }
   return out;
 }
 
-export function paybackSummary(flows: PaybackPoint[], base: number, t0: string, rate: number, asOf: string) {
+export function paybackSummary(flows: PaybackPoint[], base: number, df: Deflator, asOf: string) {
   let cumN = 0, cumD = 0;
   let reachedN: string | null = null, reachedD: string | null = null;
   for (const f of flows) {
@@ -430,7 +435,7 @@ export function paybackSummary(flows: PaybackPoint[], base: number, t0: string, 
     let c = start;
     for (let k = 1; k <= 12 * 100; k++) {
       const d = addMonths(asOf, k);
-      c += monthly * (discounted ? discountFactor(t0, d, rate) : 1);
+      c += monthly * (discounted ? df(d) : 1);
       if (c >= base) return d;
     }
     return null;

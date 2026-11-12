@@ -20,7 +20,9 @@ import {
   pnlKey,
   spread,
   type Day,
+  type Deflator,
 } from "./gh-calc";
+import { CPI_LONG_RUN, makeCpiDeflator } from "./cpi";
 
 export type Stay = {
   code: string;
@@ -38,14 +40,14 @@ export type GhData = {
   first: string;
   asOf: string;
   include: PnlTaxInclude;
-  rate: number;
+  longRun: number;
+  df: Deflator;
   base: number;
   t0: string | null;
   stays: Stay[];
   profile: TaxProfile;
 };
 
-export const DEFAULT_DISCOUNT_RATE = 0.06;
 
 export async function loadGuesthouse(companyId: number, profile: TaxProfile | null, asOf = today()): Promise<GhData> {
   const p = profile ?? DEFAULT_TAX_PROFILE;
@@ -227,7 +229,8 @@ export async function loadGuesthouse(companyId: number, profile: TaxProfile | nu
     first,
     asOf,
     include: p.pnlTaxInclude ?? "both",
-    rate: p.discountRate ?? DEFAULT_DISCOUNT_RATE,
+    longRun: p.inflationLongRun ?? CPI_LONG_RUN,
+    df: makeCpiDeflator(t0 ?? first, p.inflationLongRun ?? CPI_LONG_RUN),
     base,
     t0,
     stays: [...stays.values()].sort((a, b) => (a.from < b.from ? 1 : -1)),

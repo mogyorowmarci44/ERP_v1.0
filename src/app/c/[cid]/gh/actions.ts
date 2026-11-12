@@ -132,7 +132,7 @@ export async function ghReverseAction(fd: FormData) {
   });
 }
 
-/** Megtérülés: éves diszkontráta mentése. */
+/** Megtérülés: hosszú távú inflációs feltevés (az MNB-előrejelzés utáni évekre). */
 export async function saveDiscountRateAction(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
@@ -141,10 +141,10 @@ export async function saveDiscountRateAction(fd: FormData) {
   await runOrRedirect(back, async () => {
     if (!isPrivate(company)) throw new Error("Csak vendégháznál.");
     const v = parseNumber(str(fd, "rate"));
-    if (v === null || !Number.isFinite(v) || v < 0 || v > 50) throw new Error("A diszkontráta 0 és 50% között legyen.");
-    const profile = { ...(company.taxProfile ?? DEFAULT_TAX_PROFILE), discountRate: v / 100 };
+    if (v === null || !Number.isFinite(v) || v < -5 || v > 50) throw new Error("A hosszú távú infláció −5 és 50% között legyen.");
+    const profile = { ...(company.taxProfile ?? DEFAULT_TAX_PROFILE), inflationLongRun: v / 100 };
     await db.update(schema.companies).set({ taxProfile: profile }).where(eq(schema.companies.id, cid));
     revalidatePath(`/c/${cid}`, "layout");
-    return `${back}${back.includes("?") ? "&" : "?"}ok=${encodeURIComponent("Diszkontráta mentve.")}`;
+    return `${back}${back.includes("?") ? "&" : "?"}ok=${encodeURIComponent("Hosszú távú inflációs feltevés mentve.")}`;
   });
 }

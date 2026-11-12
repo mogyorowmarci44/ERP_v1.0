@@ -5,11 +5,12 @@ import { isPrivate, PNL_INCLUDE_LABEL } from "@/lib/entity";
 import { fmtDate } from "@/lib/dates";
 import { fmtHuf } from "@/lib/money";
 import { loadGuesthouse } from "@/lib/guesthouse";
-import { CF_LINES, cfOf, discountFactor, paybackFlows, paybackSummary, periodKey, periodKeys, periodLabel, type Gran } from "@/lib/gh-calc";
+import { CF_LINES, cfOf, paybackFlows, paybackSummary, periodKey, periodKeys, periodLabel, type Gran } from "@/lib/gh-calc";
 import { fmtPct } from "@/lib/gh-view";
 import { Flash } from "@/components/Flash";
 import { IncludeToggle, LineChart, Meter, Seg } from "@/components/gh/GhUi";
 import { saveDiscountRateAction } from "../actions";
+import { CPI_FORECAST, CPI_LAST_ACTUAL, cumulativeInflation } from "@/lib/cpi";
 
 type View = Exclude<Gran, "week"> | "ltd";
 const VIEW_LABEL: Record<View, string> = { month: "Havi", quarter: "Negyedéves", year: "Éves", ltd: "Kezdettől (LTD)" };
@@ -32,8 +33,9 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
     );
   }
   const t0 = d.t0;
-  const flows = paybackFlows(d.days, d.include, t0, d.rate, d.asOf);
-  const s = paybackSummary(flows, d.base, t0, d.rate, d.asOf);
+  const flows = paybackFlows(d.days, d.include, t0, d.df, d.asOf);
+  const s = paybackSummary(flows, d.base, d.df, d.asOf);
+  const infl = cumulativeInflation(t0.slice(0, 7), CPI_LAST_ACTUAL, d.longRun);
 
   // időszakos tábla
   const g: Gran = view === "ltd" ? "year" : view;
@@ -72,7 +74,7 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
   const addCat = (k: string, n: number, date: string) => {
     const c = cat.get(k) ?? { n: 0, dsc: 0 };
     c.n += n;
-    c.dsc += n * discountFactor(t0, date, d.rate);
+    c.dsc += n * d.df(date);
     cat.set(k, c);
   };
   for (const day of d.days) {
@@ -95,14 +97,14 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
       <div className="topbar">
         <div>
           <h1>Megtérülés</h1>
-          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>A vételár + illeték ({fmtHuf(d.base)} Ft, {fmtDate(t0)}) megtérülése a vásárlás óta befolyt nettó pénzáramból, {fmtPct(d.rate, 1)} éves diszkontrátával.</div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>A vételár + illeték ({fmtHuf(d.base)} Ft, {fmtDate(t0)}) megtérülése a vásárlás óta befolyt nettó pénzáramból, a KSH havi inflációjával a vásárláskori forintra diszkontálva. Infláció {fmtDate(t0).slice(0, 8)} – {CPI_LAST_ACTUAL.replace("-", ". ")}.: {fmtPct(infl, 1)}.</div>
         </div>
         <Seg items={(["month", "quarter", "year", "ltd"] as View[]).map((v) => ({ href: `${base}?g=${v}`, label: VIEW_LABEL[v], on: view === v }))} />
       </div>
 
       <div className="grid cols-4">
         <div className="card kpi">
-          <div className="label">Megtérült (diszkontált)</div>
+          <div className="label">Megtérült (reálértéken, 2021-es forintban)</div>
           <div className="value">{fmtPct(s.recoveredPct, 1)}<small>· {fmtHuf(s.cumDiscounted)} Ft</small></div>
           <Meter pct={s.recoveredPct} label="Diszkontált megtérülés" />
           <div className="hint">hátravan: {fmtHuf(Math.max(0, d.base - s.cumDiscounted))} Ft (a vásárláskori értéken)</div>
@@ -114,12 +116,12 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
           <div className="hint">hátravan: {fmtHuf(Math.max(0, d.base - s.cumNominal))} Ft</div>
         </div>
         <div className="card kpi">
-          <div className="label">Diszkontált megtérülési idő</div>
+          <div className="label">Megtérülési idő reálértéken</div>
           <div className="value" style={{ fontSize: 20 }}>{projected(s.projectedDiscounted, s.reachedDiscounted)}</div>
           <div className="hint">{yearsFrom(s.projectedDiscounted) ? `${yearsFrom(s.projectedDiscounted)} év a vásárlástól · ` : ""}nominálisan: {projected(s.projectedNominal, s.reachedNominal)}</div>
         </div>
         <div className="card kpi">
-          <div className="label">Nettó jelenérték eddig (NPV)</div>
+          <div className="label">Reálérték-egyenleg eddig (NPV)</div>
           <div className={`value ${s.npv < 0 ? "neg" : "pos"}`}>{fmtHuf(s.npv)}<small>Ft</small></div>
           <div className="hint">utolsó 12 hónap pénzárama: {fmtHuf(s.ttm)} Ft ({fmtHuf(s.monthly)} Ft/hó) – erre épül az előrejelzés</div>
         </div>
@@ -129,9 +131,9 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
         <form action={saveDiscountRateAction} className="row" style={{ gap: 8 }}>
           <input type="hidden" name="cid" value={cid} />
           <input type="hidden" name="g" value={view} />
-          <label style={{ display: "flex", gap: 8, alignItems: "center" }}>Diszkontráta (évi %)
-            <input name="rate" className="num" defaultValue={String(+(d.rate * 100).toFixed(2)).replace(".", ",")} style={{ width: 80 }} />
-          </label>
+          <span className="muted" style={{ fontSize: 12.5 }}>Előrejelzés (MNB, 2026. szept.): {Object.entries(CPI_FORECAST).map(([y, r]) => `${y}: ${fmtPct(r, 1)}`).join(" · ")} · utána</span>
+          <input name="rate" className="num" aria-label="Hosszú távú infláció (%)" defaultValue={String(+(d.longRun * 100).toFixed(2)).replace(".", ",")} style={{ width: 64 }} />
+          <span className="muted" style={{ fontSize: 12.5 }}>%/év</span>
           <button>Mentés</button>
         </form>
         <IncludeToggle cid={cid} inc={d.include} back={`${base}?g=${view}`} />
@@ -141,7 +143,7 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
         <LineChart
           title="Halmozott pénzáram a vásárlás óta, a vételárhoz mérve"
           series={[
-            { name: "Halmozott diszkontált pénzáram", color: "var(--ch-airbnb)", points: dscPts },
+            { name: "Halmozott reálértéken (2021. szept. forint)", color: "var(--ch-airbnb)", points: dscPts },
             { name: "Halmozott nominális pénzáram", color: "var(--ch-booking)", points: nomPts },
           ]}
           base={d.base}
@@ -155,7 +157,7 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
           <h2>Kezdettől (LTD) – miből jött vissza a pénz</h2>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Tétel</th><th className="num">Nominális</th><th className="num">Diszkontált</th><th className="num">a vételár %-ában</th></tr></thead>
+              <thead><tr><th>Tétel</th><th className="num">Nominális</th><th className="num">Reálértéken</th><th className="num">a vételár %-ában</th></tr></thead>
               <tbody>
                 {[...cat.entries()].sort((x, y) => y[1].n - x[1].n).map(([k, v]) => (
                   <tr key={k}><td>{catLabel.get(k) ?? k}</td><td className={`num${v.n < 0 ? " neg" : ""}`}>{fmtHuf(v.n)}</td><td className={`num${v.dsc < 0 ? " neg" : ""}`}>{fmtHuf(v.dsc)}</td><td className="num">{fmtPct(v.dsc / d.base, 1)}</td></tr>
@@ -175,7 +177,7 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Időszak</th><th className="num">Pénzáram</th><th className="num">Diszkontált</th><th className="num">Halmozott (nominális)</th><th className="num">Halmozott (diszkontált)</th><th className="num">Megtérült</th><th className="num">Hátralévő</th></tr>
+                <tr><th>Időszak</th><th className="num">Pénzáram</th><th className="num">Reálértéken</th><th className="num">Halmozott (nominális)</th><th className="num">Halmozott (reálértéken)</th><th className="num">Megtérült</th><th className="num">Hátralévő</th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
@@ -196,7 +198,7 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
       )}
       <p className="muted" style={{ fontSize: 12.5 }}>
         Pénzáram = minden tényleges befolyás és kiadás a vásárlás óta (a hosszú távú bérleti díj, a szállásdíjak, a költségek, az eszközbeszerzések pl. dézsa), plusz a számított adók esedékesség szerint (TFH/IFA: {PNL_INCLUDE_LABEL[d.include].toLowerCase()}); a vételár és az illeték maga a megtérülendő összeg.
-        A diszkontálás a vásárlás napjára történik: (1 + ráta)^−év. Az ingatlan értéknövekedése (eladási ár) nincs benne – ez a működésből való megtérülés. Az előrejelzés az utolsó 12 hónap átlagos havi pénzáramával számol.
+        Diszkontálás: minden hónap pénzáramát a KSH fogyasztóiár-indexével (előző hónap = 100) a vásárlás hónapjának árszintjére számoljuk vissza; a még nem publikált hónapokra és az előrejelzésben az MNB inflációs pályája, utána a megadott hosszú távú ráta érvényes. Az ingatlan értéknövekedése (eladási ár) nincs benne – ez a működésből való megtérülés. Az előrejelzés az utolsó 12 hónap átlagos havi pénzáramával számol, az előrejelzett inflációval diszkontálva.
       </p>
     </div>
   );
