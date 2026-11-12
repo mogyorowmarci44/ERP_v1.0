@@ -31,9 +31,9 @@ export default async function CashflowPage({ params, searchParams }: { params: P
   // halmozott pénzállás a kezdettől az időszak végéig
   const cum = (end: string) => cfOf(sumRange(d.days, "0000-01-01", end), d.include).net;
   const rows: StRow[] = [
-    { label: "Befolyások", values: [], kind: "head" },
+    { label: "Bevételek", values: [], kind: "head" },
     ...inLines.map(([k, l]) => line(l, lineOf(k), { indent: true })),
-    line("Összes befolyás", (c) => c.inflow, { kind: "sub" }),
+    line("Összes bevétel", (c) => c.inflow, { kind: "sub" }),
     { label: "Működési kiadások", values: [], kind: "head" },
     ...outLines.map(([k, l]) => line(l, lineOf(k), { indent: true })),
     line("Tételes adó (esedékesség szerint, számított)", (c) => c.flat, { indent: true }),
@@ -77,7 +77,7 @@ export default async function CashflowPage({ params, searchParams }: { params: P
         <LineChart title="Halmozott cash flow havonta" series={[{ name: "Halmozott cash flow", color: "var(--accent)", points: pts }]} />
       </div>
       <p className="muted" style={{ fontSize: 12.5 }}>
-        * folyamatban lévő időszak (a mai napig). A tételes adó, a TFH és az IFA számított, esedékesség szerinti kiáramlás – a könyvelt befizetések a „Könyvelt adóbefizetés” sorban vannak. Az Airbnb a jutalékot a kifizetésből vonja le, ezért a befolyás nettó.
+        * folyamatban lévő időszak (a mai napig). A tételes adó, a TFH és az IFA számított, esedékesség szerinti kiáramlás – a könyvelt befizetések a „Könyvelt adóbefizetés” sorban vannak. Az Airbnb a jutalékot a kifizetésből vonja le, ezért az Airbnb-bevétel itt nettó.
       </p>
     </div>
   );
