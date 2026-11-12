@@ -57,9 +57,14 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
     }
   }
   const rcTotal = round2([...rc.values()].reduce((a, b) => a + b, 0));
-  // Gyanús: platform-jutalék fordított adózás nélkül
+  // Gyanús: ÁFA nélküli platform-jutalék, ami nincs fordított adózásként könyvelve.
+  // (Ha az Airbnb maga számolt fel 27% ÁFA-t – nem adtál meg közösségi adószámot –, az rendben van: 27NL.)
   const suspicious = vat.rows.filter(
-    (r) => r.direction === "in" && /airbnb|booking|expedia|szallas\.hu|vrbo/i.test(r.partnerName) && !["reverse_charge", "eu_acquisition"].includes(r.vatKind),
+    (r) =>
+      r.direction === "in" &&
+      /airbnb|booking|expedia|szallas\.hu|vrbo/i.test(r.partnerName) &&
+      !["reverse_charge", "eu_acquisition"].includes(r.vatKind) &&
+      Number(r.vatHuf) === 0,
   );
 
   return (
@@ -143,7 +148,10 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
             </p>
           </div>
           <h3>Fordított adózású ÁFA (pl. Airbnb jutalék)</h3>
-          <p className="muted">Alanyi mentesként is fizetendő, ha külföldi platformtól szolgáltatást veszel igénybe – levonni nem lehet, a költség része. Ehhez közösségi adószám kell.</p>
+          <p className="muted">
+            Ha az Airbnb a közösségi adószámodra ÁFA nélkül számláz, a 27% ÁFA-t neked kell bevallani és befizetni (alanyi mentesként is), levonni nem lehet – FAD27 kóddal könyveld.
+            Ha a számlán már szerepel 27% magyar ÁFA, azt az Airbnb fizeti be, neked nincs teendőd – 27NL kóddal könyveld.
+          </p>
           <table>
             <thead><tr><th>Hónap</th><th className="num">Fizetendő ÁFA</th></tr></thead>
             <tbody>
@@ -153,7 +161,7 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
           </table>
           {suspicious.length > 0 && (
             <div className="flash error" style={{ marginTop: 8 }}>
-              {suspicious.length} platform-számla nem fordított adózású ÁFA-kóddal van könyvelve (pl. {suspicious[0].partnerName} – {suspicious[0].invoiceNumber}). Ellenőrizd: jellemzően FAD27 kell.
+              {suspicious.length} platform-számla nem fordított adózású ÁFA-kóddal van könyvelve (pl. {suspicious[0].partnerName} – {suspicious[0].invoiceNumber}). ÁFA nélküli platform-számlánál FAD27 (fordított adózás) kell.
             </div>
           )}
         </>
