@@ -5,6 +5,7 @@ import Link from "next/link";
 import { importBundleAction } from "@/app/c/[cid]/actions";
 import type { ImportReport } from "@/lib/importer";
 import { fmtHuf } from "@/lib/money";
+import { progress } from "@/lib/progress";
 
 type Preview = { partners: number; vehicles: number; kinds: Record<string, number>; from?: string; to?: string; log: string[][]; source?: string };
 
@@ -35,9 +36,22 @@ export function ImportForm({ cid }: { cid: number }) {
   const run = () =>
     start(async () => {
       setError(null);
-      const res = await importBundleAction(cid, json!);
-      if (res.error) setError(res.error);
-      else setReport(res.report!);
+      // Egy tranzakcióban fut a szerveren: a % a korábbi importok dokumentumonkénti idejéből becsült
+      const docs = preview ? Object.values(preview.kinds).reduce((a, b) => a + b, 0) : 1;
+      const id = progress.start({ key: "import:doc", label: `Importálás – ${docs} tétel…`, manual: true, units: docs, expectedMs: 600 + docs * 60 });
+      try {
+        const res = await importBundleAction(cid, json!);
+        if (res.error) {
+          setError(res.error);
+          progress.done(id, { cancel: true });
+        } else {
+          setReport(res.report!);
+          progress.done(id);
+        }
+      } catch (e) {
+        progress.done(id, { cancel: true });
+        throw e;
+      }
     });
 
   const kindHu: Record<string, string> = { invoice: "számla", entry: "vegyes / bank / pénztár tétel", sale_payment: "vevői befizetés", cogs_ref: "ELÁBÉ-összevetés", sale_entry: "egyéb eladás" };
@@ -62,7 +76,7 @@ export function ImportForm({ cid }: { cid: number }) {
             </table>
           </details>
           <div className="row">
-            <button className="primary" onClick={run} disabled={pending}>Importálás indítása</button>
+            <button className="primary" onClick={run} disabled={pending} data-progress="off">Importálás indítása</button>
             {pending && <span className="muted">Könyvelés folyamatban, ez akár egy-két percig is tarthat. Ne zárd be az oldalt.</span>}
           </div>
         </div>

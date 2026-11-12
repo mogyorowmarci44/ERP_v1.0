@@ -17,6 +17,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ cid: str
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="${slug}_tagi_kolcson_${asOf}.xlsx"`,
       "Cache-Control": "no-store",
+      "Content-Length": String(buffer.byteLength),
     },
   });
 }

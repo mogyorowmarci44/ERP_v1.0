@@ -21,6 +21,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ cid: str
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="${name}"`,
       "Cache-Control": "no-store",
+      "Content-Length": String(buffer.byteLength),
     },
   });
 }

@@ -528,3 +528,29 @@ table.heat th:first-child, table.heat td:first-child { text-align: left; }
 .lc-lbl { font-size: 12px; font-weight: 600; fill: var(--ink); font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; }
 .lc-hit { fill: transparent; }
 .lc-hit:hover { fill: color-mix(in srgb, var(--accent) 7%, transparent); }
+
+/* ---------- Globális töltésjelző (kör, %) ---------- */
+.gp {
+  --gp-accent: var(--accent);
+  position: fixed; right: 18px; bottom: 18px; z-index: 1000;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px 8px 8px;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.16), 0 2px 6px rgba(16, 24, 40, 0.08);
+  font-size: 13px; font-weight: 500;
+  animation: gp-in 0.18s ease-out;
+  pointer-events: none;
+}
+.gp-ring { position: relative; width: 48px; height: 48px; flex: none; }
+.gp-ring svg { display: block; transform: rotate(-90deg); }
+.gp-track { fill: none; stroke: color-mix(in srgb, var(--gp-accent) 14%, var(--line)); stroke-width: 4.5; }
+.gp-bar { fill: none; stroke: var(--gp-accent); stroke-width: 4.5; stroke-linecap: round; transition: stroke-dashoffset 0.2s linear; }
+.gp-pct { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gp-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gp-done { animation: gp-out 0.45s ease-in forwards; }
+.gp-done .gp-bar { stroke: var(--pos); }
+@keyframes gp-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes gp-out { 0%, 60% { opacity: 1; } 100% { opacity: 0; transform: translateY(4px); } }
+@media (max-width: 640px) { .gp { right: 12px; bottom: 12px; } .gp-label { max-width: 150px; } }
+@media print { .gp { display: none !important; } }
