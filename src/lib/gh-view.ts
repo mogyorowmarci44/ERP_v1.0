@@ -80,13 +80,14 @@ export function fmtNum(x: number | null | undefined, digits = 0): string {
   return x.toLocaleString("hu-HU", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
-/** Változás: relatív (%) pénzösszegeknél, százalékpont arányoknál. */
+/** Változás: relatív (%) pénzösszegeknél, bázispont (bps) arányoknál. */
 export function delta(cur: number | null, prev: number | null, kind: "rel" | "pp"): { text: string; dir: "up" | "down" | "flat" } | null {
   if (cur === null || prev === null || !Number.isFinite(cur) || !Number.isFinite(prev)) return null;
   if (kind === "pp") {
-    const d = (cur - prev) * 100;
-    if (Math.abs(d) < 0.05) return { text: "±0 pp", dir: "flat" };
-    return { text: `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1).replace(".", ",")} pp`, dir: d > 0 ? "up" : "down" };
+    // bázispont: 1 százalékpont = 100 bps
+    const d = Math.round((cur - prev) * 10000);
+    if (d === 0) return { text: "±0 bps", dir: "flat" };
+    return { text: `${d > 0 ? "+" : "−"}${Math.abs(d).toLocaleString("hu-HU")} bps`, dir: d > 0 ? "up" : "down" };
   }
   if (Math.abs(prev) < 1) return null;
   const d = (cur - prev) / Math.abs(prev);

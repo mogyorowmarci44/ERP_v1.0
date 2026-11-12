@@ -174,3 +174,12 @@ describe("eladás", () => {
     expect(chosenValue({ comparable: 1, income: null, indexed: 3, value: 2 }, "indexed")).toBe(3);
   });
 });
+
+describe("összevetés", () => {
+  it("arányoknál bázispont", async () => {
+    const { delta } = await import("@/lib/gh-view");
+    expect(delta(0.17, 0.318, "pp")).toEqual({ text: "−1480 bps", dir: "down" });
+    expect(delta(0.2, 0.2, "pp")?.text).toBe("±0 bps");
+    expect(delta(110, 100, "rel")?.text).toBe("+10%");
+  });
+});
