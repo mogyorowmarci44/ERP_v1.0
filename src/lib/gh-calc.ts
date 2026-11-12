@@ -332,7 +332,7 @@ export const CF_LINES: Array<[string, string]> = [
   ["rev_airbnb", "Airbnb kifizetések (jutalék után)"],
   ["rev_booking", "Booking.com"],
   ["rev_direct", "Közvetlen vendégek"],
-  ["rev_other", "Egyéb befolyás (bérleti díj stb.)"],
+  ["rev_other", "Egyéb bevétel (bérleti díj stb.)"],
   ["c_commission", "Platform jutalék (külön fizetve)"],
   ["c_cleaning", "Takarítás"],
   ["c_supplies", "Anyag, tisztítószer, vendégellátás"],
