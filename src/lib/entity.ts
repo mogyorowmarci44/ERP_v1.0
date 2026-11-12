@@ -245,6 +245,7 @@ export function taxProfileFromForm(fd: FormData, prev: TaxProfile = DEFAULT_TAX_
   const rooms = Math.round(n("rooms", prev.rooms));
   if (rooms < 1) throw new Error("Legalább 1 szoba kell (a tételes adót ingatlanonként legalább egy szoba után fizetni kell).");
   return {
+    ...prev,
     activity: "accommodation",
     vatExempt: fd.has("vatExemptField") ? fd.get("vatExempt") === "on" : prev.vatExempt,
     szjaMethod: (["flat_rate_room", "cost_ratio_10", "itemized"].includes(method) ? method : prev.szjaMethod) as TaxProfile["szjaMethod"],
@@ -263,3 +264,70 @@ export const SZJA_METHOD_LABEL: Record<TaxProfile["szjaMethod"], string> = {
   cost_ratio_10: "Önálló tevékenység – 10% költséghányad",
   itemized: "Önálló tevékenység – tételes költségelszámolás",
 };
+
+// ---------------------------------------------------------------------------
+// v2.0 – TFH / IFA csatornánként (platform: Airbnb, Booking… / közvetlen), P&L-beállítás
+// ---------------------------------------------------------------------------
+
+export type Channel = "platform" | "direct";
+export const CHANNEL_LABEL: Record<Channel, string> = { platform: "Platformon keresztüli (Airbnb, Booking)", direct: "Közvetlen" };
+export type PnlTaxInclude = NonNullable<TaxProfile["pnlTaxInclude"]>;
+export const PNL_INCLUDE_LABEL: Record<PnlTaxInclude, string> = {
+  both: "Mindkettő",
+  platform: "Csak platformos",
+  direct: "Csak közvetlen",
+  none: "Egyik sem",
+};
+
+/** Szállásdíj-bevételi számla → csatorna (911 Airbnb, 912 egyéb platform, 914 platformon beszedett kiegészítő díj, 913 közvetlen). */
+export function revenueChannel(code: string): Channel | null {
+  if (code.startsWith("913")) return "direct";
+  if (code.startsWith("911") || code.startsWith("912") || code.startsWith("914")) return "platform";
+  return null;
+}
+
+export const TFH_RATE = 0.04;
+/** Időszakok, amikor nem kellett TFH-t megállapítani (veszélyhelyzeti könnyítések). */
+export const TFH_SUSPENSIONS: Array<[string, string]> = [
+  ["2020-03-01", "2021-12-31"],
+  ["2022-10-01", "2023-03-31"],
+];
+export const tfhSuspended = (month: string) => TFH_SUSPENSIONS.some(([a, b]) => month >= a.slice(0, 7) && month <= b.slice(0, 7));
+
+export type ChannelAmounts = Record<Channel, number>;
+export const zeroCh = (): ChannelAmounts => ({ platform: 0, direct: 0 });
+
+/** TFH-alap és TFH csatornánként havi bevételsorokból (a felfüggesztett hónapok nélkül). */
+export function tfhByChannel(rows: Array<{ month: string; code: string; amount: number }>) {
+  const base = zeroCh();
+  const suspended = zeroCh();
+  for (const r of rows) {
+    const ch = revenueChannel(r.code);
+    if (!ch) continue;
+    if (tfhSuspended(r.month)) suspended[ch] = round2(suspended[ch] + r.amount);
+    else base[ch] = round2(base[ch] + r.amount);
+  }
+  const tfh: ChannelAmounts = { platform: Math.round(base.platform * TFH_RATE), direct: Math.round(base.direct * TFH_RATE) };
+  return { base, suspended, tfh };
+}
+
+/** IFA = vendégéjszaka × átlagos vendégszám × tarifa (csatornánként). Hiányzó adatnál null. */
+export function ifaByChannel(nights: ChannelAmounts, avgGuests?: number | null, rate?: number | null): ChannelAmounts | null {
+  if (!rate || !avgGuests) return null;
+  return {
+    platform: Math.round(nights.platform * avgGuests * rate),
+    direct: Math.round(nights.direct * avgGuests * rate),
+  };
+}
+
+/** A P&L-be számítandó összeg a kiválasztás szerint. */
+export function pnlPick(x: ChannelAmounts | null, inc: PnlTaxInclude): number {
+  if (!x) return 0;
+  return (inc === "both" || inc === "platform" ? x.platform : 0) + (inc === "both" || inc === "direct" ? x.direct : 0);
+}
+
+/** Éjszakák kinyerése a számlasor szövegéből („3 éj”, „(5 éj, kb.”). */
+export function nightsFromText(t: string): number {
+  const m = t.match(/(\d+)\s*éj/);
+  return m ? Number(m[1]) : 0;
+}

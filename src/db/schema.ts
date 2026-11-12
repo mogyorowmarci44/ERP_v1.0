@@ -107,6 +107,12 @@ export type TaxProfile = {
   ifaPerNight?: number | null;
   /** Értékesítési csatornák (Airbnb, közvetlen, weboldal…). */
   channels?: string[];
+  /** IFA: átlagos fizető vendégszám egy éjszakára (18 év alattiak nélkül). */
+  ifaAvgGuests?: number | null;
+  /** IFA: vendégéjszakák évente és csatornánként (felülírja a számlákból becsült értéket). */
+  ifaNights?: Record<string, { platform?: number | null; direct?: number | null }>;
+  /** P&L: a TFH / IFA melyik csatornára számítva kerüljön az eredménybe. */
+  pnlTaxInclude?: "both" | "platform" | "direct" | "none";
 };
 
 export type CompanyTheme = { preset: string; accent: string; sidebar: string; mode: "light" | "dark" };

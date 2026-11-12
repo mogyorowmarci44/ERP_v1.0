@@ -140,3 +140,56 @@ describe("v2.0 – pénzforgalmi kategóriák", () => {
     expect(categorize([])).toBe("transfer");
   });
 });
+
+import { ifaByChannel, nightsFromText, pnlPick, revenueChannel, tfhByChannel, tfhSuspended } from "@/lib/entity";
+
+describe("v2.0 – TFH / IFA csatornánként, P&L-választás", () => {
+  it("csatornák", () => {
+    expect(revenueChannel("911")).toBe("platform");
+    expect(revenueChannel("912")).toBe("platform");
+    expect(revenueChannel("914")).toBe("platform");
+    expect(revenueChannel("913")).toBe("direct");
+    expect(revenueChannel("925")).toBeNull();
+    expect(revenueChannel("969")).toBeNull();
+  });
+  it("TFH: 4%, a 2022.10–2023.03 felfüggesztés nélkül", () => {
+    expect(tfhSuspended("2022-09")).toBe(false);
+    expect(tfhSuspended("2022-10")).toBe(true);
+    expect(tfhSuspended("2023-03")).toBe(true);
+    expect(tfhSuspended("2023-04")).toBe(false);
+    const r = tfhByChannel([
+      { month: "2023-03", code: "911", amount: 100_000 },
+      { month: "2023-04", code: "911", amount: 200_000 },
+      { month: "2023-04", code: "914", amount: 10_000 },
+      { month: "2023-05", code: "913", amount: 50_000 },
+      { month: "2023-05", code: "925", amount: 100_000 },
+    ]);
+    expect(r.base).toEqual({ platform: 210_000, direct: 50_000 });
+    expect(r.suspended).toEqual({ platform: 100_000, direct: 0 });
+    expect(r.tfh).toEqual({ platform: 8_400, direct: 2_000 });
+  });
+  it("IFA és P&L-választás", () => {
+    expect(ifaByChannel({ platform: 100, direct: 50 }, 2, null)).toBeNull();
+    const ifa = ifaByChannel({ platform: 100, direct: 50 }, 2, 400)!;
+    expect(ifa).toEqual({ platform: 80_000, direct: 40_000 });
+    expect(pnlPick(ifa, "both")).toBe(120_000);
+    expect(pnlPick(ifa, "platform")).toBe(80_000);
+    expect(pnlPick(ifa, "direct")).toBe(40_000);
+    expect(pnlPick(ifa, "none")).toBe(0);
+    expect(pnlPick(null, "both")).toBe(0);
+  });
+  it("éjszakák a számlaszövegből", () => {
+    expect(nightsFromText("Szállásdíj – Anna (2024-01-02–2024-01-04, 2 éj) [HM1]")).toBe(2);
+    expect(nightsFromText("Szállásdíj – közvetlen foglalások, 2024. 03. hó (10 éj, kb. × 24 000 Ft)")).toBe(10);
+    expect(nightsFromText("Takarítási díj")).toBe(0);
+  });
+  it("a beállítások mentése megtartja az IFA- és P&L-adatokat", () => {
+    const fd = new FormData();
+    fd.set("rooms", "1");
+    const prev = { activity: "accommodation" as const, vatExempt: true, szjaMethod: "flat_rate_room" as const, rooms: 1, flatRatePerRoom: 38400, ifaAvgGuests: 2, ifaNights: { "2025": { platform: 99, direct: 70 } }, pnlTaxInclude: "platform" as const };
+    const p = taxProfileFromForm(fd, prev);
+    expect(p.ifaAvgGuests).toBe(2);
+    expect(p.ifaNights).toEqual({ "2025": { platform: 99, direct: 70 } });
+    expect(p.pnlTaxInclude).toBe("platform");
+  });
+});

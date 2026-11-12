@@ -14,6 +14,10 @@ import {
 } from "@/lib/entity";
 import { fmtHuf, round2 } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
+import { accommodationYear } from "@/lib/accommodation-taxes";
+import { CHANNEL_LABEL, PNL_INCLUDE_LABEL, TFH_SUSPENSIONS, type PnlTaxInclude } from "@/lib/entity";
+import { saveIfaInputsAction, setPnlTaxIncludeAction } from "../actions";
+import { Flash } from "@/components/Flash";
 
 /** v2.0 – Adók: tételes átalányadó, SZJA-módszerek, alanyi ÁFA-mentesség, fordított ÁFA, IFA. */
 export default async function TaxesPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -28,7 +32,11 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
   const to = `${year}-12-31`;
   const asOf = year === Number(t.slice(0, 4)) ? t : to;
 
-  const [tb, vat] = await Promise.all([trialBalance(cid, from, asOf), vatAnalytics(cid, from, to, { noInputVatDeduction: noInputVatDeduction(company) })]);
+  const [tb, vat, acc] = await Promise.all([
+    trialBalance(cid, from, asOf),
+    vatAnalytics(cid, from, to, { noInputVatDeduction: noInputVatDeduction(company) }),
+    accommodationYear(cid, p, year, asOf),
+  ]);
   const { revenue, costs } = revenueAndCosts(tb);
 
   // Időarányos éves becslés (csak a folyó évre)
@@ -69,6 +77,7 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
 
   return (
     <>
+      <Flash error={sp.error} ok={sp.ok} />
       <div className="topbar">
         <h1>Adók – {year}</h1>
         <form className="row no-print">
@@ -169,11 +178,81 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
         <p>ÁFA-körös vagy: a részletek az <Link href={`/c/${cid}/reports/vat`}>ÁFA analitikában</Link>.</p>
       )}
 
-      <h2>Idegenforgalmi adó (IFA)</h2>
+      <h2 id="tfh">Turizmusfejlesztési hozzájárulás (TFH, 4%) – csatornánként</h2>
+      <table>
+        <thead><tr><th>Csatorna</th><th className="num">Szállásbevétel</th><th className="num">Ebből felfüggesztett időszakra</th><th className="num">TFH-alap</th><th className="num">TFH (4%)</th></tr></thead>
+        <tbody>
+          {(["platform", "direct"] as const).map((ch) => (
+            <tr key={ch}>
+              <td>{CHANNEL_LABEL[ch]}</td>
+              <td className="num">{fmtHuf(acc.revenue[ch])}</td>
+              <td className="num">{acc.tfh.suspended[ch] ? fmtHuf(acc.tfh.suspended[ch]) : "–"}</td>
+              <td className="num">{fmtHuf(acc.tfh.base[ch])}</td>
+              <td className="num">{fmtHuf(acc.tfh.tfh[ch])}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot><tr><th>Összesen</th><th className="num">{fmtHuf(acc.revenue.platform + acc.revenue.direct)}</th><th /><th className="num">{fmtHuf(acc.tfh.base.platform + acc.tfh.base.direct)}</th><th className="num">{fmtHuf(acc.tfh.tfh.platform + acc.tfh.tfh.direct)}</th></tr></tfoot>
+      </table>
       <p className="muted">
-        {p.ifaPerNight ? `Beállított tarifa: ${fmtHuf(p.ifaPerNight)} Ft / fő / vendégéjszaka.` : "Az IFA tarifája még nincs beállítva (Beállítások → Adózási profil)."} A beszedett IFA nem bevétel: a 4631-es
-        számlára könyveld. A vendégéjszaka-alapú havi összesítő a foglalás-modullal érkezik.
+        A TFH-t mindkét csatorna után a szállásadó fizeti – a platformok nem vonják le és nem fizetik be. Alanyi mentesként (áfabevallás nélkül) az éves TFH a következő év
+        február 25-éig vallandó be (TFEJLH) és fizetendő. Felfüggesztett időszakok: {TFH_SUSPENSIONS.map(([a, b]) => `${fmtDate(a)}–${fmtDate(b)}`).join(", ")}.
       </p>
+
+      <h2 id="ifa">Idegenforgalmi adó (IFA) – csatornánként</h2>
+      <table>
+        <thead><tr><th>Csatorna</th><th className="num">Vendégéjszaka</th><th>Forrás</th><th className="num">Vendég / éj</th><th className="num">Tarifa (Ft/fő/éj)</th><th className="num">IFA</th></tr></thead>
+        <tbody>
+          {(["platform", "direct"] as const).map((ch) => (
+            <tr key={ch}>
+              <td>{CHANNEL_LABEL[ch]}</td>
+              <td className="num">{acc.nights[ch]}</td>
+              <td className="muted">{acc.nightsOverridden[ch] ? "kézi" : `becslés a számlákból (${acc.nightsEstimated[ch]})`}</td>
+              <td className="num">{p.ifaAvgGuests ?? "–"}</td>
+              <td className="num">{p.ifaPerNight ? fmtHuf(p.ifaPerNight) : "–"}</td>
+              <td className="num">{acc.ifa ? fmtHuf(acc.ifa[ch]) : "–"}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot><tr><th>Összesen</th><th className="num">{acc.nights.platform + acc.nights.direct}</th><th colSpan={3} /><th className="num">{acc.ifa ? fmtHuf(acc.ifa.platform + acc.ifa.direct) : "–"}</th></tr></tfoot>
+      </table>
+      <form action={saveIfaInputsAction} className="card form-grid no-print" style={{ marginTop: 8 }}>
+        <input type="hidden" name="cid" value={cid} />
+        <input type="hidden" name="year" value={year} />
+        <label>IFA tarifa (Ft / fő / éj)<input name="ifaPerNight" type="number" min={0} defaultValue={p.ifaPerNight ?? ""} placeholder="önkormányzati rendelet" /></label>
+        <label>Átlagos fizető vendég / éj<input name="ifaAvgGuests" type="number" min={0} step="0.1" defaultValue={p.ifaAvgGuests ?? ""} placeholder="pl. 2" /></label>
+        <label>{year} – platformos éjszakák<input name="nightsPlatform" type="number" min={0} defaultValue={acc.nightsOverridden.platform ? acc.nights.platform : ""} placeholder={`becslés: ${acc.nightsEstimated.platform}`} /></label>
+        <label>{year} – közvetlen éjszakák<input name="nightsDirect" type="number" min={0} defaultValue={acc.nightsOverridden.direct ? acc.nights.direct : ""} placeholder={`becslés: ${acc.nightsEstimated.direct}`} /></label>
+        <div style={{ alignSelf: "end" }}><button className="primary">Mentés</button></div>
+      </form>
+      <p className="muted">
+        Az éjszakák becslése a bevételi számlák szövegéből („N éj”) jön – Booking-havi összesítőnél nincs adat, ott írd be kézzel. A 18 év alatti vendégek mentesek, ezért
+        az „átlagos fizető vendég” ezek nélkül értendő. A vendégektől beszedett IFA nem bevétel: a 4631-es számlára könyveld.
+      </p>
+
+      <h2 id="pnl">Eredménykimutatás (P&amp;L) – {year}{isCurrent ? ` (${fmtDate(asOf)}-ig)` : ""}</h2>
+      <form action={setPnlTaxIncludeAction} className="row no-print" style={{ marginBottom: 8, flexWrap: "wrap" }}>
+        <input type="hidden" name="cid" value={cid} />
+        <input type="hidden" name="year" value={year} />
+        <span className="muted">TFH és IFA beszámítása:</span>
+        {(Object.keys(PNL_INCLUDE_LABEL) as PnlTaxInclude[]).map((k) => (
+          <button key={k} name="include" value={k} className={acc.include === k ? "primary" : undefined} aria-pressed={acc.include === k}>{PNL_INCLUDE_LABEL[k]}</button>
+        ))}
+      </form>
+      <table>
+        <tbody>
+          <tr><td>Szállásdíj-bevétel – {CHANNEL_LABEL.platform}</td><td className="num">{fmtHuf(acc.revenue.platform)}</td></tr>
+          <tr><td>Szállásdíj-bevétel – {CHANNEL_LABEL.direct}</td><td className="num">{fmtHuf(acc.revenue.direct)}</td></tr>
+          <tr><td>Egyéb bevétel (bérbeadás, kártérítés, kamat)</td><td className="num">{fmtHuf(acc.pnl.otherIncome)}</td></tr>
+          <tr><td>− Működési költségek (5–8)</td><td className="num">−{fmtHuf(acc.pnl.costs)}</td></tr>
+          <tr><td>− TFH ({PNL_INCLUDE_LABEL[acc.include].toLowerCase()})</td><td className="num">−{fmtHuf(acc.pnl.tfh)}</td></tr>
+          <tr><td>− IFA ({PNL_INCLUDE_LABEL[acc.include].toLowerCase()}){acc.ifa ? "" : " – nincs megadva tarifa / vendégszám"}</td><td className="num">−{fmtHuf(acc.pnl.ifa)}</td></tr>
+          <tr><th>Eredmény SZJA előtt</th><th className="num">{fmtHuf(acc.pnl.beforeSzja)}</th></tr>
+          <tr><td>− Tételes átalányadó (SZJA)</td><td className="num">−{fmtHuf(acc.pnl.szja)}</td></tr>
+          <tr><th>Nettó eredmény</th><th className="num">{fmtHuf(acc.pnl.net)}</th></tr>
+        </tbody>
+      </table>
+      <p className="muted">A választás csak ezt a kimutatást és az Áttekintés eredménysorát befolyásolja; a TFH- és IFA-kötelezettség a fenti táblázatokban mindig a teljes bevételből számolódik.</p>
     </>
   );
 }

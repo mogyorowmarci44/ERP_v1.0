@@ -253,6 +253,47 @@ export async function updateTaxProfileAction(fd: FormData) {
   });
 }
 
+/** v2.0 – P&L: melyik csatorna TFH / IFA-ja kerüljön az eredménybe. */
+export async function setPnlTaxIncludeAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { company } = await requireCompany(cid, { write: true });
+  const year = str(fd, "year");
+  await runOrRedirect(`/c/${cid}/taxes?year=${year}`, async () => {
+    if (!isPrivate(company)) throw new Error("Csak adószámos magánszemélynél.");
+    const inc = str(fd, "include");
+    if (!["both", "platform", "direct", "none"].includes(inc)) throw new Error("Ismeretlen beállítás.");
+    const profile = { ...(company.taxProfile ?? DEFAULT_TAX_PROFILE), pnlTaxInclude: inc as "both" | "platform" | "direct" | "none" };
+    await db.update(schema.companies).set({ taxProfile: profile }).where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/taxes?year=${year}#pnl`;
+  });
+}
+
+/** v2.0 – IFA adatai: tarifa, átlagos vendégszám, éves vendégéjszakák csatornánként (üres = becslés a számlákból). */
+export async function saveIfaInputsAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { company } = await requireCompany(cid, { write: true });
+  const year = str(fd, "year");
+  await runOrRedirect(`/c/${cid}/taxes?year=${year}`, async () => {
+    if (!isPrivate(company)) throw new Error("Csak adószámos magánszemélynél.");
+    if (!/^\d{4}$/.test(year)) throw new Error("Hibás év.");
+    const num = (k: string) => {
+      const v = str(fd, k).replace(/\s/g, "").replace(",", ".");
+      if (v === "") return null;
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0) throw new Error("Csak nem negatív szám adható meg.");
+      return n;
+    };
+    const prev = company.taxProfile ?? DEFAULT_TAX_PROFILE;
+    const nights = { ...(prev.ifaNights ?? {}) };
+    nights[year] = { platform: num("nightsPlatform"), direct: num("nightsDirect") };
+    const profile = { ...prev, ifaPerNight: num("ifaPerNight"), ifaAvgGuests: num("ifaAvgGuests"), ifaNights: nights };
+    await db.update(schema.companies).set({ taxProfile: profile }).where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/taxes?year=${year}&ok=${encodeURIComponent("IFA-adatok mentve.")}#ifa`;
+  });
+}
+
 export async function lockPeriodAction(fd: FormData) {
   const cid = cidOf(fd);
   const { user, role } = await requireCompany(cid, { write: true });
