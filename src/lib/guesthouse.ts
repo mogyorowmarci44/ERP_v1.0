@@ -27,7 +27,7 @@ import {
   type Deflator,
 } from "./gh-calc";
 import { CPI_LONG_RUN, makeCpiDeflator } from "./cpi";
-import { irr, valuate } from "./valuation";
+import { chosenValue, irr, saleOutcome, valuate } from "./valuation";
 
 export type Stay = {
   code: string;
@@ -257,23 +257,30 @@ export function propertyReturn(d: GhData) {
   const flows = paybackFlows(d.days, d.include, t0, d.df, d.asOf);
   const s = paybackSummary(flows, d.base, d.df, d.asOf);
   const dfNow = d.df(d.asOf);
-  const totalNominal = s.cumNominal + v.value - d.base;
-  const totalReal = s.cumDiscounted + v.value * dfNow - d.base;
-  const nomFlows = [{ date: t0, amount: -d.base }, ...flows.map((f) => ({ date: f.date, amount: f.nominal })), { date: d.asOf, amount: v.value }];
-  const realFlows = [{ date: t0, amount: -d.base }, ...flows.map((f) => ({ date: f.date, amount: f.discounted })), { date: d.asOf, amount: v.value * dfNow }];
+  const method = prop.method ?? "blend";
+  const price = chosenValue(v, method);
+  const sale = saleOutcome(prop, price, d.base, t0, d.asOf);
+  // „mi lenne, ha ma eladnám”: a nettó eladási bevétel a mai napon
+  const totalNominal = s.cumNominal + sale.net - d.base;
+  const totalReal = s.cumDiscounted + sale.net * dfNow - d.base;
+  const nomFlows = [{ date: t0, amount: -d.base }, ...flows.map((f) => ({ date: f.date, amount: f.nominal })), { date: d.asOf, amount: sale.net }];
+  const realFlows = [{ date: t0, amount: -d.base }, ...flows.map((f) => ({ date: f.date, amount: f.discounted })), { date: d.asOf, amount: sale.net * dfNow }];
   return {
     prop,
     v,
+    method,
+    price,
+    sale,
     noi,
     purchase,
     summary: s,
     dfNow,
     totalNominal,
     totalReal,
-    multiple: (s.cumNominal + v.value) / d.base,
+    multiple: (s.cumNominal + sale.net) / d.base,
     irrNominal: irr(nomFlows),
     irrReal: irr(realFlows),
-    gainNominal: v.value - d.base,
-    gainReal: v.value * dfNow - d.base,
+    gainNominal: price - d.base,
+    gainReal: price * dfNow - d.base,
   };
 }

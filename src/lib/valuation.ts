@@ -60,7 +60,67 @@ export type PropertyInfo = {
   capRate?: number | null;
   /** Berendezések, dézsa stb. jelenlegi értéke (Ft), a fajlagos áron felül. */
   equipmentValue?: number | null;
+  /** Melyik becslés legyen az eladási ár a „mi lenne, ha eladnám” számításban. */
+  method?: SaleMethod | null;
+  /** Ingatlan-nyilvántartás szerint lakóingatlan (5 év után adómentes) vagy egyéb (15 éves sáv). */
+  kind?: "residential" | "other" | null;
+  /** Ingatlanközvetítő díja a vételár %-ában (ÁFA nélkül). */
+  agentPct?: number | null;
+  /** Egyéb eladási költség (ügyvéd, energetikai tanúsítvány, hirdetés), Ft. */
+  otherSaleCosts?: number | null;
+  /** Számlával igazolt értéknövelő beruházások (csökkentik az adóalapot), Ft. */
+  improvements?: number | null;
 };
+
+export type SaleMethod = "blend" | "comparable" | "income" | "indexed";
+export const SALE_METHOD_LABEL: Record<SaleMethod, string> = {
+  blend: "Súlyozott (mindhárom)",
+  comparable: "Összehasonlító",
+  income: "Hozamszámítás",
+  indexed: "Indexált vételár",
+};
+
+export const SALE_DEFAULTS = { agentPct: 0.03, agentVat: 0.27, otherSaleCosts: 150_000, kind: "residential" as const };
+export const SALE_SZJA = 0.15;
+
+/**
+ * Ingatlaneladás SZJA-köteles hányada (Szja tv. 62. §): lakóingatlannál a szerzés éve és a következő év 100%,
+ * a 2. évben 90%, a 3. évben 60%, a 4. évben 30%, az 5. évtől 0%. Egyéb ingatlannál az 5. évig 100%,
+ * a 6. évtől évente 10 százalékponttal csökken, a 15. évtől 0%.
+ */
+export function taxableShare(kind: "residential" | "other", acqDate: string, saleDate: string): number {
+  const diff = Number(saleDate.slice(0, 4)) - Number(acqDate.slice(0, 4));
+  if (kind === "residential") return diff <= 1 ? 1 : diff === 2 ? 0.9 : diff === 3 ? 0.6 : diff === 4 ? 0.3 : 0;
+  if (diff <= 5) return 1;
+  return Math.max(0, 1 - (diff - 5) * 0.1);
+}
+
+export type SaleOutcome = {
+  price: number;
+  agentFee: number;
+  otherCosts: number;
+  income: number;
+  share: number;
+  taxBase: number;
+  szja: number;
+  net: number;
+};
+
+/** Eladás: ár − közvetítői díj (+ÁFA) − egyéb költség − SZJA = nettó eladási bevétel. */
+export function saleOutcome(p: PropertyInfo, price: number, costBasis: number, acqDate: string, saleDate: string): SaleOutcome {
+  const agentFee = price * (p.agentPct ?? SALE_DEFAULTS.agentPct) * (1 + SALE_DEFAULTS.agentVat);
+  const otherCosts = p.otherSaleCosts ?? SALE_DEFAULTS.otherSaleCosts;
+  const income = Math.max(0, price - agentFee - otherCosts - costBasis - (p.improvements ?? 0));
+  const share = taxableShare(p.kind ?? SALE_DEFAULTS.kind, acqDate, saleDate);
+  const taxBase = income * share;
+  const szja = Math.round(taxBase * SALE_SZJA);
+  return { price, agentFee, otherCosts, income, share, taxBase, szja, net: price - agentFee - otherCosts - szja };
+}
+
+export function chosenValue(v: { comparable: number | null; income: number | null; indexed: number | null; value: number }, m: SaleMethod | null | undefined): number {
+  const x = m && m !== "blend" ? v[m] : null;
+  return x ?? v.value;
+}
 
 export const PROPERTY_DEFAULTS = { priceM2: 320_000, capRate: 0.09 };
 export const GALLERY_WEIGHT = 0.5;

@@ -104,7 +104,7 @@ export default async function PaybackPage({ params, searchParams }: { params: Pr
         <Seg items={(["month", "quarter", "year", "ltd"] as View[]).map((v) => ({ href: `${base}?g=${v}`, label: VIEW_LABEL[v], on: view === v }))} />
       </div>
 
-      {pr ? <PropertySection cid={cid} view={view} pr={pr} base={d.base} t0={t0} /> : null}
+      {pr ? <PropertySection cid={cid} view={view} pr={pr} base={d.base} t0={t0} asOf={d.asOf} /> : null}
 
       <h2>Megtérülés a működésből</h2>
       <div className="grid cols-4">

@@ -157,3 +157,20 @@ describe("ingatlan értékbecslés", () => {
     expect(irr([{ date: "2020-01-01", amount: -100 }, { date: "2021-01-01", amount: 110 }])).toBeCloseTo(0.1, 2);
   });
 });
+
+describe("eladás", () => {
+  it("SZJA-sáv és nettó bevétel", async () => {
+    const { taxableShare, saleOutcome, chosenValue } = await import("@/lib/valuation");
+    expect(taxableShare("residential", "2021-09-01", "2025-06-01")).toBe(0.3);
+    expect(taxableShare("residential", "2021-09-01", "2026-11-12")).toBe(0);
+    expect(taxableShare("other", "2021-09-01", "2026-11-12")).toBe(1);
+    expect(taxableShare("other", "2021-09-01", "2029-01-01")).toBeCloseTo(0.7);
+    const o = saleOutcome({ kind: "other", agentPct: 0.03, otherSaleCosts: 100000 }, 16_000_000, 11_336_000, "2021-09-01", "2026-11-12");
+    expect(o.agentFee).toBeCloseTo(609_600);
+    expect(o.income).toBeCloseTo(16_000_000 - 609_600 - 100_000 - 11_336_000);
+    expect(o.szja).toBe(Math.round(o.income * 0.15));
+    expect(o.net).toBeCloseTo(16_000_000 - 609_600 - 100_000 - o.szja);
+    expect(chosenValue({ comparable: 1, income: null, indexed: 3, value: 2 }, "income")).toBe(2);
+    expect(chosenValue({ comparable: 1, income: null, indexed: 3, value: 2 }, "indexed")).toBe(3);
+  });
+});

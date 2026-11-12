@@ -174,10 +174,33 @@ export async function savePropertyAction(fd: FormData) {
       priceM2: num("priceM2", 1e8),
       capRate: cap === null ? null : cap / 100,
       equipmentValue: num("equipmentValue", 1e10),
+      kind: str(fd, "kind") === "other" ? ("other" as const) : ("residential" as const),
+      agentPct: (() => { const a = num("agentPct", 20); return a === null ? null : a / 100; })(),
+      otherSaleCosts: num("otherSaleCosts", 1e9),
+      improvements: num("improvements", 1e10),
     };
-    const profile = { ...(company.taxProfile ?? DEFAULT_TAX_PROFILE), property };
+    const prev = company.taxProfile?.property ?? {};
+    const profile = { ...(company.taxProfile ?? DEFAULT_TAX_PROFILE), property: { ...prev, ...property } };
     await db.update(schema.companies).set({ taxProfile: profile }).where(eq(schema.companies.id, cid));
     revalidatePath(`/c/${cid}`, "layout");
     return `${back}&ok=${encodeURIComponent("Ingatlan adatai mentve.")}#piaci-ertek`;
+  });
+}
+
+/** „Mi lenne, ha eladnám”: melyik értékbecslés legyen az eladási ár. */
+export async function setValuationMethodAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { company } = await requireCompany(cid, { write: true });
+  const g = str(fd, "g");
+  const back = `/c/${cid}/gh/payback?g=${/^(month|quarter|year|ltd)$/.test(g) ? g : "year"}`;
+  await runOrRedirect(back, async () => {
+    if (!isPrivate(company)) throw new Error("Csak vendégháznál.");
+    const m = str(fd, "method");
+    if (!["blend", "comparable", "income", "indexed"].includes(m)) throw new Error("Ismeretlen módszer.");
+    const tp = company.taxProfile ?? DEFAULT_TAX_PROFILE;
+    const profile = { ...tp, property: { ...(tp.property ?? {}), method: m as "blend" } };
+    await db.update(schema.companies).set({ taxProfile: profile }).where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `${back}#piaci-ertek`;
   });
 }

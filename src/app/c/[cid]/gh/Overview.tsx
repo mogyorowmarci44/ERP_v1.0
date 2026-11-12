@@ -5,6 +5,7 @@ import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
 import { PNL_INCLUDE_LABEL, flatRateSchedule, vatExemptThreshold } from "@/lib/entity";
 import { loadGuesthouse, propertyReturn } from "@/lib/guesthouse";
+import { SALE_METHOD_LABEL } from "@/lib/valuation";
 import { addDays, breakEven, groupBy, kpis, paybackFlows, paybackSummary, periodKey, periodLabel, periodRange, prevPeriod, sumRange, type Gran } from "@/lib/gh-calc";
 import { accommodationStart, availableDays, comparison, fmtNum, fmtPct, parseGran } from "@/lib/gh-view";
 import { IncludeToggle, Kpi, Meter, Seg, ScopeNav } from "@/components/gh/GhUi";
@@ -103,9 +104,9 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
         </Link>
         {pr ? (
           <Link href={`${base}/gh/payback#piaci-ertek`} className="card kpi" style={{ color: "inherit", textDecoration: "none" }}>
-            <div className="label">Ingatlan becsült piaci értéke</div>
-            <div className="value">{fmtNum(pr.v.value / 1e6, 1)}<small>M Ft</small></div>
-            <div className="hint">vételár + illeték: {fmtNum(d.base / 1e6, 1)} M Ft · teljes hozam: {pr.totalNominal >= 0 ? "+" : ""}{fmtNum(pr.totalNominal / 1e6, 1)} M Ft · IRR {fmtPct(pr.irrNominal, 1)} (reál {fmtPct(pr.irrReal, 1)})</div>
+            <div className="label">Ha ma eladnám ({SALE_METHOD_LABEL[pr.method].toLowerCase()} érték)</div>
+            <div className="value">{fmtNum(pr.price / 1e6, 1)}<small>M Ft · nettó {fmtNum(pr.sale.net / 1e6, 1)} M</small></div>
+            <div className="hint">teljes nyereség: {pr.totalNominal >= 0 ? "+" : ""}{fmtNum(pr.totalNominal / 1e6, 1)} M Ft · IRR {fmtPct(pr.irrNominal, 1)} (reál {fmtPct(pr.irrReal, 1)})</div>
           </Link>
         ) : null}
         <div className="card kpi">
