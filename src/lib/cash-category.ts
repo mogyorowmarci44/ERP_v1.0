@@ -16,7 +16,7 @@ export function categorize(counterCodes: string[]): CashCategory {
   if (counterCodes.length === 0 || counterCodes.every((c) => c.startsWith("38"))) return "transfer";
   if (has("419", "411")) return "private";
   if (has("462", "463", "467", "468")) return "tax";
-  if (has("91", "969", "972", "311", "316", "453")) return "revenue";
+  if (has("91", "92", "969", "972", "311", "316", "453")) return "revenue";
   if (has("5", "8", "1", "2", "454", "455", "351", "466")) return "expense";
   return "other";
 }
