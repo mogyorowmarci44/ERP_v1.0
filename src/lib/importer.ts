@@ -343,7 +343,8 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
     }
 
     // ELÁBÉ összevetés: a forrás számított ELÁBÉ-ja vs. az app könyv szerinti értéke
-    const cogsAcc = accId("814");
+    // (magánszemélynél – v2.0 – nincs 814 / gépkocsi, ilyenkor kimarad)
+    const cogsAcc = cogsRefs.length ? accId("814") : 0;
     for (const c of cogsRefs) {
       const vid = vehicleId(c.vehicle);
       if (!vid) continue;
