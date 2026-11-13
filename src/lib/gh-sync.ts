@@ -20,6 +20,8 @@ export type SyncReservation = {
   note?: string | null;
 };
 export type SyncReview = {
+  source?: "airbnb" | "google";
+  dateApprox?: boolean;
   externalId: string;
   guest?: string | null;
   guestLocation?: string | null;
@@ -56,8 +58,8 @@ export async function applySyncBundle(companyId: number, b: SyncBundle): Promise
     const directIns = res.filter((r) => r.source === "direct").map((r) => r.checkIn);
     if (directIns.length) await tx.delete(schema.ghReservations).where(and(eq(schema.ghReservations.companyId, companyId), eq(schema.ghReservations.source, "ical"), inArray(schema.ghReservations.checkIn, directIns)));
     for (const r of rev) {
-      const v = { guest: r.guest ?? null, guestLocation: r.guestLocation ?? null, stayFrom: r.stayFrom ?? null, stayTo: r.stayTo ?? null, reviewedAt: r.reviewedAt, overall: r.overall ?? null, ratings: r.ratings ?? {}, tags: r.tags ?? {}, text: r.text ?? null, privateNote: r.privateNote ?? null, reply: r.reply ?? null, syncedAt: new Date() };
-      await tx.insert(schema.ghReviews).values({ companyId, source: "airbnb", externalId: r.externalId, ...v }).onConflictDoUpdate({ target: [schema.ghReviews.companyId, schema.ghReviews.externalId], set: v });
+      const v = { source: r.source ?? "airbnb", dateApprox: !!r.dateApprox, guest: r.guest ?? null, guestLocation: r.guestLocation ?? null, stayFrom: r.stayFrom ?? null, stayTo: r.stayTo ?? null, reviewedAt: r.reviewedAt, overall: r.overall ?? null, ratings: r.ratings ?? {}, tags: r.tags ?? {}, text: r.text ?? null, privateNote: r.privateNote ?? null, reply: r.reply ?? null, syncedAt: new Date() };
+      await tx.insert(schema.ghReviews).values({ companyId, externalId: r.externalId, ...v }).onConflictDoUpdate({ target: [schema.ghReviews.companyId, schema.ghReviews.externalId], set: v });
     }
   });
   return { reservations: res.length, reviews: rev.length };

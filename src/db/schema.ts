@@ -724,7 +724,7 @@ export const ghReservations = pgTable(
   (t) => [uniqueIndex("gh_reservations_code_uq").on(t.companyId, t.code)],
 );
 
-export type ReviewRatings = { checkin?: number; cleanliness?: number; accuracy?: number; communication?: number; location?: number; value?: number };
+export type ReviewRatings = { checkin?: number; cleanliness?: number; accuracy?: number; communication?: number; location?: number; value?: number; /** Google: szobák, szolgáltatás */ rooms?: number; service?: number };
 
 /** Vendégértékelés (Airbnb): összpontszám, részletes pontok, címkék kategóriánként, szöveg, privát megjegyzés, válasz. */
 export const ghReviews = pgTable(
@@ -739,6 +739,8 @@ export const ghReviews = pgTable(
     stayFrom: date("stay_from"),
     stayTo: date("stay_to"),
     reviewedAt: date("reviewed_at").notNull(),
+    /** A dátum csak közelítő (pl. Google: „3 éve”). */
+    dateApprox: boolean("date_approx").notNull().default(false),
     overall: integer("overall"),
     ratings: jsonb("ratings").$type<ReviewRatings>(),
     tags: jsonb("tags").$type<Record<string, string[]>>(),

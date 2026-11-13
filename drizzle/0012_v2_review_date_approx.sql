@@ -1,0 +1,1 @@
+ALTER TABLE "gh_reviews" ADD COLUMN "date_approx" boolean DEFAULT false NOT NULL;

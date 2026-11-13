@@ -16,7 +16,11 @@ const CAT: Array<[keyof ReviewRatings, string]> = [
   ["communication", "Kommunikáció"],
   ["location", "Elhelyezkedés"],
   ["value", "Ár-érték"],
+  ["rooms", "Szobák (Google)"],
+  ["service", "Szolgáltatás (Google)"],
 ];
+const SRC: Record<string, string> = { airbnb: "Airbnb", google: "Google" };
+const TAG_LABEL: Record<string, string> = { highlights: "Kiemelt jellemzők", trip: "Utazás" };
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const stars = (n: number | null | undefined) => (n ? "★".repeat(n) + "☆".repeat(Math.max(0, 5 - n)) : "–");
 
@@ -25,9 +29,12 @@ export default async function ReviewsPage({ params, searchParams }: { params: Pr
   const sp = await searchParams;
   const { company } = await requireCompany(cid);
   if (!isPrivate(company)) notFound();
-  const all = await db.select().from(schema.ghReviews).where(eq(schema.ghReviews.companyId, cid)).orderBy(desc(schema.ghReviews.reviewedAt));
+  const every = await db.select().from(schema.ghReviews).where(eq(schema.ghReviews.companyId, cid)).orderBy(desc(schema.ghReviews.reviewedAt));
   const base = `/c/${cid}/gh/reviews`;
-  if (!all.length) {
+  const src = sp.src === "airbnb" || sp.src === "google" ? sp.src : "";
+  const all = src ? every.filter((r) => r.source === src) : every;
+  const sources = [...new Set(every.map((r) => r.source))];
+  if (!every.length) {
     return (
       <div className="gh">
         <h1>Értékelések</h1>
@@ -52,16 +59,22 @@ export default async function ReviewsPage({ params, searchParams }: { params: Pr
   });
   const tagCount = new Map<string, number>();
   for (const r of all) for (const [c, ts] of Object.entries(r.tags ?? {})) for (const t of ts) tagCount.set(`${c}|${t}`, (tagCount.get(`${c}|${t}`) ?? 0) + 1);
-  const catLabel = Object.fromEntries(CAT) as Record<string, string>;
+  const catLabel = { ...Object.fromEntries(CAT), ...TAG_LABEL } as Record<string, string>;
   const tags = [...tagCount.entries()].sort((a, b) => b[1] - a[1]);
   const weakest = [...cats].filter((c) => c.avg !== null).sort((a, b) => a.avg! - b.avg!)[0];
-  const q = (o: Record<string, string>) => { const u = new URLSearchParams({ ...(only ? { stars: sp.stars } : {}), ...(year ? { year } : {}), ...o }); for (const [k, v] of [...u]) if (!v) u.delete(k); const s = u.toString(); return s ? `${base}?${s}` : base; };
+  const q = (o: Record<string, string>) => { const u = new URLSearchParams({ ...(only ? { stars: sp.stars } : {}), ...(year ? { year } : {}), ...(src ? { src } : {}), ...o }); for (const [k, v] of [...u]) if (!v) u.delete(k); const s = u.toString(); return s ? `${base}?${s}` : base; };
 
   return (
     <div className="gh">
       <div className="topbar">
         <h1>Értékelések</h1>
-        <span className="muted" style={{ fontSize: 13 }}>Airbnb · {all.length} értékelés · {fmtDate(all[all.length - 1].reviewedAt)} – {fmtDate(all[0].reviewedAt)}</span>
+        <div className="toolbar">
+          <span className="muted" style={{ fontSize: 13 }}>{sources.map((x) => `${SRC[x] ?? x}: ${every.filter((r) => r.source === x).length}`).join(" · ")}</span>
+          <div className="segmented">
+            <Link href={q({ src: "" })} className={!src ? "on" : ""}>Mind</Link>
+            {sources.map((x) => <Link key={x} href={q({ src: x })} className={src === x ? "on" : ""}>{SRC[x] ?? x}</Link>)}
+          </div>
+        </div>
       </div>
 
       <div className="grid cols-4">
@@ -108,11 +121,11 @@ export default async function ReviewsPage({ params, searchParams }: { params: Pr
         {list.map((r) => (
           <article key={r.id} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <div><strong>{r.guest}</strong>{r.guestLocation ? <span className="muted"> · {r.guestLocation}</span> : null} <span style={{ color: "var(--warn, #b7791f)", letterSpacing: 1 }}>{stars(r.overall)}</span></div>
-              <div className="muted" style={{ fontSize: 12.5 }}>{r.stayFrom && r.stayTo ? `tartózkodás: ${fmtDate(r.stayFrom)} – ${fmtDate(r.stayTo)} · ` : ""}értékelve: {fmtDate(r.reviewedAt)}</div>
+              <div><strong>{r.guest}</strong>{r.guestLocation ? <span className="muted"> · {r.guestLocation}</span> : null}<span className="muted"> · {SRC[r.source] ?? r.source}</span> <span style={{ color: "var(--warn, #b7791f)", letterSpacing: 1 }}>{stars(r.overall)}</span></div>
+              <div className="muted" style={{ fontSize: 12.5 }}>{r.stayFrom && r.stayTo ? `tartózkodás: ${fmtDate(r.stayFrom)} – ${fmtDate(r.stayTo)} · ` : ""}értékelve: {r.dateApprox ? `kb. ${r.reviewedAt.slice(0, 4)}. ${r.reviewedAt.slice(5, 7)}.` : fmtDate(r.reviewedAt)}</div>
             </div>
             {r.text ? <p style={{ margin: "8px 0", whiteSpace: "pre-wrap" }}>{r.text}</p> : <p className="muted" style={{ margin: "8px 0" }}>(szöveg nélkül)</p>}
-            {r.privateNote ? <p style={{ margin: "8px 0", padding: "8px 10px", background: "var(--surface-2)", borderRadius: 8, whiteSpace: "pre-wrap" }}><span className="muted">Privát megjegyzés neked: </span>{r.privateNote}</p> : null}
+            {r.privateNote ? <p style={{ margin: "8px 0", padding: "8px 10px", background: "var(--surface-2)", borderRadius: 8, whiteSpace: "pre-wrap" }}><span className="muted">{r.source === "airbnb" ? "Privát megjegyzés neked: " : "Megjegyzés: "}</span>{r.privateNote}</p> : null}
             {r.reply ? <p className="muted" style={{ margin: "8px 0", whiteSpace: "pre-wrap" }}>Válaszod: {r.reply}</p> : null}
             <div className="legend">
               {CAT.map(([k, l]) => (r.ratings?.[k] ? <span key={k} className={r.ratings[k]! <= 3 ? "neg" : ""}>{l}: <b>{r.ratings[k]}</b></span> : null))}
