@@ -416,6 +416,10 @@ export async function importLoanTermsOnly(companyId: number, bundle: ImportBundl
 /** A cég összes könyvelési adatának törlése (számlák, tételek, partnerek, gépkocsik). A cég, a számlatükör és a beállítások maradnak. */
 export async function wipeCompanyData(companyId: number) {
   await db.transaction(async (tx) => {
+    await tx.delete(schema.ghReservations).where(eq(schema.ghReservations.companyId, companyId));
+    await tx.delete(schema.ghReviews).where(eq(schema.ghReviews.companyId, companyId));
+    await tx.delete(schema.ghAdStats).where(eq(schema.ghAdStats.companyId, companyId));
+    await tx.delete(schema.ghSyncLog).where(eq(schema.ghSyncLog.companyId, companyId));
     await tx.delete(schema.payments).where(eq(schema.payments.companyId, companyId));
     await tx.delete(schema.invoices).where(eq(schema.invoices.companyId, companyId));
     await tx.delete(schema.memberLoanExtensions).where(eq(schema.memberLoanExtensions.companyId, companyId));

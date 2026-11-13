@@ -6,7 +6,7 @@ import { requireCompany } from "@/lib/auth";
 import { isPrivate } from "@/lib/entity";
 import { fmtDate } from "@/lib/dates";
 import { fmtHuf } from "@/lib/money";
-import { loadGuesthouse, type Stay } from "@/lib/guesthouse";
+import { loadGuesthouse, withReservations, type Stay } from "@/lib/guesthouse";
 import { addDays, daysBetween, daysInMonth, kpis, sumRange } from "@/lib/gh-calc";
 import { accommodationStart, availableDays, fmtNum, fmtPct } from "@/lib/gh-view";
 import { Flash } from "@/components/Flash";
@@ -25,7 +25,8 @@ export default async function BookingsPage({ params, searchParams }: { params: P
   const y1 = Number(d.asOf.slice(0, 4));
   const y0 = Number(d.first.slice(0, 4));
   const year = /^\d{4}$/.test(sp.year ?? "") ? Math.min(y1 + 1, Math.max(y0, Number(sp.year))) : y1;
-  const stays = d.stays.filter((s) => s.from.slice(0, 4) === String(year) || s.to.slice(0, 4) === String(year));
+  const all = await withReservations(cid, d.stays);
+  const stays = all.filter((s) => s.from.slice(0, 4) === String(year) || s.to.slice(0, 4) === String(year));
   const start = accommodationStart(d.days);
   const k = kpis(sumRange(d.days, `${year}-01-01`, `${year}-12-31`), availableDays(`${year}-01-01`, `${year}-12-31`, start, d.asOf), d.include);
 
@@ -34,7 +35,7 @@ export default async function BookingsPage({ params, searchParams }: { params: P
   for (const s of stays) for (let i = 0; i < s.nights; i++) occ.set(addDays(s.from, i), s);
   const withLead = stays.filter((s) => s.bookedOn);
   const lead = withLead.length ? withLead.reduce((a, s) => a + daysBetween(s.bookedOn!, s.from), 0) / withLead.length : null;
-  const upcoming = d.stays.filter((s) => s.from > d.asOf);
+  const upcoming = all.filter((s) => s.to > d.asOf).sort((a, b) => (a.from < b.from ? -1 : 1));
 
   // rögzített közvetlen foglalások (sztornózhatók)
   const manual = await db
@@ -62,8 +63,30 @@ export default async function BookingsPage({ params, searchParams }: { params: P
         <div className="card kpi"><div className="label">Eladott éjszakák</div><div className="value">{fmtNum(k.nights, k.nightsEstimated ? 1 : 0)}<small>éj</small></div><div className="hint">kihasználtság {fmtPct(k.occupancy)}{k.nightsEstimated ? ` · ebből becsült ${fmtNum(k.nightsEstimated, 1)}` : ""}</div></div>
         <div className="card kpi"><div className="label">Dátumos foglalások</div><div className="value">{stays.length}<small>db</small></div><div className="hint">átlagosan {stays.length ? fmtNum(stays.reduce((a, s) => a + s.nights, 0) / stays.length, 1) : "–"} éj / foglalás</div></div>
         <div className="card kpi"><div className="label">Foglalási előidő (Airbnb)</div><div className="value">{lead !== null ? fmtNum(lead, 0) : "–"}<small>nap</small></div><div className="hint">a foglalás és az érkezés között átlagosan</div></div>
-        <div className="card kpi"><div className="label">Jövőbeli foglalások</div><div className="value">{upcoming.length}<small>db</small></div><div className="hint">{upcoming.length ? `${upcoming.reduce((a, s) => a + s.nights, 0)} éj · ${fmtHuf(upcoming.reduce((a, s) => a + s.amount, 0))} Ft` : "nincs rögzítve"}</div></div>
+        <div className="card kpi"><div className="label">Jövőbeli foglalások</div><div className="value">{upcoming.length}<small>db</small></div><div className="hint">{upcoming.length ? `${upcoming.reduce((a, s) => a + s.nights, 0)} éj · ${fmtHuf(upcoming.reduce((a, s) => a + s.amount, 0))} Ft várható` : "nincs rögzítve"}</div></div>
       </div>
+
+      {upcoming.length ? (
+        <>
+          <h2>Következő foglalások</h2>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Érkezés</th><th>Távozás</th><th className="num">Éj</th><th>Vendég</th><th className="num">Fő</th><th>Csatorna</th><th className="num">Várható összeg</th><th className="num">Ft / éj</th><th>Foglalva</th><th>Megjegyzés</th></tr></thead>
+              <tbody>
+                {upcoming.map((s) => (
+                  <tr key={s.code}>
+                    <td>{fmtDate(s.from)}</td><td>{fmtDate(s.to)}</td><td className="num">{s.nights}</td><td>{s.guest ?? ""}</td><td className="num">{s.guests ?? ""}</td>
+                    <td><span className="legend"><span><i style={{ background: `var(--ch-${s.channel})` }} />{CH_LABEL[s.channel]}</span></span></td>
+                    <td className="num">{s.amount ? fmtHuf(s.amount) : "–"}</td><td className="num">{s.amount ? fmtHuf(s.amount / s.nights) : "–"}</td>
+                    <td>{s.bookedOn ? fmtDate(s.bookedOn) : ""}</td><td className="muted" style={{ fontSize: 12.5 }}>{s.note ?? (s.planned ? "" : "már könyvelve")}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr><td colSpan={2}>Összesen</td><td className="num">{upcoming.reduce((a, s) => a + s.nights, 0)}</td><td colSpan={3}></td><td className="num">{fmtHuf(upcoming.reduce((a, s) => a + s.amount, 0))}</td><td colSpan={3}></td></tr></tfoot>
+            </table>
+          </div>
+        </>
+      ) : null}
 
       <h2 id="new">Új közvetlen foglalás</h2>
       <form action={addDirectBookingAction} className="card">
@@ -126,7 +149,7 @@ export default async function BookingsPage({ params, searchParams }: { params: P
                   <td>{fmtDate(s.from)}</td>
                   <td>{fmtDate(s.to)}</td>
                   <td className="num">{s.nights}</td>
-                  <td>{s.guest ?? ""}</td>
+                  <td>{s.guest ?? ""}{s.planned ? <span className="muted"> · még nem könyvelt</span> : null}</td>
                   <td><span className="legend"><span><i style={{ background: `var(--ch-${s.channel})` }} />{CH_LABEL[s.channel]}</span></span></td>
                   <td className="num">{fmtHuf(s.amount)}</td>
                   <td className="num">{fmtHuf(s.amount / s.nights)}</td>

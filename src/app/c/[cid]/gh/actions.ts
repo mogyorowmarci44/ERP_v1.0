@@ -204,3 +204,63 @@ export async function setValuationMethodAction(fd: FormData) {
     return `${back}#piaci-ertek`;
   });
 }
+
+/** Áttekintés: „Minden adat frissítése” – Airbnb iCal, Meta Ads, Instagram (ami be van állítva). */
+export async function refreshAllAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { company } = await requireCompany(cid, { write: true });
+  const back = `/c/${cid}`;
+  await runOrRedirect(back, async () => {
+    if (!isPrivate(company)) throw new Error("Csak vendégháznál.");
+    const { refreshAll } = await import("@/lib/gh-sync");
+    const res = await refreshAll(cid, company.taxProfile?.sync, today());
+    revalidatePath(`/c/${cid}`, "layout");
+    const ok = res.filter((r) => r.ok).length;
+    return `${back}?ok=${encodeURIComponent(`Frissítés kész: ${ok} / ${res.length} forrás frissült.`)}#frissites`;
+  });
+}
+
+/** Szinkronfájl (Airbnb-fiókból kiolvasott foglalások és értékelések) betöltése. */
+export async function uploadSyncAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { company } = await requireCompany(cid, { write: true });
+  const back = `/c/${cid}`;
+  await runOrRedirect(back, async () => {
+    if (!isPrivate(company)) throw new Error("Csak vendégháznál.");
+    const f = fd.get("file");
+    if (!(f instanceof File) || !f.size) throw new Error("Válaszd ki a szinkronfájlt.");
+    if (f.size > 3_000_000) throw new Error("A fájl túl nagy.");
+    let bundle;
+    try { bundle = JSON.parse(await f.text()); } catch { throw new Error("A fájl nem érvényes JSON."); }
+    const { applySyncBundle, logSync } = await import("@/lib/gh-sync");
+    const r = await applySyncBundle(cid, bundle);
+    const msg = `${r.reservations} foglalás, ${r.reviews} értékelés betöltve${bundle.generatedAt ? ` (állapot: ${String(bundle.generatedAt).slice(0, 10)})` : ""}`;
+    await logSync(cid, "Airbnb szinkronfájl", true, msg);
+    revalidatePath(`/c/${cid}`, "layout");
+    return `${back}?ok=${encodeURIComponent(msg)}#frissites`;
+  });
+}
+
+/** Adatforrások beállítása (iCal-cím, Meta token, hirdetési fiók, Instagram-azonosító). Üres token = a meglévő marad. */
+export async function saveSyncSettingsAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { company } = await requireCompany(cid, { write: true });
+  const back = `/c/${cid}`;
+  await runOrRedirect(back, async () => {
+    if (!isPrivate(company)) throw new Error("Csak vendégháznál.");
+    const tp = company.taxProfile ?? DEFAULT_TAX_PROFILE;
+    const prev = tp.sync ?? {};
+    const ical = str(fd, "airbnbIcalUrl");
+    if (ical && !/^https:\/\/(www\.)?airbnb\.[a-z.]+\/calendar\/ical\//.test(ical)) throw new Error("Az iCal-cím így kezdődjön: https://www.airbnb.com/calendar/ical/…");
+    const token = str(fd, "metaToken");
+    const sync = {
+      airbnbIcalUrl: ical || null,
+      metaToken: fd.get("clearToken") === "on" ? null : token || prev.metaToken || null,
+      metaAdAccount: str(fd, "metaAdAccount").replace(/\s/g, "") || null,
+      igUserId: str(fd, "igUserId").replace(/\s/g, "") || null,
+    };
+    await db.update(schema.companies).set({ taxProfile: { ...tp, sync } }).where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `${back}?ok=${encodeURIComponent("Adatforrások mentve.")}#frissites`;
+  });
+}

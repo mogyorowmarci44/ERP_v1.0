@@ -183,3 +183,14 @@ describe("összevetés", () => {
     expect(delta(110, 100, "rel")?.text).toBe("+10%");
   });
 });
+
+describe("Airbnb iCal", () => {
+  it("foglalások és blokkok", async () => {
+    const { parseIcal } = await import("@/lib/ical");
+    const ics = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTEND;VALUE=DATE:20261115\r\nDTSTART;VALUE=DATE:20261113\r\nDESCRIPTION:Reservation URL: https://www.airbnb.com/hosting/reservations/de\r\n tails/HM5D5WNQZ2\\nPhone Number (Last 4 Digits): 1234\r\nSUMMARY:Reserved\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTEND;VALUE=DATE:20261121\r\nDTSTART;VALUE=DATE:20261119\r\nSUMMARY:Airbnb (Not available)\r\nEND:VEVENT\r\nEND:VCALENDAR";
+    expect(parseIcal(ics)).toEqual([
+      { start: "2026-11-13", end: "2026-11-15", summary: "Reserved", code: "HM5D5WNQZ2" },
+      { start: "2026-11-19", end: "2026-11-21", summary: "Airbnb (Not available)", code: null },
+    ]);
+  });
+});

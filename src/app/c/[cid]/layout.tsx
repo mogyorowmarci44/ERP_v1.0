@@ -25,6 +25,7 @@ import {
   Landmark,
   NotebookTabs,
   CalendarDays,
+  Star,
   ReceiptText,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
@@ -68,6 +69,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/gh/cashflow`}><Wallet />Cash flow</NavLink>
           <NavLink href={`${b}/gh/payback`}><TrendingUp />Megtérülés</NavLink>
           <NavLink href={`${b}/gh/bookings`}><CalendarDays />Foglalások</NavLink>
+          <NavLink href={`${b}/gh/reviews`}><Star />Értékelések</NavLink>
 
           <div className="group">Rögzítés</div>
           <NavLink href={`${b}/gh/costs`}><ReceiptText />Költség rögzítése</NavLink>

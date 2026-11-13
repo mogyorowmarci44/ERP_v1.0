@@ -3,7 +3,7 @@
  */
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, invoiceLines, invoices, journalEntries, journalLines, type TaxProfile } from "@/db/schema";
+import { ghReservations, accounts, invoiceLines, invoices, journalEntries, journalLines, type TaxProfile } from "@/db/schema";
 import { DEFAULT_TAX_PROFILE, type PnlTaxInclude } from "./entity";
 import { today } from "./dates";
 import {
@@ -38,6 +38,10 @@ export type Stay = {
   nights: number;
   amount: number;
   bookedOn: string | null;
+  /** Külső forrásból (Airbnb-fiók / naptár) érkezett, a könyvelésben még nem szereplő foglalás. */
+  planned?: boolean;
+  guests?: number | null;
+  note?: string | null;
 };
 
 export type GhData = {
@@ -283,4 +287,19 @@ export function propertyReturn(d: GhData) {
     gainNominal: price - d.base,
     gainReal: price * dfNow - d.base,
   };
+}
+
+/** A könyvelésből ismert foglalások kiegészítése a szinkronizált (jövőbeli / még nem könyvelt) foglalásokkal. */
+export async function withReservations(companyId: number, stays: Stay[]): Promise<Stay[]> {
+  const rows = await db.select().from(ghReservations).where(eq(ghReservations.companyId, companyId));
+  const codes = new Set(stays.map((s) => s.code));
+  const out = [...stays];
+  for (const r of rows) {
+    if (r.status === "cancelled" || codes.has(r.code)) continue;
+    const channel = r.source === "airbnb" ? "airbnb" : r.source === "booking" ? "booking" : "direct";
+    // kézzel már rögzített közvetlen foglalás ugyanarra az érkezésre: nem duplázzuk
+    if (channel === "direct" && stays.some((s) => s.channel === "direct" && s.from < r.checkOut && s.to > r.checkIn)) continue;
+    out.push({ code: r.code, guest: r.guest, channel, from: r.checkIn, to: r.checkOut, nights: daysBetween(r.checkIn, r.checkOut), amount: r.amount ?? 0, bookedOn: r.bookedOn, planned: true, guests: r.guests, note: r.note });
+  }
+  return out.sort((a, b) => (a.from < b.from ? 1 : -1));
 }

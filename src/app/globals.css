@@ -554,3 +554,5 @@ table.heat th:first-child, table.heat td:first-child { text-align: left; }
 @keyframes gp-out { 0%, 60% { opacity: 1; } 100% { opacity: 0; transform: translateY(4px); } }
 @media (max-width: 640px) { .gp { right: 12px; bottom: 12px; } .gp-label { max-width: 150px; } }
 @media print { .gp { display: none !important; } }
+.gh .tag { display: inline-flex; gap: 6px; align-items: center; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 12.5px; background: var(--surface-2); }
+.gh .tag b { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }

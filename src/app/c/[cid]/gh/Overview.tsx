@@ -8,6 +8,8 @@ import { loadGuesthouse, propertyReturn } from "@/lib/guesthouse";
 import { SALE_METHOD_LABEL } from "@/lib/valuation";
 import { addDays, breakEven, groupBy, kpis, paybackFlows, paybackSummary, periodKey, periodLabel, periodRange, prevPeriod, sumRange, type Gran } from "@/lib/gh-calc";
 import { accommodationStart, availableDays, comparison, fmtNum, fmtPct, parseGran } from "@/lib/gh-view";
+import { Flash } from "@/components/Flash";
+import { RefreshCard } from "./RefreshCard";
 import { IncludeToggle, Kpi, Meter, Seg, ScopeNav } from "@/components/gh/GhUi";
 
 const HU_M = ["jan", "feb", "már", "ápr", "máj", "jún", "júl", "aug", "szep", "okt", "nov", "dec"];
@@ -59,6 +61,7 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
   const per = g === "week" ? "hét" : g === "month" ? "hónap" : "év";
   return (
     <div className="gh">
+      <Flash error={sp.error} ok={sp.ok} />
       <div className="topbar">
         <div>
           <h1>Áttekintés</h1>
@@ -116,6 +119,8 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
           <div className="hint">{d.profile.szjaMethod === "flat_rate_room" && nextInst ? `Következő tételes adó részlet: ${fmtHuf(nextInst.amount)} Ft · ${fmtDate(nextInst.due)}` : ""}</div>
         </div>
       </div>
+
+      <RefreshCard cid={cid} profile={d.profile} />
 
       <div className="row" style={{ justifyContent: "space-between", marginTop: 26 }}>
         <h2 style={{ margin: 0 }}>Szezonalitás – szállásbevétel és kihasználtság havonta</h2>

@@ -119,6 +119,8 @@ export type TaxProfile = {
   inflationLongRun?: number | null;
   /** Ingatlan adatai a piaci érték becsléséhez (cím, hrsz, telek, alapterület, galéria, terasz, fajlagos ár, tőkésítési ráta). */
   property?: import("@/lib/valuation").PropertyInfo;
+  /** Adatfrissítés forrásai: Airbnb iCal-export címe, Meta (Graph API) token, hirdetési fiók, Instagram-fiók azonosító. */
+  sync?: { airbnbIcalUrl?: string | null; metaToken?: string | null; metaAdAccount?: string | null; igUserId?: string | null };
 };
 
 export type CompanyTheme = { preset: string; accent: string; sidebar: string; mode: "light" | "dark" };
@@ -695,4 +697,79 @@ export const inboxDocuments = pgTable(
     processedAt: timestamp("processed_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("inbox_documents_ref").on(t.companyId, t.sourceRef), index("inbox_documents_status").on(t.companyId, t.status), index("inbox_documents_sha").on(t.companyId, t.sha256)],
+);
+
+// ---------------------------------------------------------------------------
+// v2.0 – Vendégház: foglalások és értékelések (külső forrásból szinkronizálva)
+// ---------------------------------------------------------------------------
+
+/** Foglalás külső forrásból (Airbnb-foglalás, Airbnb-naptárban kiblokkolt közvetlen foglalás, iCal). */
+export const ghReservations = pgTable(
+  "gh_reservations",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    source: varchar("source", { length: 16 }).notNull(), // airbnb | direct | booking | ical
+    code: varchar("code", { length: 60 }).notNull(),
+    guest: text("guest"),
+    guests: integer("guests"),
+    checkIn: date("check_in").notNull(),
+    checkOut: date("check_out").notNull(),
+    amount: money("amount"),
+    status: varchar("status", { length: 20 }).notNull().default("confirmed"),
+    bookedOn: date("booked_on"),
+    note: text("note"),
+    syncedAt: timestamp("synced_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("gh_reservations_code_uq").on(t.companyId, t.code)],
+);
+
+export type ReviewRatings = { checkin?: number; cleanliness?: number; accuracy?: number; communication?: number; location?: number; value?: number };
+
+/** Vendégértékelés (Airbnb): összpontszám, részletes pontok, címkék kategóriánként, szöveg, privát megjegyzés, válasz. */
+export const ghReviews = pgTable(
+  "gh_reviews",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    source: varchar("source", { length: 16 }).notNull().default("airbnb"),
+    externalId: varchar("external_id", { length: 60 }).notNull(),
+    guest: text("guest"),
+    guestLocation: text("guest_location"),
+    stayFrom: date("stay_from"),
+    stayTo: date("stay_to"),
+    reviewedAt: date("reviewed_at").notNull(),
+    overall: integer("overall"),
+    ratings: jsonb("ratings").$type<ReviewRatings>(),
+    tags: jsonb("tags").$type<Record<string, string[]>>(),
+    text: text("text"),
+    privateNote: text("private_note"),
+    reply: text("reply"),
+    syncedAt: timestamp("synced_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("gh_reviews_ext_uq").on(t.companyId, t.externalId)],
+);
+
+/** Adatfrissítések naplója (forrásonként az utolsó futás eredménye). */
+export const ghSyncLog = pgTable("gh_sync_log", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  source: varchar("source", { length: 24 }).notNull(),
+  ok: boolean("ok").notNull(),
+  message: text("message").notNull(),
+  at: timestamp("at").notNull().defaultNow(),
+});
+
+/** Meta Ads napi statisztika (Graph API-ból frissítve). */
+export const ghAdStats = pgTable(
+  "gh_ad_stats",
+  {
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    spend: money("spend").notNull().default(0),
+    impressions: integer("impressions").notNull().default(0),
+    reach: integer("reach").notNull().default(0),
+    clicks: integer("clicks").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.companyId, t.date] })],
 );

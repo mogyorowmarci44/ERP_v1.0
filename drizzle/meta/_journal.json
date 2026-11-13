@@ -78,6 +78,13 @@
       "when": 1794475592232,
       "tag": "0010_v2_entity_type",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794556424967,
+      "tag": "0011_v2_gh_sync",
+      "breakpoints": true
     }
   ]
 }
