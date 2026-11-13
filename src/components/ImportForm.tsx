@@ -9,7 +9,7 @@ import { progress } from "@/lib/progress";
 
 type Preview = { partners: number; vehicles: number; kinds: Record<string, number>; from?: string; to?: string; log: string[][]; source?: string };
 
-export function ImportForm({ cid }: { cid: number }) {
+export function ImportForm({ cid, doneHref }: { cid: number; doneHref?: string }) {
   const [json, setJson] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +22,7 @@ export function ImportForm({ cid }: { cid: number }) {
     const text = await f.text();
     try {
       const b = JSON.parse(text);
+      if (b.format === "mm-erp-gh-sync/1") throw new Error("Ez vendégház-szinkronfájl (foglalások, értékelések): az oldal tetején, a „Vendégház-szinkronfájl” résznél vagy az Áttekintés „Adatfrissítés” részénél töltsd be.");
       if (b.format !== "mm-erp-import/1") throw new Error("Ez nem MM ERP import csomag.");
       const kinds: Record<string, number> = {};
       for (const d of b.documents) kinds[d.kind] = (kinds[d.kind] ?? 0) + 1;
@@ -45,8 +46,15 @@ export function ImportForm({ cid }: { cid: number }) {
           setError(res.error);
           progress.done(id, { cancel: true });
         } else {
-          setReport(res.report!);
           progress.done(id);
+          // a sikeres import után az oldal újratöltődik (a cég már nem üres) – vendégháznál az Áttekintésre visszük az eredményt
+          if (doneHref) {
+            const r = res.report!;
+            const msg = `Import kész: ${Object.entries(r.counts).map(([k, n]) => `${n} ${k}`).join(", ")}.${r.warnings.length ? ` Figyelmeztetések: ${r.warnings.join(" | ")}` : ""}`;
+            window.location.assign(`${doneHref}?ok=${encodeURIComponent(msg.slice(0, 900))}`);
+            return;
+          }
+          setReport(res.report!);
         }
       } catch (e) {
         progress.done(id, { cancel: true });

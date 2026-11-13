@@ -407,6 +407,19 @@ export async function importBundleAction(cid: number, json: string): Promise<{ e
   try {
     const bundle = JSON.parse(json) as ImportBundle;
     const report = await importBundle(cid, bundle, user.id);
+    // v2.0 – a csomagba ágyazott vendégház-szinkron (foglalások, értékelések)
+    const ghSync = (bundle as { ghSync?: unknown }).ghSync;
+    if (ghSync) {
+      try {
+        const { applySyncBundle, logSync } = await import("@/lib/gh-sync");
+        const r = await applySyncBundle(cid, ghSync as Parameters<typeof applySyncBundle>[1]);
+        report.counts["foglalás (szinkron)"] = r.reservations;
+        report.counts["értékelés"] = r.reviews;
+        await logSync(cid, "Airbnb szinkronfájl", true, `${r.reservations} foglalás, ${r.reviews} értékelés betöltve (import csomagból)`);
+      } catch (e) {
+        report.warnings.push(`A foglalások / értékelések betöltése nem sikerült: ${errMsg(e)}`);
+      }
+    }
     revalidatePath(`/c/${cid}`, "layout");
     return { report };
   } catch (e) {

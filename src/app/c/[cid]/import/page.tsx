@@ -3,6 +3,8 @@ import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { ImportForm } from "@/components/ImportForm";
 import { LoanTermsForm } from "@/components/LoanTermsForm";
+import { isPrivate } from "@/lib/entity";
+import { uploadSyncAction } from "../gh/actions";
 import { Flash } from "@/components/Flash";
 import { wipeCompanyAction } from "../actions";
 
@@ -19,6 +21,17 @@ export default async function ImportPage({ params, searchParams }: { params: Pro
         Régi nyilvántartásból (pl. Excel) átalakított import csomag betöltése. Számlák, kiegyenlítések, vegyes tételek, partnerek
         és gépkocsik kerülnek be, egyetlen lépésben: vagy minden bekerül, vagy semmi.
       </p>
+      {isPrivate(company) ? (
+        <form action={uploadSyncAction} className="card grid" style={{ gap: 10, marginBottom: 16 }}>
+          <input type="hidden" name="cid" value={cid} />
+          <strong>Vendégház-szinkronfájl (foglalások, értékelések)</strong>
+          <span className="muted">A „dezsavu-szinkron-….json” fájl ide tölthető be – akkor is, ha a cégben már vannak könyvelési tételek. Többször is betölthető, nem duplázódik.</span>
+          <div className="row">
+            <input type="file" name="file" accept="application/json,.json" required />
+            <button className="primary">Szinkronfájl betöltése</button>
+          </div>
+        </form>
+      ) : null}
       {role !== "owner" ? (
         <div className="flash error">Importálni csak a cég tulajdonosa tud.</div>
       ) : n > 0 ? (
@@ -39,7 +52,7 @@ export default async function ImportPage({ params, searchParams }: { params: Pro
           </form>
         </div>
       ) : (
-        <ImportForm cid={cid} />
+        <ImportForm cid={cid} doneHref={isPrivate(company) ? `/c/${cid}` : undefined} />
       )}
     </>
   );
