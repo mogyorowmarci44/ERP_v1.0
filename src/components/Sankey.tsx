@@ -5,13 +5,14 @@
  */
 import { fmtHuf } from "@/lib/money";
 import type { Statement } from "@/lib/statements";
+import type { SankeyDetail } from "@/lib/sankey-detail";
 
 type Role = "revenue" | "cost" | "profit" | "loss";
 type Node = { id: string; label: string; col: number; role: Role; value: number };
 type Link = { from: string; to: string; value: number; role: Role };
 
 /** A P&L sorokból (egy oszlop vagy az összesen) a Sankey hálózat. */
-export function sankeyModel(pnl: Statement, colIndex: number | "total") {
+export function sankeyModel(pnl: Statement, colIndex: number | "total", detail?: SankeyDetail) {
   const v = (key: string) => {
     const r = pnl.rows.find((x) => x.key === key);
     if (!r) return 0;
@@ -74,6 +75,21 @@ export function sankeyModel(pnl: Statement, colIndex: number | "total") {
     add({ ...m, col: 3, role: "cost" });
     if (m.value > 0) links.push({ from: "IV", to: m.id, value: m.value, role: "cost" });
   }
+  // Egy szinttel lejjebb: ELÁBÉ gépkocsinként, anyagköltség és igénybe vett szolgáltatások főkönyvi számlánként
+  for (const m of material) {
+    const items = detail?.[m.id as keyof SankeyDetail];
+    if (!items?.length || m.value <= 0) continue;
+    // a részletek összege a csomópont értékére igazítva (kerekítés, negatív sorok miatt)
+    const sum = items.reduce((s, x) => s + x.value, 0);
+    const f = sum > 0 ? m.value / sum : 0;
+    for (const it of items) {
+      const val = Math.round(it.value * f);
+      if (val <= 0) continue;
+      const id = `${m.id}:${it.key}`;
+      add({ id, label: it.label, col: 4, role: "cost", value: val });
+      links.push({ from: m.id, to: id, value: val, role: "cost" });
+    }
+  }
   if (result >= 0) {
     add({ id: "C", label: "Adózás előtti eredmény", col: 2, role: "profit", value: preTax });
     if (preTax > 0) links.push({ from: "TOT", to: "C", value: preTax, role: "profit" });
@@ -88,19 +104,20 @@ export function sankeyModel(pnl: Statement, colIndex: number | "total") {
   return { nodes, links, revenue: v("I"), result, skipped };
 }
 
-const W = 1120;
-const H = 520;
+const W = 1280;
+const BASE_H = 520;
 const NODE_W = 14;
 const PAD = 12;
 const MIN_SLOT = 30; // két címkesor helye a kis csomópontoknál
-const COL_X = [200, 440, 690, 910];
+const COL_X = [190, 395, 600, 805, 1010];
 
 export function Sankey({ model, title }: { model: ReturnType<typeof sankeyModel>; title: string }) {
   const { nodes, links, revenue, result } = model;
   if (nodes.length < 2) return <div className="card muted">Ebben az időszakban nincs bevétel vagy költség.</div>;
 
   // Lépték: minden oszlop férjen el, a kis csomópontoknak is legyen helye a címkéhez
-  const cols = [0, 1, 2, 3].map((c) => nodes.filter((n) => n.col === c));
+  const cols = [0, 1, 2, 3, 4].map((c) => nodes.filter((n) => n.col === c));
+  const H = Math.max(BASE_H, ...cols.map((c) => c.length * (MIN_SLOT + PAD)));
   const k = Math.min(
     ...cols.filter((c) => c.length).map((c) => (H - PAD * (c.length - 1) - MIN_SLOT * c.length) / c.reduce((s, n) => s + n.value, 0)),
   );
@@ -162,7 +179,7 @@ export function Sankey({ model, title }: { model: ReturnType<typeof sankeyModel>
               <rect x={g.x} y={g.y} width={NODE_W} height={g.h} rx={3} fill={color[n.role]} className="sk-node">
                 <title>{`${n.label}: ${fmtHuf(n.value)} Ft${revenue > 0 ? ` (${ratio(n.value)})` : ""}`}</title>
               </rect>
-              <text x={tx} y={ty - 2} textAnchor={left ? "end" : "start"} className="sk-label">{n.label}</text>
+              <text x={tx} y={ty - 2} textAnchor={left ? "end" : "start"} className="sk-label">{n.col === 4 && n.label.length > 32 ? `${n.label.slice(0, 31)}…` : n.label}</text>
               <text x={tx} y={ty + 13} textAnchor={left ? "end" : "start"} className="sk-value">
                 {fmtHuf(n.value)} Ft{pct(n.value)}
               </text>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { sankeyDetail } from "@/lib/sankey-detail";
 import { requireCompany } from "@/lib/auth";
 import { dailyRows } from "@/lib/reports";
 import { buckets, buildPnl, buildCashFlow, buildBalanceSheet, GRAN_LABEL, MAX_COLUMNS, type Granularity, type Statement } from "@/lib/statements";
@@ -73,6 +74,10 @@ export default async function StatementsPage({ params, searchParams }: { params:
   const period = sp.period && cols.some((c) => c.key === sp.period) ? sp.period : "total";
   const periodIdx = period === "total" ? "total" : cols.findIndex((c) => c.key === period);
 
+  const detail = statement && type === "sankey"
+    ? await sankeyDetail(cid, period === "total" ? from : cols[periodIdx as number].start, period === "total" ? to : cols[periodIdx as number].end)
+    : null;
+
   const base = `/c/${cid}/reports/statements`;
   // Típus- vagy bontásváltáskor az alapértelmezett időtartam (kivéve, ha a felhasználó állította)
   const link = (o: Partial<{ type: T; gran: Granularity }>) => {
@@ -131,7 +136,7 @@ export default async function StatementsPage({ params, searchParams }: { params:
             <noscript><button style={{ alignSelf: "end" }}>Mutasd</button></noscript>
           </form>
           {(() => {
-            const model = sankeyModel(statement, periodIdx as number | "total");
+            const model = sankeyModel(statement, periodIdx as number | "total", detail ?? undefined);
             const label = period === "total" ? `${fmtDate(from)} – ${fmtDate(to)}` : cols[periodIdx as number].label;
             return (
               <>
