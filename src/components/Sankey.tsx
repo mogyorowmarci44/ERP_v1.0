@@ -117,7 +117,8 @@ export function Sankey({ model, title }: { model: ReturnType<typeof sankeyModel>
 
   // Lépték: minden oszlop férjen el, a kis csomópontoknak is legyen helye a címkéhez
   const cols = [0, 1, 2, 3, 4].map((c) => nodes.filter((n) => n.col === c));
-  const H = Math.max(BASE_H, ...cols.map((c) => c.length * (MIN_SLOT + PAD)));
+  // sok csomópontnál is maradjon hely a szalagok vastagságának (ne csak a címkéknek)
+  const H = Math.max(BASE_H, ...cols.map((c) => c.length * (MIN_SLOT + PAD) + 380));
   const k = Math.min(
     ...cols.filter((c) => c.length).map((c) => (H - PAD * (c.length - 1) - MIN_SLOT * c.length) / c.reduce((s, n) => s + n.value, 0)),
   );
