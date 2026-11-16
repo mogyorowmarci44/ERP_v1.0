@@ -6,7 +6,6 @@ import {
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { trialBalance, openItems, vehicleStock, vatAnalytics } from "@/lib/reports";
-import { fmtHuf } from "@/lib/money";
 import { fmtDate, monthEnd, monthStart, today, yearStart } from "@/lib/dates";
 import { isPrivate } from "@/lib/entity";
 import { nextVatDeadline } from "@/lib/vat-deadline";
@@ -18,7 +17,8 @@ const STALE_DAYS = 90;
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
 const toHuf = (r: { currency: string; openFx: number; grossHuf: string | number; grossFx: string | number }) =>
   r.currency === "HUF" ? r.openFx : (r.openFx * Number(r.grossHuf)) / Number(r.grossFx || 1);
-const mFt = (n: number) => `${(n / 1_000_000).toLocaleString("hu-HU", { maximumFractionDigits: 1 })} M Ft`;
+/** Ezer forintra kerekítve, „eFt” egységgel. */
+const eFt = (n: number) => `${(Math.round(n / 1000) || 0).toLocaleString("hu-HU")} eFt`;
 
 export default async function Dashboard({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
@@ -54,8 +54,8 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   const todos: Todo[] = [];
   if (inbox.n) todos.push({ icon: <Inbox />, text: `${inbox.n} beérkező bizonylat könyvelésre vár`, href: `${b}/inbox`, tag: "Megnyitás" });
   if (drafts.n) todos.push({ icon: <FilePlus2 />, text: `${drafts.n} számla piszkozatban – még nincs lekönyvelve`, href: `${b}/invoices?dir=in`, tag: "Piszkozat" });
-  if (recvLate.length) todos.push({ icon: <Clock />, text: `${recvLate.length} lejárt vevőszámla · ${fmtHuf(recvLate.reduce((s, r) => s + toHuf(r), 0))} Ft`, href: `${b}/reports/open-items`, tag: "Lejárt", warn: true });
-  if (payLate.length) todos.push({ icon: <Clock />, text: `${payLate.length} lejárt szállítói számla · ${fmtHuf(payLate.reduce((s, r) => s + toHuf(r), 0))} Ft`, href: `${b}/reports/open-items`, tag: "Fizetendő", warn: true });
+  if (recvLate.length) todos.push({ icon: <Clock />, text: `${recvLate.length} lejárt vevőszámla · ${eFt(recvLate.reduce((s, r) => s + toHuf(r), 0))}`, href: `${b}/reports/open-items`, tag: "Lejárt", warn: true });
+  if (payLate.length) todos.push({ icon: <Clock />, text: `${payLate.length} lejárt szállítói számla · ${eFt(payLate.reduce((s, r) => s + toHuf(r), 0))}`, href: `${b}/reports/open-items`, tag: "Fizetendő", warn: true });
   todos.push({ icon: <Percent />, text: `Következő ÁFA-bevallás határideje: ${fmtDate(vatDue)}`, href: `${b}/reports/vat`, tag: `${vatDays} nap`, warn: vatDays <= 5 });
   if (stale.length) todos.push({ icon: <CarFront />, text: `${stale.length} gépkocsi több mint ${STALE_DAYS} napja készleten`, href: `${b}/vehicles`, tag: "Figyelj", warn: true });
   // az ÁFA-határidő csak akkor számít teendőnek, ha 5 napon belül van
@@ -97,12 +97,12 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
       </div>
 
       <div className="grid cols-4 lp-kpi">
-        <div className="card stat primary"><div className="label">Pénzeszközök</div><div className="value">{mFt(cash)}</div></div>
-        <div className="card stat"><div className="label">Készlet ({inStock.length} db)</div><div className="value">{mFt(stockValue)}</div></div>
-        <div className="card stat"><div className="label">Eredmény (év, adózás előtt)</div><div className={result < 0 ? "value neg" : "value"}>{mFt(result)}</div></div>
-        <div className="card stat"><div className="label">ÁFA egyenleg (tárgyhó)</div><div className="value">{fmtHuf(vat.balance)}<small>Ft</small></div></div>
+        <div className="card stat primary"><div className="label">Pénzeszközök</div><div className="value">{eFt(cash)}</div></div>
+        <div className="card stat"><div className="label">Készlet ({inStock.length} db)</div><div className="value">{eFt(stockValue)}</div></div>
+        <div className="card stat"><div className="label">Eredmény (év, adózás előtt)</div><div className={result < 0 ? "value neg" : "value"}>{eFt(result)}</div></div>
+        <div className="card stat"><div className="label">ÁFA egyenleg (tárgyhó)</div><div className="value">{eFt(vat.balance)}</div></div>
       </div>
-      <p className="muted lp-sub">Nyitott vevők: {fmtHuf(recvHuf)} Ft · Nyitott szállítók: {fmtHuf(payHuf)} Ft · Bevétel (év): {mFt(revenue)} · Költség (év): {mFt(costs)}</p>
+      <p className="muted lp-sub">Nyitott vevők: {eFt(recvHuf)} · Nyitott szállítók: {eFt(payHuf)} · Bevétel (év): {eFt(revenue)} · Költség (év): {eFt(costs)}</p>
 
       <div className="lp-tiles">
         {tiles.map((x) => (
