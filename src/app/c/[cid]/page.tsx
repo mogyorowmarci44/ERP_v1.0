@@ -1,59 +1,117 @@
 import Link from "next/link";
-import { vehicleIdent } from "@/lib/vehicle-id";
+import { and, count, eq, inArray } from "drizzle-orm";
+import {
+  Inbox, FileOutput, FileInput, FilePlus2, BookPlus, ChartNoAxesCombined, Percent, Clock, CarFront, Files, PiggyBank, Library, Database, Cog, ChevronRight,
+} from "lucide-react";
+import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { trialBalance, openItems, vehicleStock, vatAnalytics } from "@/lib/reports";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate, monthEnd, monthStart, today, yearStart } from "@/lib/dates";
 import { isPrivate } from "@/lib/entity";
+import { nextVatDeadline } from "@/lib/vat-deadline";
 import { GhOverview } from "./gh/Overview";
+
+const INBOX_TODO = ["review", "error", "new", "extracted"];
+const STALE_DAYS = 90;
+
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+const toHuf = (r: { currency: string; openFx: number; grossHuf: string | number; grossFx: string | number }) =>
+  r.currency === "HUF" ? r.openFx : (r.openFx * Number(r.grossHuf)) / Number(r.grossFx || 1);
+const mFt = (n: number) => `${(n / 1_000_000).toLocaleString("hu-HU", { maximumFractionDigits: 1 })} M Ft`;
 
 export default async function Dashboard({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
   const { company } = await requireCompany(cid);
   const t = today();
   if (isPrivate(company)) return <GhOverview cid={cid} profile={company.taxProfile} sp={await searchParams} />;
-  const [tb, recv, pay, stock, vat] = await Promise.all([
+  const [tb, recv, pay, stock, vat, [inbox], [drafts]] = await Promise.all([
     trialBalance(cid, yearStart(t), t),
     openItems(cid, "out"),
     openItems(cid, "in"),
     vehicleStock(cid),
     vatAnalytics(cid, monthStart(t), monthEnd(t)),
+    db.select({ n: count() }).from(schema.inboxDocuments).where(and(eq(schema.inboxDocuments.companyId, cid), inArray(schema.inboxDocuments.status, INBOX_TODO))),
+    db.select({ n: count() }).from(schema.invoices).where(and(eq(schema.invoices.companyId, cid), eq(schema.invoices.status, "draft"))),
   ]);
   const bal = (pred: (code: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
   const cash = bal((c) => c.startsWith("38"));
   const revenue = -bal((c) => c.startsWith("9"));
   const costs = bal((c) => c.startsWith("5") || c.startsWith("8"));
+  const result = revenue - costs;
   const inStock = stock.filter((v) => v.status !== "sold");
   const stockValue = inStock.reduce((s, v) => s + v.bookValue, 0);
-  const recvHuf = recv.reduce((s, r) => s + (r.currency === "HUF" ? r.openFx : (r.openFx * Number(r.grossHuf)) / Number(r.grossFx || 1)), 0);
-  const payHuf = pay.reduce((s, r) => s + (r.currency === "HUF" ? r.openFx : (r.openFx * Number(r.grossHuf)) / Number(r.grossFx || 1)), 0);
+  const recvHuf = recv.reduce((s, r) => s + toHuf(r), 0);
+  const payHuf = pay.reduce((s, r) => s + toHuf(r), 0);
+  const recvLate = recv.filter((r) => r.dueDate && r.dueDate < t);
+  const payLate = pay.filter((r) => r.dueDate && r.dueDate < t);
+  const stale = inStock.filter((v) => v.purchaseDate && daysBetween(v.purchaseDate, t) > STALE_DAYS);
+  const vatDue = nextVatDeadline(company.vatPeriod, t);
+  const vatDays = daysBetween(t, vatDue);
+  const b = `/c/${cid}`;
+
+  type Todo = { icon: React.ReactNode; text: string; href: string; tag: string; warn?: boolean };
+  const todos: Todo[] = [];
+  if (inbox.n) todos.push({ icon: <Inbox />, text: `${inbox.n} beérkező bizonylat könyvelésre vár`, href: `${b}/inbox`, tag: "Megnyitás" });
+  if (drafts.n) todos.push({ icon: <FilePlus2 />, text: `${drafts.n} számla piszkozatban – még nincs lekönyvelve`, href: `${b}/invoices?dir=in`, tag: "Piszkozat" });
+  if (recvLate.length) todos.push({ icon: <Clock />, text: `${recvLate.length} lejárt vevőszámla · ${fmtHuf(recvLate.reduce((s, r) => s + toHuf(r), 0))} Ft`, href: `${b}/reports/open-items`, tag: "Lejárt", warn: true });
+  if (payLate.length) todos.push({ icon: <Clock />, text: `${payLate.length} lejárt szállítói számla · ${fmtHuf(payLate.reduce((s, r) => s + toHuf(r), 0))} Ft`, href: `${b}/reports/open-items`, tag: "Fizetendő", warn: true });
+  todos.push({ icon: <Percent />, text: `Következő ÁFA-bevallás határideje: ${fmtDate(vatDue)}`, href: `${b}/reports/vat`, tag: `${vatDays} nap`, warn: vatDays <= 5 });
+  if (stale.length) todos.push({ icon: <CarFront />, text: `${stale.length} gépkocsi több mint ${STALE_DAYS} napja készleten`, href: `${b}/vehicles`, tag: "Figyelj", warn: true });
+  // az ÁFA-határidő csak akkor számít teendőnek, ha 5 napon belül van
+  const open = todos.length - (vatDays <= 5 ? 0 : 1);
+
+  const tiles: { title: string; icon: React.ReactNode; badge?: string; links: [string, string][] }[] = [
+    { title: "Bizonylatok", icon: <Files />, badge: inbox.n ? `${inbox.n} új` : undefined, links: [["Beérkező bizonylatok", `${b}/inbox`], ["Vevőszámlák", `${b}/invoices?dir=out`], ["Szállítói számlák", `${b}/invoices?dir=in`], ["Vegyes / bank tétel", `${b}/journal/new`]] },
+    { title: "Pénzügy", icon: <PiggyBank />, links: [["Pénztár és bank", `${b}/money`], ["Tagi kölcsön", `${b}/member-loans`]] },
+    { title: "Kimutatások", icon: <ChartNoAxesCombined />, links: [["P&L, cash-flow, mérleg", `${b}/reports/statements`], ["Főkönyvi kivonat", `${b}/reports/trial-balance`], ["ÁFA analitika", `${b}/reports/vat`], ["Nyitott tételek", `${b}/reports/open-items`]] },
+    { title: "Főkönyv", icon: <Library />, links: [["Napló", `${b}/journal`], ["Számlakarton", `${b}/reports/ledger`]] },
+    { title: "Törzsadatok", icon: <Database />, badge: `${inStock.length} autó`, links: [["Gépkocsi készlet", `${b}/vehicles`], ["Partnerek", `${b}/partners`], ["Számlatükör", `${b}/accounts`], ["Árfolyamok (MNB)", `${b}/fx`]] },
+    { title: "Tervezés és rendszer", icon: <Cog />, links: [["Forecast", `${b}/forecast`], ["Megjelenés", `${b}/appearance`], ["Beállítások", `${b}/settings`], ["Adatimport", `${b}/import`]] },
+  ];
 
   return (
-    <>
+    <div className="landing">
       <div className="topbar">
-        <h1>Áttekintés</h1>
-        <Link className="btn" href={`/c/${cid}/reports/statements?type=pnl&gran=month`}>Havi eredménykimutatás</Link>
+        <div>
+          <h1>{open ? `${open} dolog vár rád` : "Minden rendben"}</h1>
+          <span className="muted">{company.name} · {fmtDate(t)}</span>
+        </div>
+        <Link className="btn" href={`${b}/reports/statements?type=pnl&gran=month`}>Havi eredménykimutatás</Link>
       </div>
-      <div className="grid cols-4">
-        <div className="card stat primary"><div className="label">Pénzeszközök (bank + pénztár)</div><div className="value">{fmtHuf(cash)}<small>Ft</small></div></div>
-        <div className="card stat"><div className="label">Gépkocsi készlet ({inStock.length} db)</div><div className="value">{fmtHuf(stockValue)}<small>Ft</small></div></div>
-        <div className="card stat"><div className="label">Nyitott vevők</div><div className="value">{fmtHuf(recvHuf)}<small>Ft</small></div></div>
-        <div className="card stat"><div className="label">Nyitott szállítók</div><div className="value">{fmtHuf(payHuf)}<small>Ft</small></div></div>
-        <div className="card stat"><div className="label">Árbevétel + egyéb bevétel (év)</div><div className="value">{fmtHuf(revenue)}<small>Ft</small></div></div>
-        <div className="card stat"><div className="label">Költség + ráfordítás (év)</div><div className="value">{fmtHuf(costs)}<small>Ft</small></div></div>
-        <div className="card stat"><div className="label">Eredmény (év, adózás előtt)</div><div className="value">{fmtHuf(revenue - costs)}<small>Ft</small></div></div>
+
+      <div className="lp-top">
+        <div className="card lp-todo">
+          {todos.map((x, i) => (
+            <Link key={i} href={x.href} className="lp-row">
+              {x.icon}<span>{x.text}</span><span className={x.warn ? "lp-tag warn" : "lp-tag"}>{x.tag}</span>
+            </Link>
+          ))}
+        </div>
+        <div className="lp-actions">
+          <Link className="btn primary" href={`${b}/invoices/new?dir=out`}><FileOutput />Új vevőszámla</Link>
+          <Link className="btn" href={`${b}/invoices/new?dir=in`}><FileInput />Új szállítói számla</Link>
+          <Link className="btn" href={`${b}/journal/new`}><BookPlus />Vegyes / bank tétel</Link>
+          <Link className="btn" href={`${b}/vehicles`}><CarFront />Gépkocsi készlet</Link>
+        </div>
+      </div>
+
+      <div className="grid cols-4 lp-kpi">
+        <div className="card stat primary"><div className="label">Pénzeszközök</div><div className="value">{mFt(cash)}</div></div>
+        <div className="card stat"><div className="label">Készlet ({inStock.length} db)</div><div className="value">{mFt(stockValue)}</div></div>
+        <div className="card stat"><div className="label">Eredmény (év, adózás előtt)</div><div className={result < 0 ? "value neg" : "value"}>{mFt(result)}</div></div>
         <div className="card stat"><div className="label">ÁFA egyenleg (tárgyhó)</div><div className="value">{fmtHuf(vat.balance)}<small>Ft</small></div></div>
       </div>
-      <h2>Készleten lévő gépkocsik</h2>
-      <table>
-        <thead><tr><th>Gépkocsi</th><th>Rendszám</th><th>Adózás</th><th className="num">Könyv szerinti érték</th></tr></thead>
-        <tbody>
-          {inStock.map((v) => (
-            <tr key={v.id}><td><Link href={`/c/${cid}/vehicles?edit=${v.id}`}>{v.make} {v.model} {v.year ?? ""}</Link></td><td className="mono">{vehicleIdent(v)}</td><td>{v.vatTreatment === "margin" ? "különbözeti" : "normál"}</td><td className="num">{fmtHuf(v.bookValue)}</td></tr>
-          ))}
-          {inStock.length === 0 && <tr><td colSpan={4} className="muted">Nincs készleten gépkocsi.</td></tr>}
-        </tbody>
-      </table>
-    </>
+      <p className="muted lp-sub">Nyitott vevők: {fmtHuf(recvHuf)} Ft · Nyitott szállítók: {fmtHuf(payHuf)} Ft · Bevétel (év): {mFt(revenue)} · Költség (év): {mFt(costs)}</p>
+
+      <div className="lp-tiles">
+        {tiles.map((x) => (
+          <div key={x.title} className="card lp-tile">
+            <h3>{x.icon}{x.title}{x.badge && <span className="lp-tag">{x.badge}</span>}</h3>
+            {x.links.map(([label, href]) => <Link key={href} href={href}>{label}<ChevronRight /></Link>)}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
