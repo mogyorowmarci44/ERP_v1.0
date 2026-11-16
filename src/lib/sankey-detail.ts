@@ -2,7 +2,7 @@
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 
-const { journalLines, journalEntries, accounts, vehicles } = schema;
+const { journalLines, journalEntries, accounts, vehicles, partners } = schema;
 export type DetailItem = { key: string; label: string; value: number };
 export type SankeyDetail = Partial<Record<"IV5" | "IV6" | "IV8", DetailItem[]>>;
 
@@ -42,9 +42,33 @@ export async function sankeyDetail(companyId: number, from: string, to: string):
     value: Math.round(Number(r.v)),
   }));
 
+  // Ha egy kategóriában csak egy főkönyvi számla van, partnerenként (szállítónként) bontunk – különben a bontás semmit nem mutatna.
+  const byPartner = async (pred: (c: string) => boolean) => {
+    const rows = await db
+      .select({ code: accounts.code, pid: partners.id, pname: partners.name, v: sql<number>`sum(${journalLines.debit} - ${journalLines.credit})::float8` })
+      .from(journalLines)
+      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.entryId))
+      .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
+      .leftJoin(partners, eq(partners.id, journalLines.partnerId))
+      .where(and(period, sql`${accounts.code} like '5%'`))
+      .groupBy(accounts.code, partners.id, partners.name);
+    const m = new Map<string, DetailItem>();
+    for (const r of rows.filter((x) => pred(x.code))) {
+      const key = r.pid ? `p${r.pid}` : "nop";
+      const cur = m.get(key) ?? { key, label: r.pname ?? "Partner nélkül", value: 0 };
+      cur.value += Math.round(Number(r.v));
+      m.set(key, cur);
+    }
+    return [...m.values()];
+  };
+  const level = async (pred: (c: string) => boolean, rest: string) => {
+    const a = acc(pred).filter((x) => x.value >= 1);
+    return a.length > 1 ? top(a, rest) : top(await byPartner(pred), "Egyéb szállítók");
+  };
+
   return {
-    IV5: top(acc((c) => c.startsWith("51")), "Egyéb anyag"),
-    IV6: top(acc((c) => c.startsWith("52") || other5(c)), "Egyéb szolgáltatás"),
+    IV5: await level((c) => c.startsWith("51"), "Egyéb anyag"),
+    IV6: await level((c) => c.startsWith("52") || other5(c), "Egyéb szolgáltatás"),
     IV8: top(veh, "További autók"),
   };
 }
