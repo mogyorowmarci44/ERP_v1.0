@@ -5,7 +5,7 @@ import { ForecastTabs } from "@/components/Forecast";
 import { Flash } from "@/components/Flash";
 import { fmtHuf, fmtNum } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
-import { savePlanAction, savePlansBulkAction, deletePlanAction, addPlanCostAction, deletePlanCostAction, fillSuggestionsAction, linkPlanAction } from "../actions";
+import { savePlanAction, savePlansBulkAction, clearSalePlanAction, deletePlanAction, addPlanCostAction, deletePlanCostAction, fillSuggestionsAction, linkPlanAction } from "../actions";
 
 type Cost = { id: number; description: string; date: string | null; net: number; vatRate: number; deductible: boolean; capitalize: boolean; payment: string };
 const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
@@ -127,6 +127,12 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                         <select form={BULK} name={`v${s.vehicle.id}:salePayment`} defaultValue={p?.salePayment ?? "bank"} aria-label="Fizetés módja"><option value="bank">utalás</option><option value="cash">készpénz</option></select>
                         <input form={BULK} type="hidden" name={`v${s.vehicle.id}:note`} value={p?.note ?? ""} />
                         <button form={BULK} title="Az összes sor mentése">Mentés</button>
+                        {p && (p.salePrice || p.saleDate) && (
+                          <form action={clearSalePlanAction}>
+                            <input type="hidden" name="cid" value={cid} /><input type="hidden" name="planId" value={p.id} />
+                            <button className="link" title="Eladási terv törlése ennél az autónál">törlés</button>
+                          </form>
+                        )}
                       </div>
                     ) : price ? `${fmtHuf(price)} Ft · ${fmtDate(p?.saleDate)}` : "–"}
                     {p?.note && <div className="muted" style={{ fontSize: 12 }}>{p.note}</div>}
