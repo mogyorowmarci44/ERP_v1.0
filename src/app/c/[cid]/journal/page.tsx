@@ -3,6 +3,7 @@ import { Fragment } from "react";
 import { requireCompany } from "@/lib/auth";
 import { journalList } from "@/lib/reports";
 import { reverseEntryAction } from "../actions";
+import { canEditMeta } from "@/lib/journal-edit";
 import { Flash } from "@/components/Flash";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate, isDate, monthStart, monthEnd, today } from "@/lib/dates";
@@ -44,6 +45,7 @@ export default async function JournalPage({ params, searchParams }: { params: Pr
                 <td></td><td></td><td></td>
                 <td>
                   {e.sourceType === "invoice" || e.sourceType === "payment" ? <Link href={`/c/${cid}/invoices/${e.sourceId}`}>számla</Link> : null}
+                  {canEditMeta(e) && role !== "viewer" && <Link className="btn" href={`/c/${cid}/journal/${e.id}/edit`}>Szerkesztés</Link>}
                   {(e.sourceType === "manual" || e.sourceType === "member_loan") && !e.reversedById && role !== "viewer" && (
                     <form action={reverseEntryAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="entryId" value={e.id} /><button className="danger">Sztornó</button></form>
                   )}

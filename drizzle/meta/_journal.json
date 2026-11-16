@@ -92,6 +92,13 @@
       "when": 1794558281857,
       "tag": "0012_v2_review_date_approx",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794831696652,
+      "tag": "0013_v2_journal_line_changes",
+      "breakpoints": true
     }
   ]
 }
