@@ -26,6 +26,10 @@ function ItemFields({ it }: { it?: typeof schema.forecastItems.$inferSelect }) {
       <label>Első / egyszeri dátum<input type="date" name="startDate" defaultValue={it?.startDate ?? today()} required /></label>
       <label>Vége (opcionális)<input type="date" name="endDate" defaultValue={it?.endDate ?? ""} /></label>
       <label>Fizetés<select name="payment" defaultValue={it?.payment ?? "bank"}><option value="bank">bank</option><option value="cash">készpénz</option></select></label>
+      <label>Fizetés napja<select name="payDay" defaultValue={it?.payDay ? String(it.payDay) : ""}>
+        <option value="">a tétel napján</option>
+        {[5, 10, 12, 15, 20, 25].map((n) => <option key={n} value={n}>köv. hónap {n}.</option>)}
+      </select></label>
       <label>Főkönyvi számla (opcionális)<input name="accountCode" defaultValue={it?.accountCode ?? ""} placeholder="pl. 529" /></label>
     </>
   );
@@ -120,7 +124,7 @@ export default async function ForecastCostsPage({ params, searchParams }: { para
                 <td className="num">{i.vatRate}%{i.deductible ? "" : " (nem levonható)"}</td>
                 <td>{FREQ[i.frequency] ?? i.frequency}</td>
                 <td>{fmtDate(i.startDate)}{i.endDate ? ` – ${fmtDate(i.endDate)}` : i.frequency !== "once" ? " –" : ""}</td>
-                <td>{i.payment === "cash" ? "készpénz" : "bank"}</td>
+                <td>{i.payment === "cash" ? "készpénz" : "bank"}{i.payDay ? <span className="muted"> · köv. hó {i.payDay}.</span> : null}</td>
                 <td>
                   {canWrite && (
                     <form action={deleteItemAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={i.id} /><button className="link">törlés</button></form>

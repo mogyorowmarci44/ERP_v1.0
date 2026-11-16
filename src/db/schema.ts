@@ -586,6 +586,8 @@ export const forecastItems = pgTable(
     startDate: date("start_date").notNull(),
     endDate: date("end_date"),
     payment: varchar("payment", { length: 8 }).notNull().default("bank"),
+    /** Ha meg van adva: a pénz a költség hónapját követő hónap ezen napján mozdul (pl. bér 10., NAV 12.). Üres = a tétel napján. */
+    payDay: integer("pay_day"),
     source: varchar("source", { length: 10 }).notNull().default("manual"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

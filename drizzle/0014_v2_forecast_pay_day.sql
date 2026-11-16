@@ -1,0 +1,1 @@
+ALTER TABLE "forecast_items" ADD COLUMN "pay_day" integer;

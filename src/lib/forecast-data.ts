@@ -144,7 +144,7 @@ export async function loadForecastInput(companyId: number) {
       sale: p.saleDate && p.salePrice ? { date: p.saleDate, price: Number(p.salePrice), payment: p.salePayment as Channel } : null, costs: p.costs.map(costOf) });
   }
   const items: FcItem[] = itemsRows.map((i) => ({ id: i.id, category: i.category, description: i.description, accountCode: i.accountCode, net: Number(i.net), vatRate: i.vatRate,
-    deductible: i.deductible, frequency: i.frequency, startDate: i.startDate, endDate: i.endDate, payment: i.payment as Channel }));
+    deductible: i.deductible, frequency: i.frequency, startDate: i.startDate, endDate: i.endDate, payment: i.payment as Channel, payDay: i.payDay }));
   return { settings, opening, plans: fcPlans, items, unplanned, plansRaw: plans, itemsRows };
 }
 
