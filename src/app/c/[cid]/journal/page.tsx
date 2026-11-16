@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { requireCompany } from "@/lib/auth";
 import { journalList } from "@/lib/reports";
-import { reverseEntryAction } from "../actions";
+import { reverseEntryAction, toggleEntryCheckAction } from "../actions";
 import { canEditMeta } from "@/lib/journal-edit";
 import { Flash } from "@/components/Flash";
 import { fmtHuf } from "@/lib/money";
@@ -44,8 +44,18 @@ export default async function JournalPage({ params, searchParams }: { params: Pr
                 <td><strong>{e.description}</strong></td>
                 <td></td><td></td><td></td>
                 <td>
-                  {e.sourceType === "invoice" || e.sourceType === "payment" ? <Link href={`/c/${cid}/invoices/${e.sourceId}`}>számla</Link> : null}
-                  {canEditMeta(e) && role !== "viewer" && <Link className="btn" href={`/c/${cid}/journal/${e.id}/edit`}>Szerkesztés</Link>}
+
+                  <div className="row" style={{ gap: 6, flexWrap: "nowrap", justifyContent: "flex-end" }}>
+                  {role !== "viewer" && !e.reversalOfId && (
+                    <form action={toggleEntryCheckAction}>
+                      <input type="hidden" name="cid" value={cid} /><input type="hidden" name="entryId" value={e.id} /><input type="hidden" name="on" value={e.checkedAt ? "0" : "1"} />
+                      <input type="hidden" name="back" value={`/c/${cid}/journal?from=${from}&to=${to}${j ? `&j=${j}` : ""}`} />
+                      <button className={e.checkedAt ? "chk on" : "chk"} title={e.checkedAt ? "Ellenőrzött – kattintásra visszavonás (zárolás feloldása)" : "Megjelölés ellenőrzöttként (zárolja a tételt)"}>✓</button>
+                    </form>
+                  )}
+                  {canEditMeta(e) && role !== "viewer" && <Link className="btn" href={`/c/${cid}/journal/${e.id}/edit`}>Javítás</Link>}
+                  {(e.sourceType === "invoice" || e.sourceType === "payment") && !e.reversedById && !e.checkedAt && role !== "viewer" && <Link className="btn" href={`/c/${cid}/invoices/${e.sourceId}`}>Javítás</Link>}
+                  </div>
                   {(e.sourceType === "manual" || e.sourceType === "member_loan") && !e.reversedById && role !== "viewer" && (
                     <form action={reverseEntryAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="entryId" value={e.id} /><button className="danger">Sztornó</button></form>
                   )}

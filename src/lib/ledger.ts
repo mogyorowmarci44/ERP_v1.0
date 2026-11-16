@@ -104,7 +104,7 @@ async function nextEntryNumber(tx: Tx, companyId: number, journalCode: string, d
 }
 
 /** Ellenőrzi, hogy a sorokban szereplő számlák a céghez tartoznak és könyvelhetők. */
-async function validateAccounts(tx: DbOrTx, companyId: number, lines: DraftLine[]) {
+export async function validateAccounts(tx: DbOrTx, companyId: number, lines: DraftLine[]) {
   const ids = [...new Set(lines.map((l) => l.accountId))];
   const rows = await tx
     .select({ id: accounts.id, code: accounts.code, isPosting: accounts.isPosting, isActive: accounts.isActive })
@@ -125,6 +125,8 @@ export type PostEntryInput = {
   reversalOfId?: number;
   userId?: number;
   lines: DraftLine[];
+  /** Javításnál: a korábbi tétel számának visszaadása (ugyanaz a napló és év). */
+  number?: string;
 };
 
 export async function postEntry(tx: Tx, input: PostEntryInput) {
@@ -136,7 +138,12 @@ export async function postEntry(tx: Tx, input: PostEntryInput) {
     .from(journals)
     .where(and(eq(journals.companyId, input.companyId), eq(journals.code, input.journalCode)));
   if (!journal) throw new Error(`Ismeretlen napló: ${input.journalCode}`);
-  const number = await nextEntryNumber(tx, input.companyId, journal.code, input.date);
+  const reuse = input.number && input.number.startsWith(`${journal.code}-${input.date.slice(0, 4)}/`) ? input.number : null;
+  if (reuse) {
+    const [taken] = await tx.select({ id: journalEntries.id }).from(journalEntries).where(and(eq(journalEntries.companyId, input.companyId), eq(journalEntries.number, reuse)));
+    if (taken) throw new Error(`A(z) ${reuse} tételszám már foglalt.`);
+  }
+  const number = reuse ?? (await nextEntryNumber(tx, input.companyId, journal.code, input.date));
   const [entry] = await tx
     .insert(journalEntries)
     .values({
@@ -481,6 +488,7 @@ export async function postInvoice(companyId: number, invoiceId: number, userId?:
       sourceId: inv.id,
       userId,
       lines: posting.lines,
+      number: inv.reuseEntryNumber ?? undefined,
     });
 
     // Számított értékek frissítése (ÁFA alap a könyveléskori gépkocsi adatokból)
@@ -496,6 +504,7 @@ export async function postInvoice(companyId: number, invoiceId: number, userId?:
       .set({
         status: "posted",
         journalEntryId: entry.id,
+        reuseEntryNumber: null,
         exchangeRate: rateInfo.rate,
         rateDate: rateInfo.rateDate,
         rateSource: rateInfo.source,
@@ -592,7 +601,7 @@ export type PaymentRequest = {
   note?: string | null;
 };
 
-export async function payInvoice(companyId: number, invoiceId: number, input: PaymentRequest, userId?: number, outerTx?: Tx) {
+export async function payInvoice(companyId: number, invoiceId: number, input: PaymentRequest, userId?: number, outerTx?: Tx, reuseNumber?: string) {
   return inTx(outerTx, async (tx) => {
     await tx.execute(sql`select id from invoices where id = ${invoiceId} for update`);
     const [inv] = await tx.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
@@ -664,6 +673,7 @@ export async function payInvoice(companyId: number, invoiceId: number, input: Pa
       sourceId: inv.id,
       userId,
       lines: res.lines,
+      number: reuseNumber,
     });
     await tx.insert(payments).values({
       companyId,

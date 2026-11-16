@@ -10,6 +10,10 @@ describe("canEditMeta", () => {
     expect(canEditMeta({ sourceType: "manual", reversedById: 5, reversalOfId: null })).toBe(false);
     expect(canEditMeta({ sourceType: "storno", reversedById: null, reversalOfId: 3 })).toBe(false);
   });
+  it("ellenőrzöttnek jelölt kézi tétel zárolt", () => {
+    expect(canEditMeta({ sourceType: "manual", reversedById: null, reversalOfId: null, checkedAt: new Date() })).toBe(false);
+    expect(canEditMeta({ sourceType: "manual", reversedById: null, reversalOfId: null, checkedAt: null })).toBe(true);
+  });
   it("számlából, rendezésből, tagi kölcsönből származó tétel nem", () => {
     for (const s of ["invoice", "payment", "member_loan", "member_loan_reval", null]) expect(canEditMeta({ sourceType: s, reversedById: null, reversalOfId: null })).toBe(false);
   });

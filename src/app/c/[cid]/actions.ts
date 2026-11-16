@@ -26,7 +26,7 @@ import { PRESETS, isHex } from "@/lib/themes";
 import { importBundle, importLoanTermsOnly, wipeCompanyData, type ImportBundle, type ImportReport } from "@/lib/importer";
 import { extendLoan, recordMemberLoan, revalueMemberLoans, setLoanDueDate, undoLastExtension } from "@/lib/member-loans";
 import { invoiceAudit } from "@/lib/invoice-audit";
-import { updateEntryMeta, renameInvoiceLine } from "@/lib/journal-edit";
+import { updateEntryMeta, renameInvoiceLine, setEntryChecked, updateManualEntry, reopenInvoice, logInvoiceRepost, editPayment, type EntryLineInput } from "@/lib/journal-edit";
 import { DEFAULT_TAX_PROFILE, isPrivate, taxProfileFromForm } from "@/lib/entity";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
@@ -125,7 +125,11 @@ export async function saveInvoiceAction(cid: number, input: InvoiceInput, invoic
     if (!input.invoiceNumber.trim()) throw new Error("A számlaszám kötelező.");
     if (!input.partnerId) throw new Error("Partnert kell választani.");
     const id = await saveInvoiceDraft(cid, input, invoiceId);
-    if (postNow) await postInvoice(cid, id, user.id);
+    if (postNow) {
+      const [cur] = await db.select({ r: schema.invoices.reuseEntryNumber }).from(schema.invoices).where(eq(schema.invoices.id, id));
+      await postInvoice(cid, id, user.id);
+      if (cur?.r) await logInvoiceRepost(cid, id, user.id);
+    }
     revalidatePath(`/c/${cid}/invoices`);
     return { id };
   } catch (e) {
@@ -138,7 +142,9 @@ export async function postInvoiceAction(fd: FormData) {
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
   await runOrRedirect(`/c/${cid}/invoices/${id}`, async () => {
+    const [cur] = await db.select({ r: schema.invoices.reuseEntryNumber }).from(schema.invoices).where(and(eq(schema.invoices.id, id), eq(schema.invoices.companyId, cid)));
     await postInvoice(cid, id, user.id);
+    if (cur?.r) await logInvoiceRepost(cid, id, user.id);
     return `/c/${cid}/invoices/${id}?ok=${encodeURIComponent("Számla könyvelve.")}`;
   });
 }
@@ -188,6 +194,37 @@ export async function payInvoiceAction(fd: FormData) {
   });
 }
 
+/** Könyvelt számla újranyitása javításra (piszkozat lesz, újrakönyveléskor ugyanazt a tételszámot kapja). */
+export async function reopenInvoiceAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const id = Number(fd.get("id"));
+  await runOrRedirect(`/c/${cid}/invoices/${id}`, async () => {
+    await reopenInvoice(cid, id, user.id);
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/invoices/${id}/edit`;
+  });
+}
+
+/** Pénzügyi rendezés javítása (dátum, pénzeszköz, összeg). */
+export async function editPaymentAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const id = Number(fd.get("invoiceId"));
+  await runOrRedirect(`/c/${cid}/invoices/${id}`, async () => {
+    await editPayment(cid, Number(fd.get("paymentId")), user.id, {
+      date: str(fd, "date"),
+      moneyAccountId: Number(fd.get("moneyAccountId")),
+      amountFx: parseNumber(fd.get("amountFx")),
+      moneyHuf: parseNumber(fd.get("moneyHuf")) || null,
+      fxRate: parseNumber(fd.get("fxRate")) || null,
+      note: optStr(fd, "note"),
+    });
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/invoices/${id}?ok=${encodeURIComponent("Rendezés javítva.")}`;
+  });
+}
+
 export async function reversePaymentAction(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
@@ -225,6 +262,47 @@ export async function reverseEntryAction(fd: FormData) {
     if (e?.sourceType !== "manual" && e?.sourceType !== "member_loan") throw new Error("Számlából / rendezésből származó tételt a számlánál lehet sztornózni.");
     await db.transaction((tx) => reverseEntry(tx, cid, entryId, str(fd, "date") || today(), user.id));
     return `/c/${cid}/journal?ok=${encodeURIComponent("Tétel sztornózva.")}`;
+  });
+}
+
+/** Napló-tétel „ellenőrzött” jelölése be / ki. */
+export async function toggleEntryCheckAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const back = str(fd, "back") || `/c/${cid}/journal`;
+  await runOrRedirect(back, async () => {
+    await setEntryChecked(cid, Number(fd.get("entryId")), user.id, str(fd, "on") === "1");
+    revalidatePath(`/c/${cid}/journal`, "layout");
+    return back;
+  });
+}
+
+/** Kézi tétel teljes javítása (dátum, megnevezés, sorok). Sor mezők: `${key}:mező`, a `row` mezők sorolják a sorokat. */
+export async function updateManualEntryAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const entryId = Number(fd.get("entryId"));
+  await runOrRedirect(`/c/${cid}/journal/${entryId}/edit`, async () => {
+    if (!isDate(str(fd, "date"))) throw new Error("Hibás dátum.");
+    const lines: EntryLineInput[] = [];
+    for (const k of [...new Set(fd.getAll("row").map(String))]) {
+      const g = (f: string) => fd.get(`${k}:${f}`);
+      const accountId = Number(g("accountId")) || 0;
+      const debit = parseNumber(g("debit")) || 0, credit = parseNumber(g("credit")) || 0;
+      const id = k.startsWith("l") ? Number(k.slice(1)) : null;
+      if (!id && !accountId && !debit && !credit) continue; // üres új sor
+      if (!accountId && (debit || credit)) throw new Error("Minden összeges sorhoz főkönyvi számla kell.");
+      lines.push({
+        id, remove: g("remove") === "1", accountId, debit, credit,
+        amountFx: parseNumber(g("amountFx")) || null,
+        description: optStr(fd, `${k}:description`),
+        partnerId: intOrNull(fd, `${k}:partnerId`),
+        vehicleId: intOrNull(fd, `${k}:vehicleId`),
+      });
+    }
+    const n = await updateManualEntry(cid, entryId, user.id, { date: str(fd, "date"), description: str(fd, "description"), lines });
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/journal/${entryId}/edit?ok=${encodeURIComponent(n ? `${n} módosítás mentve.` : "Nem történt változás.")}`;
   });
 }
 
