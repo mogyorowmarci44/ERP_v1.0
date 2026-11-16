@@ -77,6 +77,8 @@ export type FcItem = {
   startDate: string;
   endDate?: string | null;
   payment: Channel;
+  /** A pénzmozgás a következő hónap ezen napján (null = a tétel napján). */
+  payDay?: number | null;
 };
 export type FcOpening = {
   asOf: string; // ma
@@ -109,6 +111,8 @@ const addMonths = (month: string, n: number) => {
   const t = new Date(Date.UTC(y, m - 1 + n, 1));
   return t.toISOString().slice(0, 7);
 };
+/** A pénzmozgás napja: payDay esetén a következő hónap adott napja (hónap végére igazítva), különben maga a nap. */
+export const payDate = (d: string, payDay?: number | null) => (payDay && payDay >= 1 && payDay <= 31 ? clampDay(addMonths(ym(d), 1), payDay) : d);
 const lastDay = (month: string) => addDays(addMonths(month, 1) + "-01", -1);
 const clampDay = (month: string, day: number) => {
   const ld = Number(lastDay(month).slice(8));
@@ -354,7 +358,8 @@ export function runForecast(
         addVat(d, -vat);
       }
       const inflow = ["loan_in", "capital_in", "other_in"].includes(it.category);
-      events.push({ date: d, channel: it.payment, amount: inflow ? net : -(net + vat), kind: inflow ? (it.category === "loan_in" ? "loan" : "capital") : "item", note: it.description });
+      const cashDate = payDate(d, it.payDay);
+      events.push({ date: cashDate, channel: it.payment, amount: inflow ? net : -(net + vat), kind: inflow ? (it.category === "loan_in" ? "loan" : "capital") : "item", note: it.description });
     }
   }
 

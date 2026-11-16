@@ -142,3 +142,22 @@ describe("forecast – segédek", () => {
     expect(c.settings.optimistic.dateShiftDays).toBeLessThan(0);
   });
 });
+
+describe("forecast – fizetés napja (bér, járulék)", () => {
+  it("payDate: köv. hónap adott napja, hónap végére igazítva", async () => {
+    const { payDate } = await import("@/lib/forecast");
+    expect(payDate("2026-11-30", 10)).toBe("2026-12-10");
+    expect(payDate("2026-12-31", 12)).toBe("2027-01-12");
+    expect(payDate("2026-01-31", 31)).toBe("2026-02-28");
+    expect(payDate("2026-11-20", null)).toBe("2026-11-20");
+  });
+  it("a költség a tárgyhónapban, a pénz a következő hónapban mozdul", () => {
+    const wage: FcItem = { id: 9, category: "expense", description: "bér", net: 300_000, vatRate: 0, deductible: true, frequency: "once", startDate: "2026-11-30", payment: "bank", payDay: 10 };
+    const r = runForecast({ opening, plans: [], items: [wage], settings }, "base");
+    const nov = r.months.find((m: FcMonth) => m.month === "2026-11")!;
+    const dec = r.months.find((m: FcMonth) => m.month === "2026-12")!;
+    expect(nov.fixedCosts).toBe(300_000);
+    expect(nov.cashOut).toBe(0);
+    expect(dec.cashOut).toBe(300_000);
+  });
+});

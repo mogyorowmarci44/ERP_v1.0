@@ -188,6 +188,7 @@ export async function saveItemAction(fd: FormData) {
       startDate,
       endDate: dateOrNull(fd, "endDate"),
       payment: chan(str(fd, "payment")),
+      payDay: (() => { const n = intOrNull(fd, "payDay"); return n && n >= 1 && n <= 31 ? n : null; })(),
     };
     if (!(values.net > 0)) throw new Error("Az összeg legyen pozitív.");
     if (id) {
