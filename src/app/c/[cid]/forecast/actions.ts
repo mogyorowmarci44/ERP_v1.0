@@ -32,38 +32,70 @@ async function ownPlan(cid: number, planId: number) {
 
 // --- Eladási tervek ---------------------------------------------------------
 
+/** Egy eladási / beszerzési terv mentése (soronkénti és tömeges mentés közös magja). */
+async function savePlanCore(cid: number, fd: FormData) {
+  const planId = intOrNull(fd, "planId");
+  const vehicleId = intOrNull(fd, "vehicleId");
+  const values = {
+    companyId: cid,
+    label: optStr(fd, "label"),
+    purchaseDate: dateOrNull(fd, "purchaseDate"),
+    purchasePrice: moneyOrNull(fd, "purchasePrice"),
+    purchasePayment: chan(str(fd, "purchasePayment") || "cash"),
+    salePrice: moneyOrNull(fd, "salePrice"),
+    saleDate: dateOrNull(fd, "saleDate"),
+    salePayment: chan(str(fd, "salePayment")),
+    note: optStr(fd, "note"),
+    updatedAt: new Date(),
+  };
+  if (values.salePrice !== null && values.salePrice <= 0) throw new Error("Az eladási ár legyen pozitív.");
+  if (!vehicleId && !planId && (!values.purchaseDate || !values.purchasePrice)) throw new Error("Tervezett beszerzésnél a vételár és a dátum kötelező.");
+  if (planId) {
+    await ownPlan(cid, planId);
+    await db.update(forecastPlans).set(values).where(eq(forecastPlans.id, planId));
+  } else if (vehicleId) {
+    const [v] = await db.select().from(vehicles).where(and(eq(vehicles.id, vehicleId), eq(vehicles.companyId, cid)));
+    if (!v) throw new Error("A gépkocsi nem található.");
+    await db.insert(forecastPlans).values({ ...values, vehicleId }).onConflictDoUpdate({ target: forecastPlans.vehicleId, set: values });
+  } else {
+    await db.insert(forecastPlans).values({ ...values, label: values.label ?? "Tervezett beszerzés" });
+  }
+}
+
 export async function savePlanAction(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "stock"), async () => {
-    const planId = intOrNull(fd, "planId");
-    const vehicleId = intOrNull(fd, "vehicleId");
-    const values = {
-      companyId: cid,
-      label: optStr(fd, "label"),
-      purchaseDate: dateOrNull(fd, "purchaseDate"),
-      purchasePrice: moneyOrNull(fd, "purchasePrice"),
-      purchasePayment: chan(str(fd, "purchasePayment") || "cash"),
-      salePrice: moneyOrNull(fd, "salePrice"),
-      saleDate: dateOrNull(fd, "saleDate"),
-      salePayment: chan(str(fd, "salePayment")),
-      note: optStr(fd, "note"),
-      updatedAt: new Date(),
-    };
-    if (values.salePrice !== null && values.salePrice <= 0) throw new Error("Az eladási ár legyen pozitív.");
-    if (!vehicleId && !planId && (!values.purchaseDate || !values.purchasePrice)) throw new Error("Tervezett beszerzésnél a vételár és a dátum kötelező.");
-    if (planId) {
-      await ownPlan(cid, planId);
-      await db.update(forecastPlans).set(values).where(eq(forecastPlans.id, planId));
-    } else if (vehicleId) {
-      const [v] = await db.select().from(vehicles).where(and(eq(vehicles.id, vehicleId), eq(vehicles.companyId, cid)));
-      if (!v) throw new Error("A gépkocsi nem található.");
-      await db.insert(forecastPlans).values({ ...values, vehicleId }).onConflictDoUpdate({ target: forecastPlans.vehicleId, set: values });
-    } else {
-      await db.insert(forecastPlans).values({ ...values, label: values.label ?? "Tervezett beszerzés" });
-    }
+    await savePlanCore(cid, fd);
     refresh(cid);
     return ok(cid, "stock", "Terv mentve.");
+  });
+}
+
+/** A Készlet és eladások fül összes sorának mentése egy gombnyomással. Minden sor mezői `${row}:mező` néven jönnek; a `row` mezők sorolják fel a sorokat. */
+export async function savePlansBulkAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(back(cid, "stock"), async () => {
+    const rows = [...new Set(fd.getAll("row").map(String))];
+    let saved = 0;
+    const errors: string[] = [];
+    for (const row of rows) {
+      const sub = new FormData();
+      for (const [k, v] of fd.entries()) if (k.startsWith(`${row}:`)) sub.append(k.slice(row.length + 1), v);
+      const isNewVehicleRow = !str(sub, "planId") && str(sub, "vehicleId");
+      // még tervezetlen autó, ahol semmit nem töltöttek ki: kihagyjuk (ne jöjjön létre üres terv)
+      if (isNewVehicleRow && !str(sub, "salePrice") && !str(sub, "saleDate")) continue;
+      try {
+        await savePlanCore(cid, sub);
+        saved++;
+      } catch (e) {
+        errors.push(`${str(sub, "rowLabel") || row}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    refresh(cid);
+    if (errors.length) throw new Error(`${saved} sor mentve, ${errors.length} hibás – ${errors.join("; ")}`);
+    return ok(cid, "stock", saved ? `${saved} sor mentve.` : "Nem volt mit menteni.");
   });
 }
 

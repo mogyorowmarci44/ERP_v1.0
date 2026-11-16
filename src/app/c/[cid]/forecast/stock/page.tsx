@@ -5,7 +5,7 @@ import { ForecastTabs } from "@/components/Forecast";
 import { Flash } from "@/components/Flash";
 import { fmtHuf, fmtNum } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
-import { savePlanAction, deletePlanAction, addPlanCostAction, deletePlanCostAction, fillSuggestionsAction, linkPlanAction } from "../actions";
+import { savePlanAction, savePlansBulkAction, deletePlanAction, addPlanCostAction, deletePlanCostAction, fillSuggestionsAction, linkPlanAction } from "../actions";
 
 type Cost = { id: number; description: string; date: string | null; net: number; vatRate: number; deductible: boolean; capitalize: boolean; payment: string };
 const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
@@ -51,6 +51,8 @@ function AddCost({ cid, planId, vehicleId }: { cid: number; planId?: number; veh
   );
 }
 
+const BULK = "fc-bulk";
+
 export default async function ForecastStockPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
   const sp = await searchParams;
@@ -84,6 +86,8 @@ export default async function ForecastStockPage({ params, searchParams }: { para
         </p>
       )}
 
+      {canWrite && <form id={BULK} action={savePlansBulkAction}><input type="hidden" name="cid" value={cid} /></form>}
+
       <h2>Készleten ({stock.length} autó)</h2>
       <div className="table-wrap">
         <table className="fc-plan">
@@ -113,16 +117,17 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                   <td className="num">{s.marginBase > 0 ? fmtHuf(s.marginBase) : <span className="neg">hiányzik</span>}</td>
                   <td>
                     {canWrite ? (
-                      <form action={savePlanAction} className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
-                        <input type="hidden" name="cid" value={cid} />
-                        <input type="hidden" name="vehicleId" value={s.vehicle.id} />
-                        {p && <input type="hidden" name="planId" value={p.id} />}
-                        <input name="salePrice" className="num" style={{ width: 120 }} defaultValue={price ?? ""} placeholder={sug ? fmtHuf(sug.price) : ""} aria-label="Bruttó eladási ár" />
-                        <input type="date" name="saleDate" defaultValue={p?.saleDate ?? ""} aria-label="Eladás dátuma" />
-                        <select name="salePayment" defaultValue={p?.salePayment ?? "bank"} aria-label="Fizetés módja"><option value="bank">utalás</option><option value="cash">készpénz</option></select>
-                        <input type="hidden" name="note" value={p?.note ?? ""} />
-                        <button>Mentés</button>
-                      </form>
+                      <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+                        <input form={BULK} type="hidden" name="row" value={`v${s.vehicle.id}`} />
+                        <input form={BULK} type="hidden" name={`v${s.vehicle.id}:rowLabel`} value={vehicleLabel(s.vehicle)} />
+                        <input form={BULK} type="hidden" name={`v${s.vehicle.id}:vehicleId`} value={s.vehicle.id} />
+                        {p && <input form={BULK} type="hidden" name={`v${s.vehicle.id}:planId`} value={p.id} />}
+                        <input form={BULK} name={`v${s.vehicle.id}:salePrice`} className="num" style={{ width: 120 }} defaultValue={price ?? ""} placeholder={sug ? fmtHuf(sug.price) : ""} aria-label="Bruttó eladási ár" />
+                        <input form={BULK} type="date" name={`v${s.vehicle.id}:saleDate`} defaultValue={p?.saleDate ?? ""} aria-label="Eladás dátuma" />
+                        <select form={BULK} name={`v${s.vehicle.id}:salePayment`} defaultValue={p?.salePayment ?? "bank"} aria-label="Fizetés módja"><option value="bank">utalás</option><option value="cash">készpénz</option></select>
+                        <input form={BULK} type="hidden" name={`v${s.vehicle.id}:note`} value={p?.note ?? ""} />
+                        <button form={BULK} title="Az összes sor mentése">Mentés</button>
+                      </div>
                     ) : price ? `${fmtHuf(price)} Ft · ${fmtDate(p?.saleDate)}` : "–"}
                     {p?.note && <div className="muted" style={{ fontSize: 12 }}>{p.note}</div>}
                   </td>
@@ -146,11 +151,11 @@ export default async function ForecastStockPage({ params, searchParams }: { para
               const capCost = costs.filter((c) => c.capitalize).reduce((a, c) => a + c.net + (c.deductible ? 0 : Math.round((c.net * c.vatRate) / 100)), 0);
               const buy = Number(p.purchasePrice ?? 0), price = p.salePrice ? Number(p.salePrice) : null;
               const vat = price ? mv(price, buy) : null;
-              const formId = `plan-${p.id}`;
+              const r = `p${p.id}`;
               return (
                 <tr key={p.id}>
                   <td>
-                    {canWrite ? <input form={formId} name="label" defaultValue={p.label ?? ""} aria-label="Megnevezés" /> : p.label}
+                    {canWrite ? <input form={BULK} name={`${r}:label`} defaultValue={p.label ?? ""} aria-label="Megnevezés" /> : p.label}
                     <CostList cid={cid} costs={costs} canWrite={canWrite} />
                     {canWrite && <AddCost cid={cid} planId={p.id} />}
                     {canWrite && freeVehicles.length > 0 && (
@@ -167,21 +172,22 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                   {canWrite ? (
                     <>
                       <td>
-                        <form id={formId} action={savePlanAction}>
-                          <input type="hidden" name="cid" value={cid} /><input type="hidden" name="planId" value={p.id} />
-                        </form>
+                        <input form={BULK} type="hidden" name="row" value={r} />
+                        <input form={BULK} type="hidden" name={`${r}:planId`} value={p.id} />
+                        <input form={BULK} type="hidden" name={`${r}:rowLabel`} value={p.label ?? "Tervezett beszerzés"} />
+                        <input form={BULK} type="hidden" name={`${r}:note`} value={p.note ?? ""} />
                         <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
-                          <input form={formId} name="purchasePrice" className="num" style={{ width: 120 }} defaultValue={p.purchasePrice ?? ""} aria-label="Vételár" />
-                          <input form={formId} type="date" name="purchaseDate" defaultValue={p.purchaseDate ?? ""} aria-label="Vétel dátuma" />
-                          <select form={formId} name="purchasePayment" defaultValue={p.purchasePayment} aria-label="Vétel fizetése"><option value="cash">készpénz</option><option value="bank">utalás</option></select>
+                          <input form={BULK} name={`${r}:purchasePrice`} className="num" style={{ width: 120 }} defaultValue={p.purchasePrice ?? ""} aria-label="Vételár" />
+                          <input form={BULK} type="date" name={`${r}:purchaseDate`} defaultValue={p.purchaseDate ?? ""} aria-label="Vétel dátuma" />
+                          <select form={BULK} name={`${r}:purchasePayment`} defaultValue={p.purchasePayment} aria-label="Vétel fizetése"><option value="cash">készpénz</option><option value="bank">utalás</option></select>
                         </div>
                       </td>
                       <td>
                         <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
-                          <input form={formId} name="salePrice" className="num" style={{ width: 120 }} defaultValue={p.salePrice ?? ""} aria-label="Eladási ár" />
-                          <input form={formId} type="date" name="saleDate" defaultValue={p.saleDate ?? ""} aria-label="Eladás dátuma" />
-                          <select form={formId} name="salePayment" defaultValue={p.salePayment} aria-label="Eladás fizetése"><option value="bank">utalás</option><option value="cash">készpénz</option></select>
-                          <button form={formId}>Mentés</button>
+                          <input form={BULK} name={`${r}:salePrice`} className="num" style={{ width: 120 }} defaultValue={p.salePrice ?? ""} aria-label="Eladási ár" />
+                          <input form={BULK} type="date" name={`${r}:saleDate`} defaultValue={p.saleDate ?? ""} aria-label="Eladás dátuma" />
+                          <select form={BULK} name={`${r}:salePayment`} defaultValue={p.salePayment} aria-label="Eladás fizetése"><option value="bank">utalás</option><option value="cash">készpénz</option></select>
+                          <button form={BULK} title="Az összes sor mentése">Mentés</button>
                         </div>
                       </td>
                     </>
@@ -208,6 +214,12 @@ export default async function ForecastStockPage({ params, searchParams }: { para
           </tbody>
         </table>
       </div>
+      {canWrite && (stock.length > 0 || planned.length > 0) && (
+        <div className="fc-bulk-save">
+          <button form={BULK} className="primary">Összes mentése</button>
+          <span className="muted">Bármelyik sor Mentés gombja is az összes sort menti.</span>
+        </div>
+      )}
       {canWrite && (
         <form action={savePlanAction} className="card form-grid" style={{ marginTop: 12 }}>
           <input type="hidden" name="cid" value={cid} />
