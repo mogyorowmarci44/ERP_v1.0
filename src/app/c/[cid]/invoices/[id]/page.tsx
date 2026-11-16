@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq, inArray, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, or } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { invoiceOpenAmount } from "@/lib/ledger";
 import { invoicePayments } from "@/lib/reports";
-import { postInvoiceAction, cancelInvoiceAction, renameInvoiceLineAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction } from "../../actions";
+import { postInvoiceAction, cancelInvoiceAction, renameInvoiceLineAction, reopenInvoiceAction, editPaymentAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction } from "../../actions";
 import { invoiceAudit } from "@/lib/invoice-audit";
 import { vehicleIdent, vehicleTitle } from "@/lib/vehicle-id";
 import { PaymentForm } from "@/components/PaymentForm";
@@ -54,6 +54,16 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         .orderBy(asc(schema.journalLines.id))
     : [];
   const pays = await invoicePayments(id);
+  const [chk] = await db.select({ at: schema.invoiceChecks.checkedAt }).from(schema.invoiceChecks).where(eq(schema.invoiceChecks.invoiceId, id));
+  const locked = !!chk?.at;
+  const invEntry = entries.find((e) => e.id === inv.journalEntryId);
+  const canReopen = inv.status === "posted" && canWrite && !locked && !invEntry?.checkedAt && !invEntry?.reversedById;
+  const entryById = new Map(entries.map((e) => [e.id, e]));
+  const history = await db
+    .select({ h: schema.journalLineChanges, user: schema.users.name })
+    .from(schema.journalLineChanges).leftJoin(schema.users, eq(schema.users.id, schema.journalLineChanges.userId))
+    .where(entries.length ? or(eq(schema.journalLineChanges.invoiceId, id), inArray(schema.journalLineChanges.entryId, entries.map((e) => e.id))) : eq(schema.journalLineChanges.invoiceId, id))
+    .orderBy(desc(schema.journalLineChanges.changedAt));
   const open = inv.status === "posted" ? await invoiceOpenAmount(db, id) : null;
   const moneyAccounts = await db
     .select()
@@ -142,6 +152,15 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
       </div>
       {isMarginSale && <p className="muted">Számlán feltüntetendő: „Különbözet szerinti szabályozás – használt cikkek”. Az ÁFA összege a számlán nem szerepel.</p>}
 
+      {canReopen && (
+        <form action={reopenInvoiceAction} className="row no-print" style={{ margin: "12px 0", gap: 10, alignItems: "center" }}>
+          <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} />
+          <button>Számla javítása</button>
+          <span className="muted">Újranyitja szerkesztésre (partner, dátum, tételek, összegek); újrakönyveléskor ugyanazt a tételszámot kapja. A rendezések megmaradnak.</span>
+        </form>
+      )}
+      {inv.status === "posted" && locked && <p className="muted no-print">Ellenőrzöttnek jelölve – a számla és a rendezései zároltak. Javításhoz előbb vedd le a jelölést.</p>}
+
       <h2>Tételek</h2>
       <table>
         <thead><tr><th>#</th><th>Megnevezés</th><th>Gépkocsi</th><th className="num">Menny.</th><th className="num">Egységár</th><th>ÁFA</th><th>Ellenszámla</th><th className="num">Nettó Ft</th><th className="num">ÁFA Ft</th><th className="num">Bruttó Ft</th></tr></thead>
@@ -200,7 +219,24 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                 <td className="num">{fmtMoney(x.p.amountFx, inv.currency)}</td><td className="num">{inv.currency !== "HUF" ? x.p.fxRate : ""}</td>
                 <td className="num">{fmtHuf(x.p.amountHuf)}</td><td className="mono">{x.entryNumber}</td>
                 <td>{!x.reversed && canWrite && (
-                  <form action={reversePaymentAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="invoiceId" value={id} /><input type="hidden" name="paymentId" value={x.p.id} /><button className="danger">Sztornó</button></form>
+                  <div className="row" style={{ gap: 6, alignItems: "flex-start" }}>
+                    {!locked && !(x.p.journalEntryId && entryById.get(x.p.journalEntryId)?.checkedAt) && (
+                      <details className="fc-more">
+                        <summary>javítás</summary>
+                        <form action={editPaymentAction} className="row" style={{ gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                          <input type="hidden" name="cid" value={cid} /><input type="hidden" name="invoiceId" value={id} /><input type="hidden" name="paymentId" value={x.p.id} />
+                          <input type="date" name="date" defaultValue={x.p.date} required aria-label="Dátum" />
+                          <select name="moneyAccountId" defaultValue={x.p.moneyAccountId} aria-label="Pénzeszköz">
+                            {moneyAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+                          </select>
+                          <input name="amountFx" className="num" style={{ width: 120 }} defaultValue={Number(x.p.amountFx)} required aria-label={`Összeg (${inv.currency})`} />
+                          {inv.currency !== "HUF" && <input name="moneyHuf" className="num" style={{ width: 120 }} defaultValue={Number(x.p.amountHuf)} placeholder="Ft (forintszámlánál)" aria-label="Forint összeg" />}
+                          <button>Mentés</button>
+                        </form>
+                      </details>
+                    )}
+                    <form action={reversePaymentAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="invoiceId" value={id} /><input type="hidden" name="paymentId" value={x.p.id} /><button className="danger">Sztornó</button></form>
+                  </div>
                 )}</td>
               </tr>
             ))}
@@ -225,6 +261,25 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                     <td className="num">{x.l.credit ? fmtHuf(x.l.credit) : ""}</td>
                   </tr>
                 ))
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {history.length > 0 && (
+        <>
+          <h2>Módosítások</h2>
+          <table>
+            <thead><tr><th>Időpont</th><th>Felhasználó</th><th>Esemény</th><th>Régi</th><th>Új</th></tr></thead>
+            <tbody>
+              {history.map(({ h, user }) => (
+                <tr key={h.id}>
+                  <td>{new Date(h.changedAt).toLocaleString("hu-HU", { timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
+                  <td>{user ?? "–"}</td>
+                  <td>{({ invoice_reopen: "Újranyitva javításra", invoice_repost: "Újrakönyvelve", payment_edit: "Rendezés javítva", invoice_line: "Tétel megnevezése", description: "Könyvelési sor szövege" } as Record<string, string>)[h.field] ?? h.field}</td>
+                  <td className="muted">{h.oldValue ?? "–"}</td><td>{h.newValue ?? "–"}</td>
+                </tr>
               ))}
             </tbody>
           </table>

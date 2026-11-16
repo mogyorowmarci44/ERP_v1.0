@@ -19,6 +19,9 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ ci
   return (
     <>
       <h1>Számla szerkesztése – {inv.invoiceNumber}</h1>
+      {inv.reuseEntryNumber && (
+        <p className="flash error">Ez a számla javításra újra van nyitva (eredeti tétel: {inv.reuseEntryNumber}), jelenleg nincs a könyvelésben. Javítás után nyomd meg a „Mentés és könyvelés” gombot – ugyanazt a tételszámot kapja vissza.</p>
+      )}
       <InvoiceForm
         cid={cid}
         direction={inv.direction}

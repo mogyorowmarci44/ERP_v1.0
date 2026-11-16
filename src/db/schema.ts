@@ -298,6 +298,9 @@ export const journalEntries = pgTable(
     reversedById: integer("reversed_by_id"),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** „Ellenőrzött” jelölés – a megjelölt tétel nem szerkeszthető, amíg a jelölést vissza nem veszik. */
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+    checkedBy: integer("checked_by").references(() => users.id),
   },
   (t) => [
     uniqueIndex("journal_entries_company_number").on(t.companyId, t.number),
@@ -335,15 +338,16 @@ export const journalLineChanges = pgTable(
   {
     id: serial("id").primaryKey(),
     companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
-    entryId: integer("entry_id").notNull().references(() => journalEntries.id, { onDelete: "cascade" }),
-    lineId: integer("line_id").references(() => journalLines.id, { onDelete: "cascade" }), // null = a tétel fejének megnevezése
-    field: varchar("field", { length: 20 }).notNull(), // description | partner | vehicle | entry_description
+    entryId: integer("entry_id").references(() => journalEntries.id, { onDelete: "cascade" }), // null: számlaszintű esemény (újranyitás, rendezés javítása)
+    invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }),
+    lineId: integer("line_id").references(() => journalLines.id, { onDelete: "set null" }), // null = a tétel feje / törölt sor
+    field: varchar("field", { length: 20 }).notNull(), // description | partner | vehicle | entry_description | date | account | debit | credit | amount_fx | line_added | line_deleted | invoice_reopen | invoice_repost | payment_edit
     oldValue: text("old_value"),
     newValue: text("new_value"),
     userId: integer("user_id").references(() => users.id),
     changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("journal_line_changes_entry").on(t.entryId)],
+  (t) => [index("journal_line_changes_entry").on(t.entryId), index("journal_line_changes_invoice").on(t.invoiceId)],
 );
 
 
@@ -381,6 +385,8 @@ export const invoices = pgTable(
     grossHuf: money("gross_huf").notNull().default(0),
     grossFx: money("gross_fx").notNull().default(0),
     status: docStatusEnum("status").notNull().default("draft"),
+    /** Újranyitott (javításra visszavett) számla eredeti könyvelési tételszáma – újrakönyveléskor ezt kapja vissza. */
+    reuseEntryNumber: varchar("reuse_entry_number", { length: 32 }),
     journalEntryId: integer("journal_entry_id").references(() => journalEntries.id),
     note: text("note"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

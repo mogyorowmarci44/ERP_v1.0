@@ -4,7 +4,7 @@ import { flagsFor, fingerprintOf, type AuditInvoice } from "@/lib/invoice-flags"
 const base = (): AuditInvoice => ({
   inv: { id: 1, companyId: 1, direction: "out", partnerId: 1, invoiceNumber: "MM-1", issueDate: "2026-10-01", fulfillmentDate: "2026-10-01", dueDate: "2026-10-10",
     paymentMethod: "transfer", currency: "HUF", exchangeRate: 1, rateDate: null, rateSource: "MNB", periodic: false, netHuf: 787402, vatHuf: 212598, grossHuf: 1000000,
-    grossFx: 1000000, status: "posted", journalEntryId: 5, note: null, createdAt: new Date() },
+    grossFx: 1000000, status: "posted", journalEntryId: 5, reuseEntryNumber: null, note: null, createdAt: new Date() },
   partnerName: "Vevő", partnerTax: null, partnerPrivate: true,
   lines: [{ position: 1, description: "Colt", accountCode: "911", accountName: "", vatCode: "KÜL27", vatKind: "margin", vatRate: 27, vehicle: "Colt", vehicleId: 3, quantity: 1,
     unitPrice: 1000000, netHuf: 787402, vatHuf: 212598, grossHuf: 1000000, marginPurchaseHuf: null }],
