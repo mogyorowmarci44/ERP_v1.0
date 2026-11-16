@@ -110,7 +110,9 @@ export function SankeyChart({ model, title }: { model: SankeyModel; title: strin
           {result < 0 ? "Veszteség" : "Adózott eredmény"}: {fmtHuf(result)} Ft{revenue > 0 ? ` (${ratio(result)})` : ""}
         </span>
       </figcaption>
-      <svg viewBox={`0 -8 ${W} ${H + 16}`} role="img" aria-label={`${title}: bevételek és ráfordítások megoszlása`} style={{ width: "100%", height: "auto" }}>
+      <div style={{ overflowX: W > 1120 ? "auto" : undefined }}>
+      {/* széles (sokszintű) nézetben nem zsugorodik: vízszintesen görgethető, a betűméret marad */}
+      <svg viewBox={`0 -8 ${W} ${H + 16}`} role="img" aria-label={`${title}: bevételek és ráfordítások megoszlása`} style={W > 1120 ? { width: W, height: "auto", maxWidth: "none" } : { width: "100%", height: "auto" }}>
         {paths}
         {cols.flat().map((n) => {
           const g = geom.get(n.id)!;
@@ -142,6 +144,7 @@ export function SankeyChart({ model, title }: { model: SankeyModel; title: strin
           );
         })}
       </svg>
+      </div>
       <p className="muted no-print" style={{ margin: "4px 0 0", fontSize: 12.5 }}>
         A ▸ jelű csomópontra kattintva kibontod (főkönyvi számla → szállító → számla; ELÁBÉ: autó → szállító → számla), dupla kattintással visszazárod.
       </p>
