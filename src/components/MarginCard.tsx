@@ -1,7 +1,7 @@
 /** Különbözeti ÁFA karton – nyomtatható A4 álló lap (egy gépkocsi). */
 import Link from "next/link";
 import type { MarginCard as Card, CardDoc } from "@/lib/margin-card";
-import { fmtHuf } from "@/lib/money";
+import { fmtHuf, fmtNum } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
 import { vehicleIdent } from "@/lib/vehicle-id";
 import { DocMark } from "@/components/Brand";
@@ -17,7 +17,7 @@ function DocRows({ docs, cid, showMargin }: { docs: CardDoc[]; cid: number; show
           <td>{fmtDate(d.date)}</td>
           <td>{d.invoiceId ? <Link href={`/c/${cid}/invoices/${d.invoiceId}`}>{d.number}</Link> : d.number}</td>
           <td>{d.partner}<div className="mc-sub">{d.partnerPrivate ? "magánszemély" : d.partnerTax ? `adószám: ${d.partnerTax}` : ""}</div></td>
-          <td>{d.description}<div className="mc-sub">{d.vatCode}{d.amountFx !== null ? ` · ${d.amountFx.toLocaleString("hu-HU")} ${d.currency} × ${d.rate?.toLocaleString("hu-HU")}` : ""}</div></td>
+          <td>{d.description}<div className="mc-sub">{d.vatCode}{d.amountFx !== null ? ` · ${fmtNum(d.amountFx)} ${d.currency} × ${fmtNum(d.rate)}` : ""}</div></td>
           {showMargin && <td className="num">{d.vatHuf ? fmtHuf(d.vatHuf) : "–"}</td>}
           <td className="num">{fmtHuf(d.grossHuf)}</td>
         </tr>

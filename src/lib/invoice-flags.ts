@@ -1,6 +1,7 @@
 /** Számla-ellenőrzés – tiszta (adatbázis nélküli) részek: típusok, ujjlenyomat, jelzések. */
 import { createHash } from "node:crypto";
 import type { schema } from "@/db";
+import { fmtNum } from "@/lib/money";
 
 type InvoiceRow = (typeof schema.invoices)["$inferSelect"];
 export type FlagLevel = "warn" | "info";
@@ -58,7 +59,7 @@ export function flagsFor(a: AuditInvoice, t: string): Flag[] {
   if (inv.status === "posted") {
     const due = inv.dueDate ?? inv.issueDate;
     if (a.openFx > 5 && due < t) f.push({ code: "overdue", level: "warn", text: `Lejárt (${due}), nyitott ${fmt(a.openHuf)} Ft` });
-    else if (Math.abs(a.openFx) > 0.004 && Math.abs(a.openFx) <= 5) f.push({ code: "rounding", level: "warn", text: `Kerekítési maradék: ${a.openFx.toLocaleString("hu-HU")} ${inv.currency}` });
+    else if (Math.abs(a.openFx) > 0.004 && Math.abs(a.openFx) <= 5) f.push({ code: "rounding", level: "warn", text: `Kerekítési maradék: ${fmtNum(a.openFx)} ${inv.currency}` });
     if (a.openFx < -0.5) f.push({ code: "overpaid", level: "warn", text: `Túlfizetés: ${fmt(-a.openHuf)} Ft` });
   }
   for (const l of a.lines) {
@@ -74,4 +75,4 @@ export function flagsFor(a: AuditInvoice, t: string): Flag[] {
   if (a.check.stale) f.push({ code: "stale", level: "warn", text: "Az ellenőrzés óta módosult (új kifizetés, sztornó vagy módosítás)" });
   return f;
 }
-const fmt = (x: number) => Math.round(x).toLocaleString("hu-HU");
+const fmt = (x: number) => fmtNum(Math.round(x));

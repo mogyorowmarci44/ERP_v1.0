@@ -3,7 +3,7 @@ import { loadPlans, soldHistory, suggestSale, vehicleLabel } from "@/lib/forecas
 import { MIN_CALIBRATION_SALES } from "@/lib/forecast";
 import { ForecastTabs } from "@/components/Forecast";
 import { Flash } from "@/components/Flash";
-import { fmtHuf } from "@/lib/money";
+import { fmtHuf, fmtNum } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
 import { savePlanAction, deletePlanAction, addPlanCostAction, deletePlanCostAction, fillSuggestionsAction, linkPlanAction } from "../actions";
 
@@ -234,7 +234,7 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                   <td>{vehicleLabel(c.vehicle)}</td>
                   <td className="num">{plan ? fmtHuf(plan) : "–"}</td>
                   <td className="num">{fmtHuf(c.actualGross)}</td>
-                  <td className="num">{plan ? <span className={c.actualGross - plan < 0 ? "neg" : undefined}>{fmtHuf(c.actualGross - plan)} ({(((c.actualGross - plan) / plan) * 100).toLocaleString("hu-HU", { maximumFractionDigits: 1 })}%)</span> : "–"}</td>
+                  <td className="num">{plan ? <span className={c.actualGross - plan < 0 ? "neg" : undefined}>{fmtHuf(c.actualGross - plan)} ({fmtNum((((c.actualGross - plan) / plan) * 100), { maximumFractionDigits: 1 })}%)</span> : "–"}</td>
                   <td>{fmtDate(c.plan.saleDate)}</td>
                   <td>{fmtDate(c.actualDate)}</td>
                   <td className="num">{c.plan.saleDate && c.actualDate ? days(c.plan.saleDate, c.actualDate) : "–"}</td>

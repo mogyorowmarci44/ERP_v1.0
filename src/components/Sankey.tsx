@@ -116,7 +116,7 @@ export function Sankey({ model, title }: { model: ReturnType<typeof sankeyModel>
   }
 
   const color: Record<Role, string> = { revenue: "var(--sk-rev)", cost: "var(--sk-cost)", profit: "var(--sk-profit)", loss: "var(--sk-loss)" };
-  const pctFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 1 });
+  const pctFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 1, useGrouping: "always" });
   const share = (x: number) => `${pctFmt.format((x / revenue) * 100)}%`;
   const pct = (x: number) => (revenue > 0 ? ` (${share(x)})` : "");
   const ratio = (x: number) => (revenue > 0 ? `${share(x)} az árbevételből` : "");

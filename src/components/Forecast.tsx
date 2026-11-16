@@ -1,6 +1,6 @@
 /** Tervezés – közös UI elemek: fülek, forgatókönyv-kapcsoló, három forgatókönyves pénzgörbe. */
 import Link from "next/link";
-import { fmtHuf } from "@/lib/money";
+import { fmtHuf, fmtNum } from "@/lib/money";
 import { SCENARIO_LABEL, SCENARIOS, type Scenario } from "@/lib/forecast";
 
 const TABS = [
@@ -104,7 +104,7 @@ export function niceTicks(min: number, max: number, count: number) {
 }
 export function fmtShort(v: number) {
   const a = Math.abs(v);
-  if (a >= 1e6) return `${(v / 1e6).toLocaleString("hu-HU", { maximumFractionDigits: 1 })} M`;
-  if (a >= 1e3) return `${Math.round(v / 1e3).toLocaleString("hu-HU")} e`;
+  if (a >= 1e6) return `${fmtNum((v / 1e6), { maximumFractionDigits: 1 })} M`;
+  if (a >= 1e3) return `${fmtNum(Math.round(v / 1e3))} e`;
   return String(Math.round(v));
 }

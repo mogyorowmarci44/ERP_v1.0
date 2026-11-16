@@ -5,6 +5,7 @@ import { db, schema } from "@/db";
 import { memberLoans } from "./member-loans";
 import { normalizeTheme } from "./themes";
 import { FX, HUF, brandWorkbook, d, finish, palette, sheet, totalRow, type Col } from "./invoice-export";
+import { fmtNum } from "@/lib/money";
 
 const KIND = { loan: "Befizetés", repayment: "Visszafizetés", reval: "Átértékelés" } as const;
 
@@ -25,7 +26,7 @@ export async function buildMemberLoanWorkbook(companyId: number, asOf: string) {
     { header: "Következő lejárat", key: "next", width: 13, date: true }, { header: "Deviza", key: "fx", width: 22 },
   ];
   const s1 = sheet(wb, "Összesítő", "Tagi kölcsön – összesítő", c1, o);
-  for (const m of book.members) s1.addRow({ name: m.name, received: m.received, repaid: m.repaid, reval: m.revaluation, balance: m.balance, overdue: m.overdue, soon: m.dueSoon, open: m.openLoans, next: d(m.nextDue), fx: m.fx.filter((f) => Math.abs(f.balanceFx) > 0.004).map((f) => `${f.balanceFx.toLocaleString("hu-HU")} ${f.currency} (átlag ${f.avgRate})`).join("; ") });
+  for (const m of book.members) s1.addRow({ name: m.name, received: m.received, repaid: m.repaid, reval: m.revaluation, balance: m.balance, overdue: m.overdue, soon: m.dueSoon, open: m.openLoans, next: d(m.nextDue), fx: m.fx.filter((f) => Math.abs(f.balanceFx) > 0.004).map((f) => `${fmtNum(f.balanceFx)} ${f.currency} (átlag ${fmtNum(f.avgRate)})`).join("; ") });
   finish(s1, pal, c1);
   totalRow(s1, s1.addRow({ name: "Összesen", balance: book.total, overdue: book.overdue, soon: book.dueSoon, received: book.members.reduce((s, m) => s + m.received, 0), repaid: book.members.reduce((s, m) => s + m.repaid, 0), reval: book.members.reduce((s, m) => s + m.revaluation, 0) }), pal, c1.length);
 

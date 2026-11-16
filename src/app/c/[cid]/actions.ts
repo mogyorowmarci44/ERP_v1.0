@@ -17,7 +17,7 @@ import {
   type InvoiceInput,
 } from "@/lib/ledger";
 import { runOrRedirect, str, optStr, intOrNull, errMsg } from "@/lib/action-utils";
-import { parseNumber } from "@/lib/money";
+import { parseNumber, fmtNum } from "@/lib/money";
 import { isDate, today } from "@/lib/dates";
 import type { DraftLine } from "@/lib/posting";
 import { getMnbRate, storeRates, fetchMnbRates } from "@/lib/fx-service";
@@ -502,7 +502,7 @@ export async function revalueMemberLoansAction(fd: FormData) {
     if (!isDate(date)) throw new Error("Hibás dátum.");
     const done = await revalueMemberLoans(cid, date, user.id);
     revalidatePath(`/c/${cid}`, "layout");
-    const msg = done.length ? done.map((x) => `${x.member}: ${x.diff > 0 ? "+" : ""}${x.diff.toLocaleString("hu-HU")} Ft (${x.currency} ${x.rate})`).join("; ") : "Nincs könyvelendő különbözet.";
+    const msg = done.length ? done.map((x) => `${x.member}: ${x.diff > 0 ? "+" : ""}${fmtNum(x.diff)} Ft (${x.currency} ${fmtNum(x.rate)})`).join("; ") : "Nincs könyvelendő különbözet.";
     return `/c/${cid}/member-loans?ok=${encodeURIComponent("Átértékelés: " + msg)}`;
   });
 }
