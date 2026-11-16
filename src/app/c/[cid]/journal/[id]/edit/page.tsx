@@ -11,7 +11,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
 
-const FIELD_HU: Record<string, string> = { entry_description: "Megnevezés", description: "Sor szövege", partner: "Partner", vehicle: "Gépkocsi" };
+const FIELD_HU: Record<string, string> = { invoice_line: "Számlatétel megnevezése", entry_description: "Megnevezés", description: "Sor szövege", partner: "Partner", vehicle: "Gépkocsi" };
 const fmtAt = (d: Date) => new Date(d).toLocaleString("hu-HU", { timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export default async function EditEntryPage({ params, searchParams }: { params: Promise<{ cid: string; id: string }>; searchParams: Promise<Record<string, string>> }) {

@@ -5,7 +5,7 @@ import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { invoiceOpenAmount } from "@/lib/ledger";
 import { invoicePayments } from "@/lib/reports";
-import { postInvoiceAction, cancelInvoiceAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction } from "../../actions";
+import { postInvoiceAction, cancelInvoiceAction, renameInvoiceLineAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction } from "../../actions";
 import { invoiceAudit } from "@/lib/invoice-audit";
 import { vehicleIdent, vehicleTitle } from "@/lib/vehicle-id";
 import { PaymentForm } from "@/components/PaymentForm";
@@ -149,7 +149,18 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
           {lines.map(({ l, vat, acc, veh }) => (
             <tr key={l.id}>
               <td>{l.position}</td>
-              <td>{l.description}{l.marginPurchaseHuf !== null && <div className="muted" style={{ fontSize: 12 }}>beszerzési ár (különbözeti alap): {fmtHuf(l.marginPurchaseHuf)} Ft · árrés: {fmtHuf(Number(l.grossHuf) - Number(l.marginPurchaseHuf))} Ft</div>}</td>
+              <td>{l.description}
+                {inv.status === "posted" && canWrite && (
+                  <details className="fc-more">
+                    <summary>megnevezés javítása</summary>
+                    <form action={renameInvoiceLineAction} className="row" style={{ gap: 6, marginTop: 6 }}>
+                      <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} /><input type="hidden" name="lineId" value={l.id} />
+                      <input name="description" defaultValue={l.description} required style={{ minWidth: 240 }} />
+                      <button>Mentés</button>
+                    </form>
+                  </details>
+                )}
+                {l.marginPurchaseHuf !== null && <div className="muted" style={{ fontSize: 12 }}>beszerzési ár (különbözeti alap): {fmtHuf(l.marginPurchaseHuf)} Ft · árrés: {fmtHuf(Number(l.grossHuf) - Number(l.marginPurchaseHuf))} Ft</div>}</td>
               <td>{veh ? vehicleTitle(veh) : ""}</td>
               <td className="num">{l.quantity}</td>
               <td className="num">{fmtMoney(l.unitPrice, inv.currency)}</td>
