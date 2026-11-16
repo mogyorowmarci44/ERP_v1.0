@@ -23,7 +23,8 @@ const daysBetween = (a: string, b: string) => Math.round((Date.parse(b + "T00:00
 const toHuf = (r: { currency: string; openFx: number; grossHuf: string | number; grossFx: string | number }) =>
   r.currency === "HUF" ? r.openFx : (r.openFx * Number(r.grossHuf)) / Number(r.grossFx || 1);
 /** Ezer forintra kerekítve, „eFt” egységgel. */
-const eFt = (n: number) => `${(Math.round(n / 1000) || 0).toLocaleString("hu-HU")} eFt`;
+const eFtFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0, useGrouping: "always" }); // 4 jegyű számot is tagol (8 412)
+const eFt = (n: number) => `${eFtFmt.format(Math.round(n / 1000) || 0)} eFt`;
 
 export default async function Dashboard({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
