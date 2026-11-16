@@ -4,7 +4,8 @@ import { db, schema } from "@/db";
 
 const { journalLines, journalEntries, accounts, vehicles, partners } = schema;
 export type DetailItem = { key: string; label: string; value: number };
-export type SankeyDetail = Partial<Record<"IV5" | "IV6" | "IV8", DetailItem[]>>;
+/** Szülő csomópont (P&L sor kulcsa) → a kibontáskor megjelenő tételek. */
+export type SankeyDetail = Partial<Record<string, DetailItem[]>>;
 
 const MAX_ITEMS = 7;
 /** A legnagyobb tételek + „egyéb” összevonás, csak pozitív értékek. */
@@ -23,7 +24,7 @@ export async function sankeyDetail(companyId: number, from: string, to: string):
     .from(journalLines)
     .innerJoin(journalEntries, eq(journalEntries.id, journalLines.entryId))
     .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
-    .where(and(period, sql`${accounts.code} like '5%'`))
+    .where(and(period, sql`(${accounts.code} like '5%' or ${accounts.code} like '8%')`))
     .groupBy(accounts.code, accounts.name);
   const other5 = (c: string) => c.startsWith("5") && !["51", "52", "53", "54", "55", "56", "57", "58", "59"].some((p) => c.startsWith(p));
   const acc = (pred: (c: string) => boolean) => byAcc.filter((r) => pred(r.code)).map((r) => ({ key: r.code, label: `${r.code} ${r.name}`, value: Math.round(Number(r.v)) }));
@@ -50,7 +51,7 @@ export async function sankeyDetail(companyId: number, from: string, to: string):
       .innerJoin(journalEntries, eq(journalEntries.id, journalLines.entryId))
       .innerJoin(accounts, eq(accounts.id, journalLines.accountId))
       .leftJoin(partners, eq(partners.id, journalLines.partnerId))
-      .where(and(period, sql`${accounts.code} like '5%'`))
+      .where(and(period, sql`(${accounts.code} like '5%' or ${accounts.code} like '8%')`))
       .groupBy(accounts.code, partners.id, partners.name);
     const m = new Map<string, DetailItem>();
     for (const r of rows.filter((x) => pred(x.code))) {
@@ -66,9 +67,16 @@ export async function sankeyDetail(companyId: number, from: string, to: string):
     return a.length > 1 ? top(a, rest) : top(await byPartner(pred), "Egyéb szállítók");
   };
 
+  const p = (...xs: string[]) => (c: string) => xs.some((x) => c.startsWith(x));
   return {
-    IV5: await level((c) => c.startsWith("51"), "Egyéb anyag"),
+    IV5: await level(p("51"), "Egyéb anyag"),
     IV6: await level((c) => c.startsWith("52") || other5(c), "Egyéb szolgáltatás"),
+    IV7: await level(p("53"), "Egyéb"),
     IV8: top(veh, "További autók"),
+    IV9: await level(p("815", "816", "817"), "Egyéb"),
+    V: await level(p("54", "55", "56"), "Egyéb"),
+    VI: await level(p("57"), "Egyéb"),
+    VII: await level((c) => c.startsWith("8") && !["81", "87", "89"].some((x) => c.startsWith(x)), "Egyéb ráfordítás"),
+    IX: await level(p("87"), "Egyéb"),
   };
 }

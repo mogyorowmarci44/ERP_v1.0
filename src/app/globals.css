@@ -640,3 +640,6 @@ table.heat th:first-child, table.heat td:first-child { text-align: left; }
 @media (max-width: 900px) { .lp-top { grid-template-columns: 1fr; } .lp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .lp-tiles { grid-template-columns: 1fr; } }
 .fc-bulk-save { display: flex; align-items: center; gap: 12px; margin: 12px 0 4px; position: sticky; bottom: 0; padding: 10px 0; background: var(--bg); z-index: 2; }
+.sk-click { cursor: pointer; user-select: none; }
+.sk-click:hover .sk-node { opacity: 0.85; }
+.sk-toggle { fill: var(--accent); font-weight: 700; }

@@ -15,7 +15,15 @@ describe("Sankey részletező", () => {
     });
     const col4 = m.nodes.filter((n) => n.col === 4);
     expect(col4.map((n) => n.id).sort()).toEqual(["IV5:511", "IV5:512", "IV6:524", "IV8:v1", "IV8:v2"]);
+    // a részletek csak kibontásra látszanak: mind szülőhöz kötöttek
+    expect(col4.every((n) => n.parent && n.id.startsWith(`${n.parent}:`))).toBe(true);
+    expect(m.nodes.filter((n) => !n.parent).some((n) => n.col === 4)).toBe(false);
     expect(m.links.filter((l) => l.from === "IV8").reduce((s, l) => s + l.value, 0)).toBe(600);
+  });
+  it("személyi jellegű ráfordítás is kibontható (a következő oszlopba)", () => {
+    const p2: Statement = { ...pnl, rows: [...pnl.rows, row("V", 200)] };
+    const m = sankeyModel(p2, "total", { V: [{ key: "541", label: "541 Bérköltség", value: 160 }, { key: "561", label: "561 Szocho", value: 40 }] });
+    expect(m.nodes.filter((n) => n.parent === "V").map((n) => n.col)).toEqual([3, 3]);
   });
   it("részletező nélkül változatlan (4 oszlop)", () => {
     expect(sankeyModel(pnl, "total").nodes.some((n) => n.col === 4)).toBe(false);

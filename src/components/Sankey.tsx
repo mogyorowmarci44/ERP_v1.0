@@ -4,15 +4,18 @@
  * közvetlenül címkézettek (név, összeg, árbevétel-arány), részletek a szalagok fölé húzva (title).
  */
 import { fmtHuf } from "@/lib/money";
+import { SankeyChart } from "./SankeyChart";
 import type { Statement } from "@/lib/statements";
 import type { SankeyDetail } from "@/lib/sankey-detail";
 
-type Role = "revenue" | "cost" | "profit" | "loss";
-type Node = { id: string; label: string; col: number; role: Role; value: number };
-type Link = { from: string; to: string; value: number; role: Role };
+export type Role = "revenue" | "cost" | "profit" | "loss";
+/** parent: kibontható részletező csomópontnál a szülő (csak a szülő kibontásakor látszik). */
+export type Node = { id: string; label: string; col: number; role: Role; value: number; parent?: string };
+export type Link = { from: string; to: string; value: number; role: Role };
+export type SankeyModel = { nodes: Node[]; links: Link[]; revenue: number; result: number; skipped: string[] };
 
 /** A P&L sorokból (egy oszlop vagy az összesen) a Sankey hálózat. */
-export function sankeyModel(pnl: Statement, colIndex: number | "total", detail?: SankeyDetail) {
+export function sankeyModel(pnl: Statement, colIndex: number | "total", detail?: SankeyDetail): SankeyModel {
   const v = (key: string) => {
     const r = pnl.rows.find((x) => x.key === key);
     if (!r) return 0;
@@ -75,21 +78,21 @@ export function sankeyModel(pnl: Statement, colIndex: number | "total", detail?:
     add({ ...m, col: 3, role: "cost" });
     if (m.value > 0) links.push({ from: "IV", to: m.id, value: m.value, role: "cost" });
   }
-  // Egy szinttel lejjebb: ELÁBÉ gépkocsinként, anyagköltség és igénybe vett szolgáltatások főkönyvi számlánként
-  for (const m of material) {
-    const items = detail?.[m.id as keyof SankeyDetail];
-    if (!items?.length || m.value <= 0) continue;
-    // a részletek összege a csomópont értékére igazítva (kerekítés, negatív sorok miatt)
+  // Kibontható részletek: a költségcsomópontok alatt (főkönyvi számla / gépkocsi / partner) – csak kattintásra látszanak
+  const addDetail = (parentId: string) => {
+    const parent = nodes.find((n) => n.id === parentId);
+    const items = detail?.[parentId];
+    if (!parent || !items?.length || parent.value <= 0) return;
     const sum = items.reduce((s, x) => s + x.value, 0);
-    const f = sum > 0 ? m.value / sum : 0;
+    const f = sum > 0 ? parent.value / sum : 0; // összegre igazítás (kerekítés, negatív sorok)
     for (const it of items) {
       const val = Math.round(it.value * f);
       if (val <= 0) continue;
-      const id = `${m.id}:${it.key}`;
-      add({ id, label: it.label, col: 4, role: "cost", value: val });
-      links.push({ from: m.id, to: id, value: val, role: "cost" });
+      const id = `${parentId}:${it.key}`;
+      nodes.push({ id, label: it.label, col: parent.col + 1, role: "cost", value: val, parent: parentId });
+      links.push({ from: parentId, to: id, value: val, role: "cost" });
     }
-  }
+  };
   if (result >= 0) {
     add({ id: "C", label: "Adózás előtti eredmény", col: 2, role: "profit", value: preTax });
     if (preTax > 0) links.push({ from: "TOT", to: "C", value: preTax, role: "profit" });
@@ -101,93 +104,11 @@ export function sankeyModel(pnl: Statement, colIndex: number | "total", detail?:
     add({ id: "X", label: "Társasági adó", col: 2, role: "cost", value: tax });
     if (tax > 0) links.push({ from: "TOT", to: "X", value: tax, role: "cost" });
   }
+  for (const id of ["IV5", "IV6", "IV7", "IV8", "IV9", "V", "VI", "VII", "IX"]) addDetail(id);
   return { nodes, links, revenue: v("I"), result, skipped };
 }
 
-const W = 1280;
-const BASE_H = 520;
-const NODE_W = 14;
-const PAD = 12;
-const MIN_SLOT = 30; // két címkesor helye a kis csomópontoknál
-const COL_X = [190, 395, 600, 805, 1010];
-
-export function Sankey({ model, title }: { model: ReturnType<typeof sankeyModel>; title: string }) {
-  const { nodes, links, revenue, result } = model;
-  if (nodes.length < 2) return <div className="card muted">Ebben az időszakban nincs bevétel vagy költség.</div>;
-
-  // Lépték: minden oszlop férjen el, a kis csomópontoknak is legyen helye a címkéhez
-  const cols = [0, 1, 2, 3, 4].map((c) => nodes.filter((n) => n.col === c));
-  // sok csomópontnál is maradjon hely a szalagok vastagságának (ne csak a címkéknek)
-  const H = Math.max(BASE_H, ...cols.map((c) => c.length * (MIN_SLOT + PAD) + 380));
-  const k = Math.min(
-    ...cols.filter((c) => c.length).map((c) => (H - PAD * (c.length - 1) - MIN_SLOT * c.length) / c.reduce((s, n) => s + n.value, 0)),
-  );
-  const geom = new Map<string, { x: number; y: number; h: number; outY: number; inY: number }>();
-  for (const c of cols) {
-    const heights = c.map((n) => Math.max(1, n.value * k));
-    const used = heights.reduce((s, h) => s + Math.max(h, MIN_SLOT), 0) + PAD * (c.length - 1);
-    let y = Math.max(0, (H - used) / 2);
-    c.forEach((n, i) => {
-      geom.set(n.id, { x: COL_X[n.col], y, h: heights[i], outY: y, inY: y });
-      y += Math.max(heights[i], MIN_SLOT) + PAD;
-    });
-  }
-
-  const color: Record<Role, string> = { revenue: "var(--sk-rev)", cost: "var(--sk-cost)", profit: "var(--sk-profit)", loss: "var(--sk-loss)" };
-  const pctFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 1, useGrouping: "always" });
-  const share = (x: number) => `${pctFmt.format((x / revenue) * 100)}%`;
-  const pct = (x: number) => (revenue > 0 ? ` (${share(x)})` : "");
-  const ratio = (x: number) => (revenue > 0 ? `${share(x)} az árbevételből` : "");
-
-  const paths = links.map((l, i) => {
-    const a = geom.get(l.from)!;
-    const b = geom.get(l.to)!;
-    const h = l.value * k;
-    const x0 = a.x + NODE_W;
-    const x1 = b.x;
-    const y0 = a.outY;
-    const y1 = b.inY;
-    a.outY += h;
-    b.inY += h;
-    const xm = (x0 + x1) / 2;
-    const d = `M${x0},${y0} C${xm},${y0} ${xm},${y1} ${x1},${y1} L${x1},${y1 + h} C${xm},${y1 + h} ${xm},${y0 + h} ${x0},${y0 + h} Z`;
-    const from = nodes.find((n) => n.id === l.from)!.label;
-    const to = nodes.find((n) => n.id === l.to)!.label;
-    return (
-      <path key={i} d={d} className="sk-link" fill={color[l.role]}>
-        <title>{`${from} → ${to}: ${fmtHuf(l.value)} Ft${revenue > 0 ? ` (${ratio(l.value)})` : ""}`}</title>
-      </path>
-    );
-  });
-
-  return (
-    <figure className="sankey card" style={{ margin: 0 }}>
-      <figcaption className="sk-head">
-        <span>{title}</span>
-        <span className={result < 0 ? "neg" : "pos"}>
-          {result < 0 ? "Veszteség" : "Adózott eredmény"}: {fmtHuf(result)} Ft{revenue > 0 ? ` (${ratio(result)})` : ""}
-        </span>
-      </figcaption>
-      <svg viewBox={`0 -8 ${W} ${H + 16}`} role="img" aria-label={`${title}: bevételek és ráfordítások megoszlása`} style={{ width: "100%", height: "auto" }}>
-        {paths}
-        {nodes.map((n) => {
-          const g = geom.get(n.id)!;
-          const left = n.col === 0;
-          const tx = left ? g.x - 8 : g.x + NODE_W + 8;
-          const ty = g.y + Math.max(g.h, MIN_SLOT - 6) / 2;
-          return (
-            <g key={n.id}>
-              <rect x={g.x} y={g.y} width={NODE_W} height={g.h} rx={3} fill={color[n.role]} className="sk-node">
-                <title>{`${n.label}: ${fmtHuf(n.value)} Ft${revenue > 0 ? ` (${ratio(n.value)})` : ""}`}</title>
-              </rect>
-              <text x={tx} y={ty - 2} textAnchor={left ? "end" : "start"} className="sk-label">{n.col === 4 && n.label.length > 32 ? `${n.label.slice(0, 31)}…` : n.label}</text>
-              <text x={tx} y={ty + 13} textAnchor={left ? "end" : "start"} className="sk-value">
-                {fmtHuf(n.value)} Ft{pct(n.value)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-    </figure>
-  );
+/** Megjelenítés: interaktív (kattintás = kibontás, dupla kattintás = visszazárás). */
+export function Sankey({ model, title }: { model: SankeyModel; title: string }) {
+  return <SankeyChart model={model} title={title} />;
 }
