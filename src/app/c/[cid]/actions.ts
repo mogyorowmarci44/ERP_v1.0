@@ -26,7 +26,7 @@ import { PRESETS, isHex } from "@/lib/themes";
 import { importBundle, importLoanTermsOnly, wipeCompanyData, type ImportBundle, type ImportReport } from "@/lib/importer";
 import { extendLoan, recordMemberLoan, revalueMemberLoans, setLoanDueDate, undoLastExtension } from "@/lib/member-loans";
 import { invoiceAudit } from "@/lib/invoice-audit";
-import { updateEntryMeta } from "@/lib/journal-edit";
+import { updateEntryMeta, renameInvoiceLine } from "@/lib/journal-edit";
 import { DEFAULT_TAX_PROFILE, isPrivate, taxProfileFromForm } from "@/lib/entity";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
@@ -151,6 +151,18 @@ export async function cancelInvoiceAction(fd: FormData) {
     const date = str(fd, "date") || today();
     const rev = await cancelInvoice(cid, id, date, user.id);
     return rev ? `/c/${cid}/invoices/${id}?ok=${encodeURIComponent("Számla sztornózva.")}` : `/c/${cid}/invoices?ok=${encodeURIComponent("Piszkozat törölve.")}`;
+  });
+}
+
+/** Könyvelt számla tételmegnevezésének javítása (összeg nem változik), naplózva. */
+export async function renameInvoiceLineAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const id = Number(fd.get("id"));
+  await runOrRedirect(`/c/${cid}/invoices/${id}`, async () => {
+    await renameInvoiceLine(cid, id, Number(fd.get("lineId")), user.id, str(fd, "description"));
+    revalidatePath(`/c/${cid}/invoices/${id}`);
+    return `/c/${cid}/invoices/${id}?ok=${encodeURIComponent("Tétel megnevezése javítva.")}`;
   });
 }
 

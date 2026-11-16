@@ -57,3 +57,38 @@ export async function updateEntryMeta(companyId: number, entryId: number, userId
     return changes.length;
   });
 }
+
+/**
+ * Könyvelt számla egy tételének megnevezés-javítása (pl. elírt alvázszám). Összeg, ÁFA, számla nem változik.
+ * A számla könyvelési tételében a régi szöveget tartalmazó sorok szövege is cserélődik; minden változás naplózva.
+ */
+export async function renameInvoiceLine(companyId: number, invoiceId: number, lineId: number, userId: number, newDescription: string) {
+  const desc = newDescription.trim();
+  if (!desc) throw new Error("A megnevezés nem lehet üres.");
+  const { invoices, invoiceLines } = schema;
+  return db.transaction(async (tx) => {
+    const [inv] = await tx.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
+    if (!inv) throw new Error("A számla nem található.");
+    if (inv.status !== "posted") throw new Error("Csak könyvelt számla tételének megnevezése javítható így (piszkozatot szerkessz).");
+    const [line] = await tx.select().from(invoiceLines).where(and(eq(invoiceLines.id, lineId), eq(invoiceLines.invoiceId, invoiceId)));
+    if (!line) throw new Error("A tétel nem található.");
+    const old = line.description;
+    if (old === desc) return 0;
+    await tx.update(invoiceLines).set({ description: desc }).where(eq(invoiceLines.id, lineId));
+    const entries = await tx.select().from(journalEntries).where(and(eq(journalEntries.companyId, companyId), eq(journalEntries.sourceType, "invoice"), eq(journalEntries.sourceId, invoiceId)));
+    const changes: (typeof journalLineChanges.$inferInsert)[] = [];
+    for (const e of entries) {
+      const jl = await tx.select().from(journalLines).where(eq(journalLines.entryId, e.id));
+      let first = true;
+      for (const l of jl) {
+        if (!l.description || !l.description.includes(old)) continue;
+        const nd = l.description.split(old).join(desc);
+        await tx.update(journalLines).set({ description: nd }).where(eq(journalLines.id, l.id));
+        if (first) { changes.push({ companyId, entryId: e.id, lineId: null, field: "invoice_line", oldValue: `${inv.invoiceNumber} #${line.position}: ${old}`, newValue: desc, userId }); first = false; }
+        changes.push({ companyId, entryId: e.id, lineId: l.id, field: "description", oldValue: l.description, newValue: nd, userId });
+      }
+    }
+    if (changes.length) await tx.insert(journalLineChanges).values(changes);
+    return changes.length;
+  });
+}
