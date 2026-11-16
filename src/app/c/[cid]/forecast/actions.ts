@@ -111,6 +111,23 @@ export async function deletePlanAction(fd: FormData) {
   });
 }
 
+/** Készleten lévő autó eladási tervének törlése. A tervezett autós költségek (javítás, fényezés …) megmaradnak;
+ *  ha nincs ilyen költség, maga a terv is törlődik. */
+export async function clearSalePlanAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(back(cid, "stock"), async () => {
+    const id = Number(fd.get("planId"));
+    const p = await ownPlan(cid, id);
+    if (!p.vehicleId) throw new Error("Ez nem készleten lévő autó terve.");
+    const [c] = await db.select({ id: forecastPlanCosts.id }).from(forecastPlanCosts).where(eq(forecastPlanCosts.planId, id)).limit(1);
+    if (c) await db.update(forecastPlans).set({ salePrice: null, saleDate: null, updatedAt: new Date() }).where(eq(forecastPlans.id, id));
+    else await db.delete(forecastPlans).where(eq(forecastPlans.id, id));
+    refresh(cid);
+    return ok(cid, "stock", c ? "Eladási terv törölve (a tervezett költségek megmaradtak)." : "Eladási terv törölve.");
+  });
+}
+
 /** Tervezett beszerzés összekapcsolása a ténylegesen megvett gépkocsival. */
 export async function linkPlanAction(fd: FormData) {
   const cid = cidOf(fd);
