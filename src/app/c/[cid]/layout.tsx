@@ -139,7 +139,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
       </nav>
       <main className="main">
         {children}
-        <AppFooter company={company.name} version={APP_VERSION} />
+        <AppFooter company={company.name} version={APP_VERSION} darkMark={theme.mode === "dark"} />
       </main>
     </div>
   );
