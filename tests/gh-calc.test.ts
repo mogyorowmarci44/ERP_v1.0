@@ -178,7 +178,7 @@ describe("eladás", () => {
 describe("összevetés", () => {
   it("arányoknál bázispont", async () => {
     const { delta } = await import("@/lib/gh-view");
-    expect(delta(0.17, 0.318, "pp")).toEqual({ text: "−1480 bps", dir: "down" });
+    expect(delta(0.17, 0.318, "pp")).toEqual({ text: "−1\u00a0480 bps", dir: "down" });
     expect(delta(0.2, 0.2, "pp")?.text).toBe("±0 bps");
     expect(delta(110, 100, "rel")?.text).toBe("+10%");
   });

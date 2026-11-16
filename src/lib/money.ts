@@ -37,3 +37,9 @@ export function parseNumber(s: FormDataEntryValue | string | null | undefined): 
   if (!Number.isFinite(n)) throw new Error(`Érvénytelen szám: ${s}`);
   return n;
 }
+
+/** Általános számformázás egységes ezres tagolással (4 jegyűnél is: 8 412). */
+export function fmtNum(x: number | null | undefined, opts: Intl.NumberFormatOptions = {}): string {
+  if (x === null || x === undefined || Number.isNaN(x)) return "";
+  return new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 3, ...opts, useGrouping: "always" }).format(x === 0 ? 0 : x);
+}

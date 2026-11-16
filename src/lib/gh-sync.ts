@@ -6,6 +6,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { ReviewRatings, TaxProfile } from "@/db/schema";
 import { parseIcal } from "./ical";
+import { fmtNum } from "@/lib/money";
 
 export type SyncReservation = {
   source: "airbnb" | "direct" | "booking";
@@ -130,7 +131,7 @@ async function syncMetaAds(companyId: number, token: string, account: string, to
     await db.insert(schema.ghAdStats).values({ companyId, date: r.date_start, ...v }).onConflictDoUpdate({ target: [schema.ghAdStats.companyId, schema.ghAdStats.date], set: v });
   }
   const spend = rows.reduce((a, r) => a + Number(r.spend ?? 0), 0);
-  return `${rows.length} nap frissítve (utolsó 90 nap költése: ${Math.round(spend).toLocaleString("hu-HU")})`;
+  return `${rows.length} nap frissítve (utolsó 90 nap költése: ${fmtNum(Math.round(spend))})`;
 }
 
 async function syncInstagram(token: string, igUserId: string): Promise<string> {

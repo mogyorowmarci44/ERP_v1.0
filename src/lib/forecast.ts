@@ -11,6 +11,7 @@
  * negatív különbözet esetén 0, és nem csökkenti más autó adóalapját.
  */
 import type { ForecastScenarioParams, ForecastSettings } from "@/db/schema";
+import { fmtNum } from "@/lib/money";
 
 export type Scenario = "base" | "pessimistic" | "optimistic";
 export const SCENARIO_LABEL: Record<Scenario, string> = { pessimistic: "Rosszabb", base: "Alap", optimistic: "Jobb" };
@@ -443,7 +444,7 @@ export function runForecast(
     },
   };
 }
-const fmt = (x: number) => Math.round(x).toLocaleString("hu-HU");
+const fmt = (x: number) => fmtNum(Math.round(x));
 
 // ---------------------------------------------------------------------------
 // Kalibrálás a múltbeli eladásokból

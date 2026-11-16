@@ -4,7 +4,7 @@
  */
 import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { round2 } from "./money";
+import { round2, fmtNum } from "./money";
 import { today } from "./dates";
 import { CASH_LIMIT, fingerprintOf, flagsFor, type AuditInvoice, type AuditLine, type AuditPayment } from "./invoice-flags";
 export * from "./invoice-flags";
@@ -94,7 +94,7 @@ export async function invoiceAudit(companyId: number, opts: { from?: string; to?
     const months = new Set(a.payments.filter((p) => !p.reversed && p.accountCode.startsWith("381")).map((p) => p.date.slice(0, 7)));
     for (const m of months) {
       const sum = cashByPartnerMonth.get(`${a.inv.partnerId}|${m}`) ?? 0;
-      if (sum > CASH_LIMIT) a.flags.push({ code: "cash_limit", level: "warn", text: `Készpénzes fizetés ${m}-ban ezzel a vállalkozással ${Math.round(sum).toLocaleString("hu-HU")} Ft (havi korlát 1,5 M Ft)` });
+      if (sum > CASH_LIMIT) a.flags.push({ code: "cash_limit", level: "warn", text: `Készpénzes fizetés ${m}-ban ezzel a vállalkozással ${fmtNum(Math.round(sum))} Ft (havi korlát 1,5 M Ft)` });
     }
   }
   return out;

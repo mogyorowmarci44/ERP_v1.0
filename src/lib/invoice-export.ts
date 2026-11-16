@@ -4,6 +4,7 @@ import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { invoiceAudit } from "./invoice-audit";
 import { normalizeTheme, inkOn } from "./themes";
+import { fmtNum } from "@/lib/money";
 
 const { journalEntries, journalLines, accounts, vehicles, companies } = schema;
 const DIR = { in: "Szállítói", out: "Vevő" } as const;
@@ -141,7 +142,7 @@ export async function buildInvoiceWorkbook(companyId: number, opts: { from: stri
   cols.forEach((c, i) => { if (c.hidden) ws2.getColumn(i + 1).hidden = true; });
   for (const a of list) {
     const fx = a.inv.currency !== "HUF";
-    const pays = a.payments.filter((p) => !p.reversed).map((p) => `${p.date.slice(5).replace("-", ".")}. ${p.accountCode} ${Math.round(p.amountHuf).toLocaleString("hu-HU")}`).join("\n");
+    const pays = a.payments.filter((p) => !p.reversed).map((p) => `${p.date.slice(5).replace("-", ".")}. ${p.accountCode} ${fmtNum(Math.round(p.amountHuf))}`).join("\n");
     const flags = a.flags.map((f) => (f.level === "warn" ? "⚠ " : "") + f.text).join("\n");
     const chk = a.check.checked ? `✓ ${a.check.by ?? ""} ${a.check.at ? a.check.at.toISOString().slice(0, 10) : ""}` : a.check.stale ? "módosult" : "";
     const lines = a.lines.length ? a.lines : [null];
@@ -153,7 +154,7 @@ export async function buildInvoiceWorkbook(companyId: number, opts: { from: stri
         ful: d(a.inv.fulfillmentDate), due: d(a.inv.dueDate), pm: PAY[a.inv.paymentMethod] ?? a.inv.paymentMethod,
         desc: l?.description ?? "", acc: l?.accountCode ?? "", vat: l?.vatCode ?? "", veh: veh ?? "",
         net: l?.netHuf ?? null, vatHuf: l?.vatHuf ?? null, gross: l?.grossHuf ?? null,
-        fxInfo: fx && li === 0 ? `${Number(a.inv.grossFx).toLocaleString("hu-HU")} ${a.inv.currency} × ${Number(a.inv.exchangeRate).toLocaleString("hu-HU")}` : "",
+        fxInfo: fx && li === 0 ? `${fmtNum(Number(a.inv.grossFx))} ${a.inv.currency} × ${fmtNum(Number(a.inv.exchangeRate))}` : "",
         pays: li === 0 ? pays : "", open: li === 0 ? (Math.round(a.openHuf) || null) : null, flags: li === 0 ? flags : "", ok: "", note: li === 0 ? a.check.note ?? "" : "",
         iss: d(a.inv.issueDate), tax: a.partnerTax ?? (a.partnerPrivate ? "magánszemély" : ""), vin, st: STATUS[a.inv.status],
         mbase: l?.marginPurchaseHuf ?? null, invGross: Number(a.inv.grossHuf), chk, doc: a.check.docUrl ? { text: "megnyitás", hyperlink: a.check.docUrl } : "",

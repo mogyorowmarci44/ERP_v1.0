@@ -7,7 +7,7 @@ import { memberLoanAction, extendLoanAction, undoExtensionAction, revalueMemberL
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
 import { LoanBalanceChart, MaturityChart } from "@/components/LoanCharts";
-import { fmtHuf, fmtMoney } from "@/lib/money";
+import { fmtHuf, fmtMoney, fmtNum } from "@/lib/money";
 import { fmtDate, today, addDaysIso } from "@/lib/dates";
 
 const statusClass: Record<string, string> = { "Lejárt": "overdue", "Hamarosan lejár": "soon", "Nyitott": "reserved", "Rendezve": "posted" };
@@ -76,7 +76,7 @@ export default async function MemberLoansPage({ params, searchParams }: { params
               <span>{m.openLoans} nyitott kölcsön</span>
               {m.nextDue && <span>következő lejárat: {fmtDate(m.nextDue)}</span>}
               {m.overdue > 0 && <span className="neg">lejárt: {fmtHuf(m.overdue)} Ft</span>}
-              {m.fx.filter((f) => Math.abs(f.balanceFx) > 0.004).map((f) => <span key={f.currency}>{fmtMoney(f.balanceFx, f.currency)} · átlag {f.avgRate?.toLocaleString("hu-HU")} Ft</span>)}
+              {m.fx.filter((f) => Math.abs(f.balanceFx) > 0.004).map((f) => <span key={f.currency}>{fmtMoney(f.balanceFx, f.currency)} · átlag {fmtNum(f.avgRate)} Ft</span>)}
             </div>
           </Link>
         ))}

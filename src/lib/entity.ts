@@ -6,7 +6,7 @@
  */
 import type { CompanySettings, TaxProfile } from "@/db/schema";
 import { DEFAULT_COA, DEFAULT_JOURNALS, DEFAULT_SETTINGS, DEFAULT_VAT_CODES, type CoaRow } from "./coa";
-import { round2 } from "./money";
+import { round2, fmtNum } from "./money";
 
 export type EntityType = "company" | "private_taxpayer";
 
@@ -230,7 +230,7 @@ export function compareSzjaMethods(p: { revenue: number; costs: number; rooms: n
       szja: flat,
       szocho: 0,
       total: flat,
-      note: `${Math.max(1, p.rooms)} szoba × ${p.flatRatePerRoom.toLocaleString("hu-HU")} Ft, bevételtől függetlenül; szocho nincs`,
+      note: `${Math.max(1, p.rooms)} szoba × ${fmtNum(p.flatRatePerRoom)} Ft, bevételtől függetlenül; szocho nincs`,
     },
     { method: "cost_ratio_10", label: "10% költséghányad", ...contrib(p.revenue * 0.9), note: "jövedelem = bevétel 90%-a, bizonylat nélkül" },
     { method: "itemized", label: "Tételes költségelszámolás", ...contrib(p.revenue - p.costs), note: "jövedelem = bevétel − igazolt költségek" },

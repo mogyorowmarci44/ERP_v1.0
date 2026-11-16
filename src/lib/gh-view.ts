@@ -1,4 +1,5 @@
 /** v2.0 – Vendégház nézetek: időszak-választás, összehasonlítás, formázás. */
+import { fmtNum as baseFmtNum } from "./money";
 import { addDays, daysBetween, periodKey, periodKeys, periodRange, prevPeriod, type Day, type Gran } from "./gh-calc";
 
 export const GRAN_LABEL: Record<Gran, string> = { week: "Heti", month: "Havi", quarter: "Negyedéves", year: "Éves" };
@@ -77,7 +78,7 @@ export function fmtPct(x: number | null | undefined, digits = 0): string {
 
 export function fmtNum(x: number | null | undefined, digits = 0): string {
   if (x === null || x === undefined || !Number.isFinite(x)) return "–";
-  return x.toLocaleString("hu-HU", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return baseFmtNum(x, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
 /** Változás: relatív (%) pénzösszegeknél, bázispont (bps) arányoknál. */
@@ -87,7 +88,7 @@ export function delta(cur: number | null, prev: number | null, kind: "rel" | "pp
     // bázispont: 1 százalékpont = 100 bps
     const d = Math.round((cur - prev) * 10000);
     if (d === 0) return { text: "±0 bps", dir: "flat" };
-    return { text: `${d > 0 ? "+" : "−"}${Math.abs(d).toLocaleString("hu-HU")} bps`, dir: d > 0 ? "up" : "down" };
+    return { text: `${d > 0 ? "+" : "−"}${fmtNum(Math.abs(d))} bps`, dir: d > 0 ? "up" : "down" };
   }
   if (Math.abs(prev) < 1) return null;
   const d = (cur - prev) / Math.abs(prev);
