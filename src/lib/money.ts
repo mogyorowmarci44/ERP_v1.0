@@ -13,8 +13,9 @@ export function sum(xs: number[]): number {
   return round2(xs.reduce((a, b) => a + b, 0));
 }
 
-const hufFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0 });
-const fxFmt = new Intl.NumberFormat("hu-HU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// useGrouping "always": a magyar alapbeállítás a 4 jegyű számokat nem tagolja (8412 → 8 412)
+const hufFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0, useGrouping: "always" });
+const fxFmt = new Intl.NumberFormat("hu-HU", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" });
 
 export function fmtHuf(x: number | null | undefined): string {
   if (x === null || x === undefined) return "";
