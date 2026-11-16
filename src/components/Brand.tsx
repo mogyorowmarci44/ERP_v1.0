@@ -63,3 +63,13 @@ export function AppFooter({ company, version, dark }: { company?: string; versio
     </footer>
   );
 }
+
+/** Védjegy-sor nyomtatható dokumentumok (karton, kölcsönokiratok) aljára – minden lapon. */
+export function DocMark() {
+  return (
+    <div className="doc-mark">
+      <ErpMark size={12} />
+      Mogyorosi Holding™ · mogyorosi.erp
+    </div>
+  );
+}

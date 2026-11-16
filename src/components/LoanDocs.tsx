@@ -3,6 +3,7 @@ import type { LoanRow, LoanExtension } from "@/lib/member-loan-book";
 import { fmtHuf, fmtMoney } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
 import { numberToHungarian } from "@/lib/hu-words";
+import { DocMark } from "@/components/Brand";
 
 export type DocCompany = { name: string; address: string | null; registrationNumber: string | null; taxNumber: string | null; representative: string | null; representativeTitle: string | null; signPlace: string | null };
 export type DocMember = { name: string; address: string | null; taxNumber: string | null };
@@ -52,7 +53,7 @@ function Foot({ left, company, place, date, docId }: { left: [string, string]; c
       <footer className="mc-foot">
         <div className="mc-sign">{left[0]}, {left[1]}</div>
         <div className="mc-sign">{company.name}, {company.representativeTitle ?? "ügyvezető"}</div>
-        <div className="mc-meta">{docId} · készült az MM ERP-ben</div>
+        <div className="mc-meta">{docId} · készült a mogyorosi.erp rendszerben</div>
       </footer>
     </>
   );
@@ -87,6 +88,7 @@ export function ContractSheet({ company, member, loan, moneyKind }: { company: D
         <li><strong>Egyéb.</strong> A szerződésben nem szabályozott kérdésekben a Polgári Törvénykönyvről szóló 2013. évi V. törvény kölcsönszerződésre vonatkozó rendelkezései az irányadók. A szerződés két egyező példányban készült.</li>
       </ol>
       <Foot left={[member.name, "kölcsönadó"]} company={company} place={company.signPlace} date={loan.date} docId={loan.contractNo ?? ""} />
+      <DocMark />
     </article>
   );
 }
@@ -129,6 +131,7 @@ export function AmendmentSheet({ company, member, loan, ext }: { company: DocCom
         </tbody>
       </table>
       <Foot left={[member.name, "kölcsönadó"]} company={company} place={company.signPlace} date={ext.extendedOn} docId={ext.docNo} />
+      <DocMark />
     </article>
   );
 }
@@ -185,6 +188,7 @@ export function RepaymentSheet({ company, member, rep, loans, moneyKind }: { com
         {moneyKind === "cash" ? " készpénzben átvettem" : " átutalással megkaptam"} a fenti tagi kölcsön(ök) visszafizetéseként.
       </p>
       <Foot left={[member.name, "kölcsönadó"]} company={company} place={company.signPlace} date={rep.date} docId={rep.docNo ?? ""} />
+      <DocMark />
     </article>
   );
 }
@@ -237,6 +241,7 @@ export function StatementSheet({ company, member, rows, asOf, balance, fx }: { c
       </table>
       <p className="ld-text">Kérjük, hogy az egyenleget aláírásával igazolja, vagy eltérés esetén azt 8 napon belül jelezze.</p>
       <Foot left={[member.name, "tag"]} company={company} place={company.signPlace} date={asOf} docId={`Egyenlegközlő ${fmtDate(asOf)}`} />
+      <DocMark />
     </article>
   );
 }

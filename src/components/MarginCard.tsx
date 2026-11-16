@@ -4,6 +4,7 @@ import type { MarginCard as Card, CardDoc } from "@/lib/margin-card";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
 import { vehicleIdent } from "@/lib/vehicle-id";
+import { DocMark } from "@/components/Brand";
 
 const Ft = ({ v, strong }: { v: number | null | undefined; strong?: boolean }) =>
   v === null || v === undefined ? <span className="muted">–</span> : <span className={strong ? "strong" : undefined}>{fmtHuf(v)} Ft</span>;
@@ -123,9 +124,10 @@ export function MarginCardSheet({ card, cid, printedAt }: { card: Card; cid: num
       <footer className="mc-foot">
         <div className="mc-sign"><span>Készítette</span></div>
         <div className="mc-sign"><span>Ellenőrizte</span></div>
-        <div className="mc-meta">Készült: {printedAt} · MM ERP</div>
+        <div className="mc-meta">Készült: {printedAt} · mogyorosi.erp</div>
       </footer>
       </div>
+      <DocMark />
     </article>
   );
 }

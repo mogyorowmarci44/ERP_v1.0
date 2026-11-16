@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { memberLoans } from "./member-loans";
 import { normalizeTheme } from "./themes";
-import { FX, HUF, d, finish, palette, sheet, totalRow, type Col } from "./invoice-export";
+import { FX, HUF, brandWorkbook, d, finish, palette, sheet, totalRow, type Col } from "./invoice-export";
 
 const KIND = { loan: "Befizetés", repayment: "Visszafizetés", reval: "Átértékelés" } as const;
 
@@ -13,7 +13,7 @@ export async function buildMemberLoanWorkbook(companyId: number, asOf: string) {
   const pal = palette(normalizeTheme(company.theme).accent);
   const book = await memberLoans(companyId, asOf);
   const wb = new ExcelJS.Workbook();
-  wb.creator = "MM ERP";
+  brandWorkbook(wb);
   const o = { company: company.name, period: `Állapot: ${asOf}`, pal };
 
   // 1. Összesítő

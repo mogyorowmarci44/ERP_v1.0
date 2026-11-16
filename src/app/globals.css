@@ -607,3 +607,8 @@ table.heat th:first-child, table.heat td:first-child { text-align: left; }
 .app-footer.dark { width: 100%; max-width: 1100px; margin-top: 24px; border-top-color: rgba(255, 255, 255, 0.12); color: var(--side-muted); }
 .app-footer.dark .af-strong { color: var(--side-ink); }
 @media print { .app-footer { margin-top: 24px; } }
+.doc-mark { display: none; }
+@media print {
+  .doc-mark { display: flex; align-items: center; gap: 5px; margin-top: 10px; padding-top: 4px; border-top: 0.5px solid #ccc; font-size: 8px; color: #777; }
+  .main:has(.mc-sheet) > .app-footer { display: none; }
+}
