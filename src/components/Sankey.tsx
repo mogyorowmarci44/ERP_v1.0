@@ -6,7 +6,7 @@
 import { fmtHuf } from "@/lib/money";
 import { SankeyChart } from "./SankeyChart";
 import type { Statement } from "@/lib/statements";
-import type { SankeyDetail } from "@/lib/sankey-detail";
+import type { DetailItem, SankeyDetail } from "@/lib/sankey-detail";
 
 export type Role = "revenue" | "cost" | "profit" | "loss";
 /** parent: kibontható részletező csomópontnál a szülő (csak a szülő kibontásakor látszik). */
@@ -78,20 +78,23 @@ export function sankeyModel(pnl: Statement, colIndex: number | "total", detail?:
     add({ ...m, col: 3, role: "cost" });
     if (m.value > 0) links.push({ from: "IV", to: m.id, value: m.value, role: "cost" });
   }
-  // Kibontható részletek: a költségcsomópontok alatt (főkönyvi számla / gépkocsi / partner) – csak kattintásra látszanak
-  const addDetail = (parentId: string) => {
-    const parent = nodes.find((n) => n.id === parentId);
-    const items = detail?.[parentId];
-    if (!parent || !items?.length || parent.value <= 0) return;
+  // Kibontható részletek (tetszőleges mélységig): csak kattintásra látszanak
+  const addItems = (parentId: string, parentCol: number, parentValue: number, items: DetailItem[] | undefined) => {
+    if (!items?.length || parentValue <= 0) return;
     const sum = items.reduce((s, x) => s + x.value, 0);
-    const f = sum > 0 ? parent.value / sum : 0; // összegre igazítás (kerekítés, negatív sorok)
+    const f = sum > 0 ? parentValue / sum : 0; // összegre igazítás (kerekítés, negatív sorok, arányos ELÁBÉ)
     for (const it of items) {
       const val = Math.round(it.value * f);
       if (val <= 0) continue;
-      const id = `${parentId}:${it.key}`;
-      nodes.push({ id, label: it.label, col: parent.col + 1, role: "cost", value: val, parent: parentId });
+      const id = `${parentId}/${it.key}`;
+      nodes.push({ id, label: it.label, col: parentCol + 1, role: "cost", value: val, parent: parentId });
       links.push({ from: parentId, to: id, value: val, role: "cost" });
+      addItems(id, parentCol + 1, val, it.children);
     }
+  };
+  const addDetail = (parentId: string) => {
+    const parent = nodes.find((n) => n.id === parentId);
+    if (parent) addItems(parentId, parent.col, parent.value, detail?.[parentId]);
   };
   if (result >= 0) {
     add({ id: "C", label: "Adózás előtti eredmény", col: 2, role: "profit", value: preTax });

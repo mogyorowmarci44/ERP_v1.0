@@ -14,9 +14,9 @@ describe("Sankey részletező", () => {
       IV6: [{ key: "524", label: "524 Hirdetés", value: 50 }],
     });
     const col4 = m.nodes.filter((n) => n.col === 4);
-    expect(col4.map((n) => n.id).sort()).toEqual(["IV5:511", "IV5:512", "IV6:524", "IV8:v1", "IV8:v2"]);
+    expect(col4.map((n) => n.id).sort()).toEqual(["IV5/511", "IV5/512", "IV6/524", "IV8/v1", "IV8/v2"]);
     // a részletek csak kibontásra látszanak: mind szülőhöz kötöttek
-    expect(col4.every((n) => n.parent && n.id.startsWith(`${n.parent}:`))).toBe(true);
+    expect(col4.every((n) => n.parent && n.id.startsWith(`${n.parent}/`))).toBe(true);
     expect(m.nodes.filter((n) => !n.parent).some((n) => n.col === 4)).toBe(false);
     expect(m.links.filter((l) => l.from === "IV8").reduce((s, l) => s + l.value, 0)).toBe(600);
   });
@@ -27,5 +27,17 @@ describe("Sankey részletező", () => {
   });
   it("részletező nélkül változatlan (4 oszlop)", () => {
     expect(sankeyModel(pnl, "total").nodes.some((n) => n.col === 4)).toBe(false);
+  });
+});
+
+describe("Sankey – mélyebb szintek", () => {
+  it("számla → szállító → bizonylat láncban, minden szint a szülő oszlopa után", () => {
+    const m = sankeyModel(pnl, "total", {
+      IV5: [{ key: "511", label: "511", value: 100, children: [{ key: "p1", label: "Bárdi", value: 100, children: [{ key: "e9", label: "SZ-1", value: 60 }, { key: "e10", label: "SZ-2", value: 40 }] }] }],
+    });
+    const deep = m.nodes.filter((n) => n.id.startsWith("IV5/511/p1/"));
+    expect(deep.map((n) => n.col)).toEqual([6, 6]);
+    expect(deep.reduce((s, n) => s + n.value, 0)).toBe(100);
+    expect(m.nodes.find((n) => n.id === "IV5/511/p1")!.parent).toBe("IV5/511");
   });
 });

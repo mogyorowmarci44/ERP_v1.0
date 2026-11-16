@@ -11,18 +11,22 @@ const NODE_W = 14;
 const PAD = 12;
 const MIN_SLOT = 30; // két címkesor helye a kis csomópontoknál
 const BASE_H = 520;
-const LAYOUT: Record<number, { W: number; X: number[] }> = {
-  4: { W: 1120, X: [200, 440, 690, 910] },
-  5: { W: 1280, X: [190, 395, 600, 805, 1010] },
-};
+/** Oszlop-elrendezés: 4 oszlopig az eredeti, utána oszloponként 210 px-szel szélesebb. */
+function layout(cols: number) {
+  if (cols <= 4) return { W: 1120, X: [200, 440, 690, 910] };
+  const step = 210;
+  return { W: 200 + step * (cols - 1) + 270, X: Array.from({ length: cols }, (_, i) => 190 + step * i) };
+}
 
 export function SankeyChart({ model, title }: { model: SankeyModel; title: string }) {
   const { revenue, result } = model;
   const [open, setOpen] = useState<Set<string>>(new Set());
   const hasChildren = useMemo(() => new Set(model.nodes.filter((n) => n.parent).map((n) => n.parent!)), [model]);
 
-  // Látható csomópontok: alapnézet + a kinyitott szülők gyerekei
-  const visible = model.nodes.filter((n) => !n.parent || open.has(n.parent));
+  // Látható csomópontok: alapnézet + azok a részletek, amelyeknek minden őse ki van nyitva
+  const byIdAll = useMemo(() => new Map(model.nodes.map((n) => [n.id, n])), [model]);
+  const shown = (n: Node): boolean => !n.parent || (open.has(n.parent) && shown(byIdAll.get(n.parent)!));
+  const visible = model.nodes.filter(shown);
   const ids = new Set(visible.map((n) => n.id));
   const links = model.links.filter((l) => ids.has(l.from) && ids.has(l.to));
 
@@ -43,8 +47,8 @@ export function SankeyChart({ model, title }: { model: SankeyModel; title: strin
 
   if (visible.length < 2) return <div className="card muted">Ebben az időszakban nincs bevétel vagy költség.</div>;
 
-  const colCount = Math.max(...visible.map((n) => n.col)) + 1 > 4 ? 5 : 4;
-  const { W, X: COL_X } = LAYOUT[colCount];
+  const colCount = Math.max(4, Math.max(...visible.map((n) => n.col)) + 1);
+  const { W, X: COL_X } = layout(colCount);
 
   // Oszloponkénti sorrend: a gyerekek a szülőjük mellé kerülnek
   const cols: Node[][] = [];
@@ -115,7 +119,8 @@ export function SankeyChart({ model, title }: { model: SankeyModel; title: strin
           const ty = g.y + Math.max(g.h, MIN_SLOT - 6) / 2;
           const can = hasChildren.has(n.id);
           const isOpen = open.has(n.id);
-          const label = n.col === colCount - 1 && n.label.length > 32 ? `${n.label.slice(0, 31)}…` : n.label;
+          const max = n.col === colCount - 1 ? 34 : 26;
+          const label = n.col >= 3 && n.label.length > max ? `${n.label.slice(0, max - 1)}…` : n.label;
           return (
             <g
               key={n.id}
@@ -138,7 +143,7 @@ export function SankeyChart({ model, title }: { model: SankeyModel; title: strin
         })}
       </svg>
       <p className="muted no-print" style={{ margin: "4px 0 0", fontSize: 12.5 }}>
-        A ▸ jelű csomópontra kattintva kibontod (főkönyvi számla / gépkocsi / partner szerint), dupla kattintással visszazárod.
+        A ▸ jelű csomópontra kattintva kibontod (főkönyvi számla → szállító → számla; ELÁBÉ: autó → szállító → számla), dupla kattintással visszazárod.
       </p>
     </figure>
   );
