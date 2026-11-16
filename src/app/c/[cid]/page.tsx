@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray, max } from "drizzle-orm";
 import {
   Inbox, FileOutput, FileInput, FilePlus2, BookPlus, ChartNoAxesCombined, Percent, Clock, CarFront, Files, PiggyBank, Library, Database, Cog, ChevronRight,
 } from "lucide-react";
@@ -14,6 +14,11 @@ import { GhOverview } from "./gh/Overview";
 const INBOX_TODO = ["review", "error", "new", "extracted"];
 const STALE_DAYS = 90;
 
+/** Dátum és idő (óra:perc) magyar idő szerint, pl. 2026.11.16. 12:24 */
+const fmtDateTime = (d: Date) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("hu-HU", { timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(d)).map((x) => [x.type, x.value]));
+  return `${p.year}.${p.month}.${p.day}. ${p.hour}:${p.minute}`;
+};
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
 const toHuf = (r: { currency: string; openFx: number; grossHuf: string | number; grossFx: string | number }) =>
   r.currency === "HUF" ? r.openFx : (r.openFx * Number(r.grossHuf)) / Number(r.grossFx || 1);
@@ -25,7 +30,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   const { company } = await requireCompany(cid);
   const t = today();
   if (isPrivate(company)) return <GhOverview cid={cid} profile={company.taxProfile} sp={await searchParams} />;
-  const [tb, recv, pay, stock, vat, [inbox], [drafts]] = await Promise.all([
+  const [tb, recv, pay, stock, vat, [inbox], [drafts], [last]] = await Promise.all([
     trialBalance(cid, yearStart(t), t),
     openItems(cid, "out"),
     openItems(cid, "in"),
@@ -33,6 +38,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
     vatAnalytics(cid, monthStart(t), monthEnd(t)),
     db.select({ n: count() }).from(schema.inboxDocuments).where(and(eq(schema.inboxDocuments.companyId, cid), inArray(schema.inboxDocuments.status, INBOX_TODO))),
     db.select({ n: count() }).from(schema.invoices).where(and(eq(schema.invoices.companyId, cid), eq(schema.invoices.status, "draft"))),
+    db.select({ at: max(schema.journalEntries.createdAt) }).from(schema.journalEntries).where(eq(schema.journalEntries.companyId, cid)),
   ]);
   const bal = (pred: (code: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
   const cash = bal((c) => c.startsWith("38"));
@@ -75,7 +81,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
       <div className="topbar">
         <div>
           <h1>{open ? `${open} dolog vár rád` : "Minden rendben"}</h1>
-          <span className="muted">{company.name} · {fmtDate(t)}</span>
+          <span className="muted">{company.name} · {fmtDate(t)} · Utolsó könyvelés: {last?.at ? fmtDateTime(last.at) : "még nincs"}</span>
         </div>
         <Link className="btn" href={`${b}/reports/statements?type=pnl&gran=month`}>Havi eredménykimutatás</Link>
       </div>
