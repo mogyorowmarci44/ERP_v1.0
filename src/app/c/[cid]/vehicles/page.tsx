@@ -4,9 +4,11 @@ import { vehicleStock } from "@/lib/reports";
 import { saveVehicleAction } from "../actions";
 import { Flash } from "@/components/Flash";
 import { fmtHuf } from "@/lib/money";
-import { fmtDate } from "@/lib/dates";
+import { fmtDate, today } from "@/lib/dates";
 
 const statusHu = { in_stock: "készleten", reserved: "foglalt", sold: "eladva" } as const;
+
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
 
 export default async function VehiclesPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
@@ -49,7 +51,7 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
       </form>
       <p className="muted">A bekerülési érték a 261-es számlára, a gépkocsihoz rendelve könyvelt tételekből (beszerzés, fényezés, javítás) adódik. Eladáskor automatikusan kivezetődik (T 814 / K 261).</p>
       <table>
-        <thead><tr><th>Gépkocsi</th><th>Rendszám</th><th>VIN</th><th>Adózás</th><th>Beszerzés</th><th>Státusz</th><th className="num">Összes bekerülés</th><th className="num">Könyv szerinti érték</th><th className="num">Nettó árbevétel</th><th className="num">Fedezet</th><th></th></tr></thead>
+        <thead><tr><th>Gépkocsi</th><th>Rendszám</th><th>VIN</th><th>Adózás</th><th>Beszerzés</th><th>Eladás</th><th className="num">Napok</th><th>Státusz</th><th className="num">Összes bekerülés</th><th className="num">Könyv szerinti érték</th><th className="num">Nettó árbevétel</th><th className="num">Fedezet</th><th></th></tr></thead>
         <tbody>
           {show.map((v) => (
             <tr key={v.id}>
@@ -58,6 +60,8 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
               <td className="mono">{v.vin}</td>
               <td>{v.vatTreatment === "margin" ? "különbözeti" : "normál"}</td>
               <td>{fmtDate(v.purchaseDate)}</td>
+              <td>{v.saleDate ? fmtDate(v.saleDate) : ""}</td>
+              <td className="num" title={v.saleDate ? "Készleten töltött napok (vételtől eladásig)" : "Készleten töltött napok (vételtől máig)"}>{v.purchaseDate ? daysBetween(v.purchaseDate, v.saleDate ?? today()) : ""}</td>
               <td><span className={`badge ${v.status}`}>{statusHu[v.status]}</span></td>
               <td className="num">{fmtHuf(v.totalCost)}</td>
               <td className="num">{fmtHuf(v.bookValue)}</td>
@@ -69,7 +73,7 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
               </td>
             </tr>
           ))}
-          {show.length === 0 && <tr><td colSpan={11} className="muted">Nincs gépkocsi.</td></tr>}
+          {show.length === 0 && <tr><td colSpan={13} className="muted">Nincs gépkocsi.</td></tr>}
         </tbody>
       </table>
     </>

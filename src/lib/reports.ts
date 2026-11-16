@@ -207,11 +207,13 @@ export async function vehicleStock(companyId: number) {
       bookValue: sql<number>`coalesce((select sum(jl.debit - jl.credit) from journal_lines jl where jl.vehicle_id = "vehicles"."id" and jl.account_id = ${inv?.id ?? 0}), 0)::float8`,
       totalCost: sql<number>`coalesce((select sum(jl.debit) from journal_lines jl where jl.vehicle_id = "vehicles"."id" and jl.account_id = ${inv?.id ?? 0}), 0)::float8`,
       revenue: sql<number>`coalesce((select sum(il.net_huf) from invoice_lines il join invoices i on i.id = il.invoice_id where il.vehicle_id = "vehicles"."id" and i.direction = 'out' and i.status = 'posted'), 0)::float8`,
+      // eladás dátuma: a legutóbbi könyvelt vevőszámla teljesítési dátuma, amelyen az autó szerepel
+      saleDate: sql<string | null>`(select max(i.fulfillment_date)::text from invoice_lines il join invoices i on i.id = il.invoice_id where il.vehicle_id = "vehicles"."id" and i.direction = 'out' and i.status = 'posted')`,
     })
     .from(vehicles)
     .where(eq(vehicles.companyId, companyId))
     .orderBy(desc(vehicles.id));
-  return list.map((x) => ({ ...x.v, bookValue: round2(Number(x.bookValue)), totalCost: round2(Number(x.totalCost)), revenue: round2(Number(x.revenue)) }));
+  return list.map((x) => ({ ...x.v, bookValue: round2(Number(x.bookValue)), totalCost: round2(Number(x.totalCost)), revenue: round2(Number(x.revenue)), saleDate: x.saleDate ?? null }));
 }
 
 export async function invoicePayments(invoiceId: number) {
