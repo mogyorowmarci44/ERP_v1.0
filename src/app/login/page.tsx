@@ -3,7 +3,8 @@ import { sql as dsql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { loginAction } from "../auth-actions";
 import { Flash } from "@/components/Flash";
-import { Plate } from "@/components/Brand";
+import { ErpLogo, AppFooter } from "@/components/Brand";
+import { APP_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <div className="auth-wrap">
     <div className="auth card">
-      <Plate text="ERP" title="MM ERP" />
+      <ErpLogo />
       <h1>Belépés</h1>
       <Flash error={sp.error} />
       <form action={loginAction}>
@@ -23,6 +24,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <button className="primary">Belépés</button>
       </form>
     </div>
+    <AppFooter version={APP_VERSION} dark />
     </div>
   );
 }
