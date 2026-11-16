@@ -33,7 +33,7 @@ import { APP_VERSION } from "@/lib/version";
 import { requireCompany } from "@/lib/auth";
 import { logoutAction } from "@/app/auth-actions";
 import { NavLink } from "@/components/NavLink";
-import { CompanyMark } from "@/components/Brand";
+import { CompanyMark, AppFooter } from "@/components/Brand";
 import { UnitSwitcher } from "@/components/UnitSwitcher";
 import { normalizeTheme, themeVars } from "@/lib/themes";
 
@@ -137,7 +137,10 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <form action={logoutAction}><button>Kilépés</button></form>
         </div>
       </nav>
-      <main className="main">{children}</main>
+      <main className="main">
+        {children}
+        <AppFooter company={company.name} version={APP_VERSION} />
+      </main>
     </div>
   );
 }

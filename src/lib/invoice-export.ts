@@ -35,7 +35,7 @@ export function sheet(wb: ExcelJS.Workbook, name: string, title: string, cols: C
     },
     headerFooter: {
       oddHeader: `&L&"-,Bold"${esc(opts.company)}&C${esc(title)}&R${esc(opts.period)}`,
-      oddFooter: `&LKészült: &D &T&R&P / &N oldal`,
+      oddFooter: `&LKészült: &D &T&C${TRADEMARK}&R&P / &N oldal`,
     },
     views: [{ state: "frozen", ySplit: 1, showGridLines: false }],
     properties: { tabColor: { argb: argb(opts.pal.head) } },
@@ -54,6 +54,14 @@ export function sheet(wb: ExcelJS.Workbook, name: string, title: string, cols: C
   return ws;
 }
 const esc = (s: string) => s.replace(/&/g, "&&");
+/** Védjegy minden exportált lap láblécében és a fájl tulajdonságaiban. */
+export const TRADEMARK = "Mogyorosi Holding™ · mogyorosi.erp";
+export function brandWorkbook(wb: ExcelJS.Workbook) {
+  wb.creator = "mogyorosi.erp";
+  wb.lastModifiedBy = "mogyorosi.erp";
+  wb.company = "Mogyorosi Holding™";
+  wb.created = new Date();
+}
 
 /** Oszloptípus szerinti igazítás: szám jobbra, dátum középre, szöveg balra kis behúzással (hogy ne tapadjon a szomszéd számhoz). */
 function alignOf(c: Col): Partial<ExcelJS.Alignment> {
@@ -97,8 +105,7 @@ export async function buildInvoiceWorkbook(companyId: number, opts: { from: stri
   const pal = palette(normalizeTheme(company.theme).accent);
   const meta = { company: company.name, period: `${opts.from} – ${opts.to}${opts.dir ? ` · ${DIR[opts.dir]} számlák` : ""}`, pal };
   const wb = new ExcelJS.Workbook();
-  wb.creator = "MM ERP";
-  wb.created = new Date();
+  brandWorkbook(wb);
 
   // 1) Eltérések – csak a figyelmeztetéssel jelzett számlák
   const flagCols: Col[] = [

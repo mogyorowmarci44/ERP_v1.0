@@ -7,7 +7,7 @@ import { TaxProfileFields } from "@/components/TaxProfileFields";
 import { ENTITY_LABEL } from "@/lib/entity";
 import { APP_VERSION } from "@/lib/version";
 import { Flash } from "@/components/Flash";
-import { CompanyMark, Plate } from "@/components/Brand";
+import { CompanyMark, ErpLogo, AppFooter } from "@/components/Brand";
 import { normalizeTheme } from "@/lib/themes";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     <div className="main" style={{ maxWidth: 1100, margin: "0 auto" }}>
       <div className="topbar">
         <div className="row" style={{ gap: 14 }}>
-          <Plate text="ERP" title="MM ERP" />
+          <ErpLogo size={32} />
           <h1>Cégeim</h1>
           <span className="version-tag">v{APP_VERSION}</span>
         </div>
@@ -126,6 +126,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           <p className="muted">A cég minden adata (számlák, könyvelési tételek, partnerek, számlatükör, beállítások) visszavonhatatlanul törlődik. Csak a tulajdonos törölhet.</p>
         </>
       )}
+      <AppFooter version={APP_VERSION} />
     </div>
   );
 }
