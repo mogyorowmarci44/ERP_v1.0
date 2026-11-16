@@ -26,6 +26,7 @@ import { PRESETS, isHex } from "@/lib/themes";
 import { importBundle, importLoanTermsOnly, wipeCompanyData, type ImportBundle, type ImportReport } from "@/lib/importer";
 import { extendLoan, recordMemberLoan, revalueMemberLoans, setLoanDueDate, undoLastExtension } from "@/lib/member-loans";
 import { invoiceAudit } from "@/lib/invoice-audit";
+import { updateEntryMeta } from "@/lib/journal-edit";
 import { DEFAULT_TAX_PROFILE, isPrivate, taxProfileFromForm } from "@/lib/entity";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
@@ -212,6 +213,27 @@ export async function reverseEntryAction(fd: FormData) {
     if (e?.sourceType !== "manual" && e?.sourceType !== "member_loan") throw new Error("Számlából / rendezésből származó tételt a számlánál lehet sztornózni.");
     await db.transaction((tx) => reverseEntry(tx, cid, entryId, str(fd, "date") || today(), user.id));
     return `/c/${cid}/journal?ok=${encodeURIComponent("Tétel sztornózva.")}`;
+  });
+}
+
+/** Lekönyvelt kézi tétel kiegészítő adatainak (megnevezés, sorszöveg, partner, gépkocsi) módosítása. */
+export async function updateEntryMetaAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const entryId = Number(fd.get("entryId"));
+  await runOrRedirect(`/c/${cid}/journal/${entryId}/edit`, async () => {
+    const lineIds = fd.getAll("lineId").map(Number);
+    const n = await updateEntryMeta(cid, entryId, user.id, {
+      description: str(fd, "description"),
+      lines: lineIds.map((id) => ({
+        id,
+        description: optStr(fd, `desc_${id}`),
+        partnerId: intOrNull(fd, `partner_${id}`),
+        vehicleId: intOrNull(fd, `vehicle_${id}`),
+      })),
+    });
+    revalidatePath(`/c/${cid}/journal`);
+    return `/c/${cid}/journal/${entryId}/edit?ok=${encodeURIComponent(n ? `${n} módosítás mentve.` : "Nem történt változás.")}`;
   });
 }
 

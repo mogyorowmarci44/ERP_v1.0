@@ -329,6 +329,24 @@ export const journalLines = pgTable(
   ],
 );
 
+/** Lekönyvelt tételsor kiegészítő adatainak (szöveg, partner, gépkocsi) utólagos módosításai – audit napló. Összeg, számla, dátum nem módosítható. */
+export const journalLineChanges = pgTable(
+  "journal_line_changes",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    entryId: integer("entry_id").notNull().references(() => journalEntries.id, { onDelete: "cascade" }),
+    lineId: integer("line_id").references(() => journalLines.id, { onDelete: "cascade" }), // null = a tétel fejének megnevezése
+    field: varchar("field", { length: 20 }).notNull(), // description | partner | vehicle | entry_description
+    oldValue: text("old_value"),
+    newValue: text("new_value"),
+    userId: integer("user_id").references(() => users.id),
+    changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("journal_line_changes_entry").on(t.entryId)],
+);
+
+
 // ---------------------------------------------------------------------------
 // Számlák
 // ---------------------------------------------------------------------------
