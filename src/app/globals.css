@@ -93,6 +93,41 @@ p { max-width: 80ch; }
 .side .foot button { width: 100%; background: transparent; color: var(--side-ink); border-color: var(--side-hover); }
 .side .foot button:hover { background: var(--side-hover); }
 
+/* Egységváltó (oldalsáv alja) – a lista a gomb FÖLÖTT nyílik */
+.unit-switch { display: flex; flex-direction: column-reverse; gap: 6px; }
+.unit-switch summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--side-active); border-radius: var(--r-sm);
+  color: var(--side-ink); font-size: 13px; font-weight: 600; background: var(--side-hover);
+}
+.unit-switch summary::-webkit-details-marker { display: none; }
+.unit-switch summary:hover { background: var(--side-active); }
+.unit-switch summary svg { width: 16px; height: 16px; flex: none; }
+.unit-switch summary .count {
+  margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  background: var(--accent); color: var(--accent-ink);
+}
+.unit-switch[open] summary { border-color: var(--accent); }
+.unit-list {
+  display: grid; gap: 2px; padding: 4px; border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--side) 80%, #000); border: 1px solid var(--side-active);
+  max-height: 50vh; overflow-y: auto;
+}
+.unit-list .unit {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 8px;
+  padding: 7px 8px; border-radius: var(--r-sm); color: var(--side-ink); font-size: 13px;
+}
+.unit-list .unit:hover { background: var(--side-hover); text-decoration: none; }
+.unit-list .unit .unit-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unit-list .unit .unit-kind { grid-column: 1; font-size: 11px; color: var(--side-muted); }
+.unit-list .unit .tick { grid-column: 2; grid-row: 1 / span 2; width: 15px; height: 15px; color: var(--accent); }
+.unit-list .unit.on { background: var(--side-active); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.unit-list .unit.all {
+  display: flex; gap: 8px; margin-top: 2px; border-top: 1px solid var(--side-active);
+  border-radius: 0; padding-top: 9px; color: var(--side-muted); font-size: 12px;
+}
+.unit-list .unit.all svg { width: 14px; height: 14px; }
+
 .main { padding: 28px 36px 64px; max-width: 1480px; width: 100%; }
 .topbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
 .topbar h1 { margin: 0; }

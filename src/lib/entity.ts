@@ -17,6 +17,23 @@ export const ENTITY_LABEL: Record<EntityType, string> = {
 
 export const isPrivate = (c: { entityType?: string | null }) => c.entityType === "private_taxpayer";
 
+const LEGAL_FORMS: [RegExp, string][] = [
+  [/\bnyrt\.?$/i, "Nyrt"],
+  [/\bzrt\.?$/i, "Zrt"],
+  [/\bkft\.?$/i, "Kft"],
+  [/\bbt\.?$/i, "Bt"],
+  [/\bkkt\.?$/i, "Kkt"],
+  [/\be\.?\s?v\.?$/i, "EV"],
+];
+
+/** Rövid jogi forma a névből (Bt / Kft / Zrt / Nyrt / Kkt / EV), magánszemélynél „Magánszemély". */
+export function legalFormLabel(c: { name: string; entityType?: string | null }): string {
+  if (isPrivate(c)) return "Magánszemély";
+  const n = c.name.trim();
+  for (const [re, label] of LEGAL_FORMS) if (re.test(n)) return label;
+  return "Társaság";
+}
+
 // ---------------------------------------------------------------------------
 // Számlatükör – adószámos magánszemély, szálláshely-szolgáltatás
 // A kódok a társasági számlatükörrel kompatibilisek (311/454/466/467/381/384…), így a könyvelési motor

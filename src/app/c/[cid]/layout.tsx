@@ -34,6 +34,7 @@ import { requireCompany } from "@/lib/auth";
 import { logoutAction } from "@/app/auth-actions";
 import { NavLink } from "@/components/NavLink";
 import { CompanyMark } from "@/components/Brand";
+import { UnitSwitcher } from "@/components/UnitSwitcher";
 import { normalizeTheme, themeVars } from "@/lib/themes";
 
 export const dynamic = "force-dynamic";
@@ -131,6 +132,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
         )}
         </div>
         <div className="foot">
+          <UnitSwitcher userId={user.id} currentId={company.id} />
           <span>Bejelentkezve: {user.name} · <span className="version-tag">v{APP_VERSION}</span></span>
           <form action={logoutAction}><button>Kilépés</button></form>
         </div>
