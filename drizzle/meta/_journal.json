@@ -120,6 +120,13 @@
       "when": 1794901271867,
       "tag": "0016_v2_epr",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794903361915,
+      "tag": "0017_v2_epr_vehicle_defaults",
+      "breakpoints": true
     }
   ]
 }
