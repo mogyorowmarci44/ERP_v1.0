@@ -813,3 +813,46 @@ export const ghAdStats = pgTable(
   },
   (t) => [primaryKey({ columns: [t.companyId, t.date] })],
 );
+
+// ---------------------------------------------------------------------------
+// v2.2 – Éves beszámoló (mérleg + eredménykimutatás a főkönyvből, kiegészítő melléklet szövege)
+// ---------------------------------------------------------------------------
+
+/** Kiegészítő melléklet egy fejezete. A törzs egyszerű jelölésű szöveg: bekezdés, „- ” felsorolás, „| a | b |” táblázat, **félkövér**. */
+export type AnnualSection = { no: string; title: string; body: string };
+
+/** Az éves beszámoló fejléc- és aláírásadatai, valamint az eredetileg közzétett (helyesbített) számok. */
+export type AnnualReportMeta = {
+  /** pl. "Egyszerűsített éves beszámoló" */
+  kind: string;
+  /** pl. "Helyesbített változat – a 2026. évben feltárt jelentős összegű hibák hatásával" */
+  versionLabel?: string | null;
+  periodFrom: string;
+  periodTo: string;
+  /** Statisztikai számjel (KSH), ha ismert. */
+  statNumber?: string | null;
+  preparedPlace?: string | null;
+  preparedAt?: string | null;
+  /** A cég képviselője (aláíró). */
+  signer?: string | null;
+  signerTitle?: string | null;
+  /** A beszámoló összeállításáért felelős személy. */
+  preparer?: string | null;
+  preparerRegNo?: string | null;
+  /** Eredetileg közzétett (letétbe helyezett) adatok soronként – a mérleg és EK sorkulcsaival (pl. "BI", "IV8"). */
+  filed?: { label?: string | null; date?: string | null; bs?: Record<string, number>; pnl?: Record<string, number> } | null;
+};
+
+export const annualReports = pgTable(
+  "annual_reports",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    meta: jsonb("meta").$type<AnnualReportMeta>().notNull(),
+    sections: jsonb("sections").$type<AnnualSection[]>().notNull().default([]),
+    updatedBy: integer("updated_by").references(() => users.id),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("annual_reports_company_year").on(t.companyId, t.year)],
+);
