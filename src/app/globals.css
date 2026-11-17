@@ -680,3 +680,19 @@ a.lp-money:hover { filter: brightness(1.06); }
   .money-days .md-toggle { display: none; }
   .money-days tr.md-day td { background: #f3f5f8 !important; }
 }
+/* napi pénzmozgás naptár */
+.money-cal { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.money-cal .mc-month { background: var(--card, #fff); border: 1px solid var(--line); border-radius: var(--r-lg, 12px); padding: 12px; }
+.money-cal h3 { margin: 0 0 8px; font-size: 13.5px; }
+.money-cal .mc-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.money-cal .mc-wd { font-size: 11px; color: var(--muted); text-align: center; }
+.money-cal .mc-cell { all: unset; box-sizing: border-box; min-height: 44px; border-radius: 6px; padding: 4px 5px; display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.money-cal .mc-cell b { font-size: 11.5px; }
+.money-cal .mc-cell span { white-space: nowrap; font-size: 10.5px; }
+.money-cal button.mc-cell:hover { outline: 2px solid var(--accent-line); }
+.money-cal button.mc-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.money-cal .mc-cell.on { outline: 2px solid #17202b; outline-offset: 1px; }
+.money-cal .mc-cell.empty { background: color-mix(in srgb, var(--line) 35%, transparent); color: var(--muted); cursor: default; }
+.money-cal .mc-cell.out { opacity: 0.35; }
+.money-cal .mc-legend { grid-column: 1 / -1; font-size: 11.5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.money-cal .mc-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
