@@ -178,7 +178,8 @@ export async function recordMemberLoan(
 }
 
 /** Hosszabbítás: a jelenlegi lejárathoz + N nap; szerződésmódosító okirat készül (sorszámmal). */
-export async function extendLoan(companyId: number, entryId: number, input: { days: number; extendedOn: string; note?: string | null }) {
+/** A módosítás kelte alapértelmezésben a jelenlegi lejárat napja. */
+export async function extendLoan(companyId: number, entryId: number, input: { days: number; extendedOn?: string | null; note?: string | null }) {
   if (!Number.isInteger(input.days) || input.days < 1 || input.days > 3650) throw new Error("A hosszabbítás napjainak száma 1 és 3650 között legyen.");
   return db.transaction(async (tx) => {
     const [t] = await tx.select().from(memberLoanTerms).where(and(eq(memberLoanTerms.entryId, entryId), eq(memberLoanTerms.companyId, companyId))).for("update");
@@ -188,7 +189,7 @@ export async function extendLoan(companyId: number, entryId: number, input: { da
     const toDue = addDaysIso(t.dueDate, input.days);
     const contractNo = t.contractNo ?? `TK-${entryId}`;
     const docNo = `${contractNo}/M${seq}`;
-    await tx.insert(memberLoanExtensions).values({ companyId, entryId, seq, extendedOn: input.extendedOn, days: input.days, fromDue: t.dueDate, toDue, docNo, note: input.note ?? null });
+    await tx.insert(memberLoanExtensions).values({ companyId, entryId, seq, extendedOn: input.extendedOn || t.dueDate, days: input.days, fromDue: t.dueDate, toDue, docNo, note: input.note ?? null });
     await tx.update(memberLoanTerms).set({ dueDate: toDue, originalDueDate: t.originalDueDate ?? t.dueDate, updatedAt: new Date() }).where(eq(memberLoanTerms.entryId, entryId));
     return { seq, docNo, toDue };
   });

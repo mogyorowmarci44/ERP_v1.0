@@ -582,10 +582,10 @@ export async function extendLoanAction(fd: FormData) {
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/member-loans`, async () => {
     const days = Number(str(fd, "days"));
-    const on = str(fd, "extendedOn") || today();
-    if (!isDate(on)) throw new Error("Hibás dátum.");
+    const on = str(fd, "extendedOn"); // üresen: a jelenlegi lejárat napja
+    if (on && !isDate(on)) throw new Error("Hibás dátum.");
     const entryId = Number(fd.get("entryId"));
-    const r = await extendLoan(cid, entryId, { days, extendedOn: on, note: optStr(fd, "note") });
+    const r = await extendLoan(cid, entryId, { days, extendedOn: on || null, note: optStr(fd, "note") });
     revalidatePath(`/c/${cid}`, "layout");
     // az automatikusan elkészült szerződésmódosítás
     return `/c/${cid}/member-loans/${entryId}?doc=M${r.seq}`;
