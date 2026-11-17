@@ -75,6 +75,10 @@ export async function saveVehicleAction(fd: FormData) {
       vatTreatment: (str(fd, "vatTreatment") || "margin") as "margin" | "normal",
       purchasePrice: pp === "" ? null : parseNumber(pp),
       note: optStr(fd, "note"),
+      eprCategory: optStr(fd, "eprCategory"),
+      eprDrive: optStr(fd, "eprDrive"),
+      eprMassKg: intOrNull(fd, "eprMassKg"),
+      eprOrigin: optStr(fd, "eprOrigin"),
     };
     if (!values.make || !values.model) throw new Error("Gyártmány és típus kötelező.");
     if (id) await db.update(schema.vehicles).set(values).where(and(eq(schema.vehicles.id, id), eq(schema.vehicles.companyId, cid)));
@@ -338,7 +342,11 @@ export async function updateCompanyAction(fd: FormData) {
     await db
       .update(schema.companies)
       .set({
-        settings: { ...cur.settings, representative: optStr(fd, "representative"), representativeTitle: optStr(fd, "representativeTitle"), signPlace: optStr(fd, "signPlace") },
+        settings: {
+          ...cur.settings, representative: optStr(fd, "representative"), representativeTitle: optStr(fd, "representativeTitle"), signPlace: optStr(fd, "signPlace"),
+          // EPR mezők csak társaságnál szerepelnek az űrlapon – magánszemélynél a meglévő érték marad.
+          ...(fd.has("eprOriginDigit") ? { eprFlatRate: fd.get("eprFlatRate") === "on", eprOriginDigit: optStr(fd, "eprOriginDigit") } : {}),
+        },
         name: str(fd, "name"),
         taxNumber: optStr(fd, "taxNumber"),
         euVatNumber: optStr(fd, "euVatNumber"),

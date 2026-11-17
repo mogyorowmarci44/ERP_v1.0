@@ -85,6 +85,10 @@ export type CompanySettings = {
   representative?: string | null;
   representativeTitle?: string | null;
   signPlace?: string | null;
+  /** EPR – díjátalány-fizetés választása (egész naptári évre szól). */
+  eprFlatRate?: boolean | null;
+  /** EPR – a KF kód 8. karaktere (származáskód) külföldről behozott gépjárműre. */
+  eprOriginDigit?: string | null;
 };
 
 /** v2.0 – Adószámos magánszemély (pl. szálláshely-szolgáltatás) adózási profilja. */
@@ -274,6 +278,14 @@ export const vehicles = pgTable(
     purchasePrice: money("purchase_price"), // HUF – különbözeti ÁFA alapja
     status: vehicleStatusEnum("status").notNull().default("in_stock"),
     note: text("note"),
+    /** EPR (80/2023. Korm. r.) – járműkategória: M1 | N1 | 3W (háromkerekű). */
+    eprCategory: varchar("epr_category", { length: 4 }),
+    /** EPR – hajtás: ice | hev | phev | bev (a díjátalány tétele ettől függ). */
+    eprDrive: varchar("epr_drive", { length: 8 }),
+    /** EPR – a díj alapjául szolgáló tömeg (kg), a forgalmi engedélyből. */
+    eprMassKg: integer("epr_mass_kg"),
+    /** EPR – származás kézi felülírása: import | domestic (null = a beszerzési számla partnerének országából). */
+    eprOrigin: varchar("epr_origin", { length: 12 }),
   },
   (t) => [index("vehicles_company").on(t.companyId)],
 );

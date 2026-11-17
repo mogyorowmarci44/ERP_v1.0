@@ -39,6 +39,21 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v2.0.1 – EPR (kiterjesztett gyártói felelősség) – gépjármű · DRAFT
+
+A különbözeti ÁFA karton mintájára: **EPR karton gépkocsinként** és **negyedéves EPR összesítő** (OKIR KG:KGYF-NÉ, határidő a negyedévet követő hónap 20-a).
+
+| Terület | Funkció |
+|---|---|
+| Gépkocsi adatok | EPR kategória (M1 / N1 / háromkerekű), hajtás (belső égésű / HEV / PHEV / BEV), tömeg (kg), származás (automatikus a beszerzési számla partnerének országából, vagy kézzel) |
+| Kötelezettség | Külföldről behozott autó első belföldi eladása; belföldi beszerzés és külföldi vevő → nem kötelezett; hiányzó adat → „nem eldönthető” lista |
+| Díj | Ft/kg × tömeg, díjtábla a forgalomba hozatal napja szerint (2025. 10. 01-től: 36 Ft/kg, ill. díjátalány pl. M1 belső égésű 44,89 Ft/kg) |
+| KF kód | 15 + anyagáram + csoport (1980 előtt/után, átalány szerint) + 1 (kollektív) + származáskód (Beállítások) |
+| Beállítások | Díjátalány választása (egész évre), KF 8. karakter |
+| Ellenőrzések | Hiányzó tömeg/évjárat/hajtás, ellenőrizetlen díjtábla, céges vevőnél a számla EPR-szövege |
+
+⚠ Élesítés előtt egyeztetendő: a KF csoport- és származáskód (80/2023. 1. melléklet 2.4.5, 2.6) és a 2025. október előtti díjtábla.
+
 ## Ütemterv
 
 1. ~~Könyvelési mag~~ ✅

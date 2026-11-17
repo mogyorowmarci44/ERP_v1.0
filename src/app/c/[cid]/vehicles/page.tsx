@@ -5,6 +5,7 @@ import { saveVehicleAction } from "../actions";
 import { Flash } from "@/components/Flash";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
+import { EPR_CATEGORY_LABEL, EPR_DRIVE_LABEL } from "@/lib/epr";
 
 const statusHu = { in_stock: "készleten", reserved: "foglalt", sold: "eladva" } as const;
 
@@ -23,6 +24,7 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
         <h1>Gépkocsi készlet</h1>
         <div className="row">
           <Link className="btn" href={`/c/${cid}/vehicles/kartonok`}>Különbözeti ÁFA kartonok (időszak)</Link>
+          <Link className="btn" href={`/c/${cid}/vehicles/epr`}>EPR összesítő (negyedév)</Link>
           <Link className="btn" href={`/c/${cid}/vehicles${sp.all ? "" : "?all=1"}`}>{sp.all ? "Csak készleten" : "Eladottakkal együtt"}</Link>
         </div>
       </div>
@@ -44,6 +46,26 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
           <input name="purchasePrice" className="num" defaultValue={edit?.purchasePrice ?? ""} placeholder="számlákból" />
         </label>
         <label>Megjegyzés<input name="note" defaultValue={edit?.note ?? ""} /></label>
+        <label title="EPR (80/2023. Korm. r.) – csak M1, N1 és háromkerekű gépjármű tartozik a gépjármű termékáramba.">EPR kategória
+          <select name="eprCategory" defaultValue={edit?.eprCategory ?? ""}>
+            <option value="">– nincs megadva –</option>
+            {Object.entries(EPR_CATEGORY_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+        </label>
+        <label>EPR hajtás
+          <select name="eprDrive" defaultValue={edit?.eprDrive ?? ""}>
+            <option value="">– nincs megadva –</option>
+            {Object.entries(EPR_DRIVE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+        </label>
+        <label title="A forgalmi engedély szerinti tömeg kg-ban – a díj alapja.">EPR tömeg (kg)<input name="eprMassKg" type="number" min={0} className="num" defaultValue={edit?.eprMassKg ?? ""} /></label>
+        <label title="Üresen: a beszerzési számla eladójának országából (HU = belföldi, egyéb = import).">EPR származás
+          <select name="eprOrigin" defaultValue={edit?.eprOrigin ?? ""}>
+            <option value="">automatikus (beszerzési számlából)</option>
+            <option value="import">külföldről behozott</option>
+            <option value="domestic">belföldi beszerzés</option>
+          </select>
+        </label>
         <div style={{ alignSelf: "end" }} className="row">
           <button className="primary">{edit ? "Mentés" : "Új gépkocsi"}</button>
           {edit && <Link href={`/c/${cid}/vehicles`} className="btn">Mégse</Link>}
@@ -70,6 +92,7 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
               <td className="nowrap">
                 <Link href={`/c/${cid}/vehicles?edit=${v.id}`}>szerk.</Link>
                 {v.vatTreatment === "margin" && <> · <Link href={`/c/${cid}/vehicles/${v.id}/karton`}>karton</Link></>}
+                {" · "}<Link href={`/c/${cid}/vehicles/${v.id}/epr`} title={v.eprCategory ? undefined : "EPR adatok hiányoznak"}>EPR{v.eprCategory && v.eprMassKg ? "" : " ⚠"}</Link>
               </td>
             </tr>
           ))}

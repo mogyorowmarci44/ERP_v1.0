@@ -42,6 +42,12 @@ export default async function SettingsPage({ params, searchParams }: { params: P
             <label>Képviselő (szerződésekhez)<input name="representative" defaultValue={company.settings.representative ?? ""} placeholder="pl. Gálos Kristóf" /></label>
             <label>Beosztás<input name="representativeTitle" defaultValue={company.settings.representativeTitle ?? "ügyvezető"} /></label>
             <label>Szerződéskötés helye<input name="signPlace" defaultValue={company.settings.signPlace ?? ""} placeholder="pl. Mór" /></label>
+            <label className="row" title="80/2023. Korm. r. 20. § (3a) – a választás egész naptári évre szól; tartalmazza az alkatrészek és a csomagolás díját is.">
+              <input type="checkbox" name="eprFlatRate" defaultChecked={!!company.settings.eprFlatRate} /> EPR díjátalány (gépjármű)
+            </label>
+            <label title="A KF kód 8. karaktere külföldről behozott gépjárműre (80/2023. 1. melléklet 2.6).">EPR származáskód (KF 8. karakter)
+              <input name="eprOriginDigit" maxLength={1} pattern="[0-9]" defaultValue={company.settings.eprOriginDigit ?? ""} placeholder="80/2023. 1. mell. 2.6" />
+            </label>
           </>
         )}
         <div style={{ alignSelf: "end" }}><button className="primary" disabled={role !== "owner"}>Mentés</button></div>
