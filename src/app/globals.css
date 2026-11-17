@@ -639,6 +639,10 @@ table.heat th:first-child, table.heat td:first-child { text-align: left; }
 .lp-actions .btn svg { width: 16px; height: 16px; }
 .lp-kpi .value { font-size: 22px; }
 .lp-kpi .value.neg { color: var(--neg); }
+.lp-kpi + .lp-kpi { margin-top: 12px; }
+a.lp-money { text-decoration: none; color: var(--accent-ink); }
+a.lp-money:hover { filter: brightness(1.06); }
+.lp-money .value.neg { color: inherit; text-decoration: underline wavy; }
 .lp-sub { margin: 8px 0 18px; font-size: 12.5px; }
 .lp-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .lp-tile { padding: 14px 16px; }
