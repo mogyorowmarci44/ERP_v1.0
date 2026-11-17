@@ -62,7 +62,7 @@ export default async function MoneyAccountPage({ params, searchParams }: { param
         <div className="card stat"><div className="label">Kiadások</div><div className="value">{fmtHuf(data.lines.reduce((s, l) => s + Number(l.credit), 0))}<small>Ft</small></div></div>
         <div className="card stat primary"><div className="label">Záró ({fmtDate(to)})</div><div className="value">{fmtHuf(data.closing)}<small>Ft</small></div></div>
       </div>
-      <MoneyDays days={dayRows} cid={cid} currency={acc.currency} initialOpen={isDate(sp.day) ? sp.day : null} />
+      <MoneyDays days={dayRows} cid={cid} currency={acc.currency} initialOpen={isDate(sp.day) ? sp.day : null} from={from} to={to} />
     </>
   );
 }
