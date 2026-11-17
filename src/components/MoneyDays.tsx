@@ -35,7 +35,7 @@ function MoneyCalendar({ days, from, to, open, onPick }: { days: MoneyDay[]; fro
     if (months.length > 24) break;
   }
   return (
-    <div className="money-cal no-print">
+    <div className="money-cal">
       {months.map((m) => {
         const [y, mo] = m.split("-").map(Number);
         const first = new Date(Date.UTC(y, mo - 1, 1));
@@ -69,82 +69,69 @@ function MoneyCalendar({ days, from, to, open, onPick }: { days: MoneyDay[]; fro
           </section>
         );
       })}
-      <div className="mc-legend muted"><i style={{ background: "hsl(221 71% 45%)" }} /> nettó befolyás <i style={{ background: "hsl(21 75% 45%)" }} /> nettó kiáramlás · sötétebb = nagyobb összeg · kattints egy napra</div>
+      <div className="mc-legend muted"><i style={{ background: "hsl(221 71% 45%)" }} /> nettó befolyás <i style={{ background: "hsl(21 75% 45%)" }} /> nettó kiáramlás · sötétebb = nagyobb összeg</div>
     </div>
   );
 }
 
 export function MoneyDays({ days, cid, currency, initialOpen, from, to }: { days: MoneyDay[]; cid: number; currency: string; initialOpen?: string | null; from: string; to: string }) {
-  const [open, setOpen] = useState<Set<string>>(() => new Set(initialOpen ? [initialOpen] : []));
   const fx = currency !== "HUF";
-  const cols = fx ? 8 : 7;
-  const toggle = (d: string) => setOpen((s) => { const n = new Set(s); if (n.has(d)) n.delete(d); else n.add(d); return n; });
-  const allOpen = days.length > 0 && days.every((d) => open.has(d.date));
-  const pick = (d: string) => {
-    setOpen((s) => new Set(s).add(d));
-    requestAnimationFrame(() => document.getElementById(`md-${d}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
-  };
+  const [sel, setSel] = useState<string | null>(() => (initialOpen && days.some((d) => d.date === initialOpen) ? initialOpen : days.length ? days[days.length - 1].date : null));
+  const day = days.find((d) => d.date === sel) ?? null;
   return (
     <>
-      <MoneyCalendar days={days} from={from} to={to} open={open} onPick={pick} />
-      <div className="row no-print" style={{ justifyContent: "flex-end", marginBottom: 8 }}>
-        <span className="muted" style={{ marginRight: "auto" }}>{days.length} nap mozgással · kattints egy napra a tételekért</span>
-        <button type="button" onClick={() => setOpen(allOpen ? new Set() : new Set(days.map((d) => d.date)))}>{allOpen ? "Mind becsuk" : "Mind kinyit"}</button>
+      <div className="md-layout no-print">
+        <MoneyCalendar days={days} from={from} to={to} open={new Set(sel ? [sel] : [])} onPick={setSel} />
+        <aside className="md-panel card" aria-live="polite">
+          {!day && <p className="muted">{days.length ? "Kattints egy színes napra a naptárban." : "Nincs mozgás az időszakban."}</p>}
+          {day && (
+            <>
+              <div className="md-panel-head">
+                <h2>{fmtDate(day.date)} <span className="muted">{dow(day.date)}</span></h2>
+                <span className="muted">{day.lines.length} tétel</span>
+              </div>
+              <dl className="md-sum">
+                <div><dt>Nyitó</dt><dd>{fmtHuf(day.open)}</dd></div>
+                <div><dt>Bevétel</dt><dd className="md-in"><Amt v={day.inflow} /></dd></div>
+                <div><dt>Kiadás</dt><dd className="md-out"><Amt v={day.outflow} /></dd></div>
+                <div><dt>Záró</dt><dd className={`strong${day.close < 0 ? " neg" : ""}`}>{fmtHuf(day.close)}</dd></div>
+              </dl>
+              <ul className="md-items">
+                {day.lines.map((l) => (
+                  <li key={l.id}>
+                    <div className="md-item-main">
+                      <span className="md-item-text">{l.text}{l.partner ? <span className="muted"> · {l.partner}</span> : null}</span>
+                      <Link className="mono muted md-item-no" href={`/c/${cid}/journal/${l.entryId}`}>{l.number}</Link>
+                    </div>
+                    <div className="md-item-amt">
+                      <strong className={l.debit ? "md-in" : "md-out"}>{l.debit ? `+${fmtHuf(l.debit)}` : `−${fmtHuf(l.credit)}`}</strong>
+                      {fx && l.amountFx ? <span className="muted">{fmtMoney(l.amountFx, currency)}</span> : null}
+                      <span className="muted">egyenleg {fmtHuf(l.balance)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </aside>
       </div>
-      <div className="table-wrap">
-        <table className="money-days">
-          <thead>
-            <tr>
-              <th className="md-chev" aria-hidden="true"></th>
-              <th>Nap</th>
-              <th className="num">Nyitó</th>
-              <th className="num">Bevétel</th>
-              <th className="num">Kiadás</th>
-              <th className="num">Záró</th>
-              {fx && <th className="num">{currency}</th>}
-              <th className="num">Tétel</th>
-            </tr>
-          </thead>
-          <tbody>
-            {days.map((d) => {
-              const isOpen = open.has(d.date);
-              return (
-                <Fragment key={d.date}>
-                  <tr id={`md-${d.date}`} className={`md-day${isOpen ? " open" : ""}`} onClick={() => toggle(d.date)}>
-                    <td className="md-chev">
-                      <button type="button" className="md-toggle" aria-expanded={isOpen} aria-label={`${fmtDate(d.date)} tételei`} onClick={(e) => { e.stopPropagation(); toggle(d.date); }}>
-                        {isOpen ? "▾" : "▸"}
-                      </button>
-                    </td>
-                    <td><strong>{fmtDate(d.date)}</strong> <span className="muted">{dow(d.date)}</span></td>
-                    <td className="num muted"><Amt v={d.open} /></td>
-                    <td className="num md-in"><Amt v={d.inflow} /></td>
-                    <td className="num md-out"><Amt v={d.outflow} /></td>
-                    <td className={`num strong${d.close < 0 ? " neg" : ""}`}>{fmtHuf(d.close)}</td>
-                    {fx && <td></td>}
-                    <td className="num muted">{d.lines.length}</td>
-                  </tr>
-                  {d.lines.map((l) => (
-                    <tr key={l.id} className={`md-item${isOpen ? "" : " collapsed"}`}>
-                      <td></td>
-                      <td className="md-text" colSpan={2}>
-                        <Link className="mono" href={`/c/${cid}/journal/${l.entryId}`}>{l.number}</Link> {l.text}
-                        {l.partner ? <span className="muted"> · {l.partner}</span> : null}
-                      </td>
-                      <td className="num md-in">{l.debit ? fmtHuf(l.debit) : ""}</td>
-                      <td className="num md-out">{l.credit ? fmtHuf(l.credit) : ""}</td>
-                      <td className={`num muted${l.balance < 0 ? " neg" : ""}`}>{fmtHuf(l.balance)}</td>
-                      {fx && <td className="num">{l.amountFx ? fmtMoney(l.amountFx, currency) : ""}</td>}
-                      <td></td>
-                    </tr>
-                  ))}
-                </Fragment>
-              );
-            })}
-            {days.length === 0 && <tr><td colSpan={cols} className="muted">Nincs mozgás az időszakban.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+
+      {/* Nyomtatásban a teljes napi jelentés */}
+      <table className="money-days print-only">
+        <thead>
+          <tr><th>Nap / tétel</th><th className="num">Bevétel</th><th className="num">Kiadás</th><th className="num">Egyenleg</th></tr>
+        </thead>
+        <tbody>
+          {days.map((d) => (
+            <Fragment key={d.date}>
+              <tr className="md-day"><td><strong>{fmtDate(d.date)}</strong> {dow(d.date)} · nyitó {fmtHuf(d.open)}</td><td className="num"><Amt v={d.inflow} /></td><td className="num"><Amt v={d.outflow} /></td><td className="num strong">{fmtHuf(d.close)}</td></tr>
+              {d.lines.map((l) => (
+                <tr key={l.id} className="md-item"><td className="md-text">{l.number} {l.text}{l.partner ? ` · ${l.partner}` : ""}{fx && l.amountFx ? ` · ${fmtMoney(l.amountFx, currency)}` : ""}</td><td className="num">{l.debit ? fmtHuf(l.debit) : ""}</td><td className="num">{l.credit ? fmtHuf(l.credit) : ""}</td><td className="num">{fmtHuf(l.balance)}</td></tr>
+              ))}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
     </>
   );
 }

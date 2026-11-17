@@ -694,6 +694,7 @@ a.lp-money:hover { filter: brightness(1.06); }
   .ar-cover { min-height: 270mm; }
   .ar-notes h2, .ar-notes h3 { break-after: avoid; }
   .ar-table { break-inside: avoid; }
+}
 
 /* v2.2 – Pénztár és bank: kattintható csempe, napi lenyíló jelentés */
 .click-card { cursor: pointer; transition: border-color .12s, box-shadow .12s; }
@@ -725,7 +726,7 @@ a.lp-money:hover { filter: brightness(1.06); }
 .money-cal .mc-wd { font-size: 11px; color: var(--muted); text-align: center; }
 .money-cal .mc-cell { all: unset; box-sizing: border-box; min-height: 44px; border-radius: 6px; padding: 4px 5px; display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; font-variant-numeric: tabular-nums; cursor: pointer; }
 .money-cal .mc-cell b { font-size: 11.5px; }
-.money-cal .mc-cell span { white-space: nowrap; font-size: 10.5px; }
+.money-cal .mc-cell span { white-space: nowrap; font-size: 10px; overflow: hidden; text-overflow: clip; letter-spacing: -0.2px; }
 .money-cal button.mc-cell:hover { outline: 2px solid var(--accent-line); }
 .money-cal button.mc-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .money-cal .mc-cell.on { outline: 2px solid #17202b; outline-offset: 1px; }
@@ -733,3 +734,25 @@ a.lp-money:hover { filter: brightness(1.06); }
 .money-cal .mc-cell.out { opacity: 0.35; }
 .money-cal .mc-legend { grid-column: 1 / -1; font-size: 11.5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .money-cal .mc-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+
+/* napi pénzmozgás: naptár + napi panel */
+.md-layout { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.md-layout .money-cal { flex: 999 1 560px; min-width: 0; margin-bottom: 0; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.md-panel { flex: 1 1 340px; min-width: 0; position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
+.md-panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.md-panel h2 { margin: 0; font-size: 17px; }
+.md-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.md-sum div { background: color-mix(in srgb, var(--line) 30%, transparent); border-radius: 8px; padding: 6px 8px; }
+.md-sum dt { font-size: 11px; color: var(--muted); }
+.md-sum dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.md-items { list-style: none; margin: 0; padding: 0; }
+.md-items li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+.md-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.md-item-text { font-size: 13.5px; }
+.md-item-no { font-size: 11.5px; }
+.md-item-amt { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 12px; }
+.md-item-amt strong { font-size: 14px; }
+.md-in { color: var(--accent); }
+.md-out { color: #a3410f; }
+.print-only { display: none; }
+@media print { .print-only { display: table; width: 100%; } }
