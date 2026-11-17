@@ -27,6 +27,7 @@ import {
   CalendarDays,
   Star,
   ReceiptText,
+  Recycle,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
 import { APP_VERSION } from "@/lib/version";
@@ -112,6 +113,8 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/reports/statements`}><ChartNoAxesCombined />P&amp;L, cash-flow, mérleg</NavLink>
           <NavLink href={`${b}/reports/trial-balance`}><Scale />Főkönyvi kivonat</NavLink>
           <NavLink href={`${b}/reports/vat`}><Percent />ÁFA analitika</NavLink>
+          <NavLink href={`${b}/vehicles/kartonok`}><ReceiptText />Különbözeti ÁFA kartonok</NavLink>
+          <NavLink href={`${b}/vehicles/epr`}><Recycle />EPR összesítő</NavLink>
           <NavLink href={`${b}/reports/open-items`}><Clock />Nyitott tételek</NavLink>
 
           <div className="group">Főkönyv</div>
@@ -119,7 +122,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/reports/ledger`}><FileSpreadsheet />Számlakarton</NavLink>
 
           <div className="group">Törzsadatok</div>
-          <NavLink href={`${b}/vehicles`}><CarFront />Gépkocsi készlet</NavLink>
+          <NavLink href={`${b}/vehicles`} exact><CarFront />Gépkocsi készlet</NavLink>
           <NavLink href={`${b}/partners`}><Users />Partnerek</NavLink>
           <NavLink href={`${b}/accounts`}><ListTree />Számlatükör</NavLink>
           <NavLink href={`${b}/fx`}><Coins />Árfolyamok (MNB)</NavLink>
