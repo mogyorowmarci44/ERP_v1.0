@@ -3,14 +3,14 @@
  * A karton a nyilvántartási kötelezettséget (EPR-rendelet 26. §) és az OKIR negyedéves adatszolgáltatás
  * (KG:KGYF-NÉ) alátámasztását szolgálja: beszerzés (származás), első belföldi forgalomba hozatal, KF kód, tömeg, díj.
  */
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, between, eq, ilike, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import {
   eprDeadline, eprFee, eprKfCode, eprLiability, eprRate, quarterOf, quarterRange, rateTableFor,
-  EPR_INVOICE_TEXT, type EprCategory, type EprDrive, type EprOrigin, type EprStatus, type Quarter,
+  EPR_INVOICE_TEXT, EPR_EXPENSE_ACCOUNT, EPR_PARTNER_HINT, type EprCategory, type EprDrive, type EprOrigin, type EprStatus, type Quarter,
 } from "./epr";
 
-const { vehicles, invoices, invoiceLines, vatCodes, partners, companies } = schema;
+const { vehicles, invoices, invoiceLines, vatCodes, partners, companies, accounts } = schema;
 
 export type EprDoc = {
   invoiceId: number;
@@ -86,7 +86,7 @@ function build(company: EprCard["company"], vehicle: EprCard["vehicle"], rows: D
   const category = (["M1", "N1", "3W"].includes(vehicle.eprCategory ?? "") ? vehicle.eprCategory : null) as EprCategory | null;
   const drive = (["ice", "hev", "phev", "bev"].includes(vehicle.eprDrive ?? "") ? vehicle.eprDrive : null) as EprDrive | null;
   const massKg = vehicle.eprMassKg ?? null;
-  const flat = !!company.settings.eprFlatRate;
+  const flat = true; // a cégek díjátalányt fizetnek
 
   const sale = sales[0] ?? null;
   const status = eprLiability({ origin, saleDate: sale?.date ?? null, buyerCountry: sale?.partnerCountry ?? null, category });
@@ -96,21 +96,19 @@ function build(company: EprCard["company"], vehicle: EprCard["vehicle"], rows: D
   let kfCode: string | null = null, rate: number | null = null, rateLabel: string | null = null, fee: number | null = null;
   if (status.liable && category) {
     const d = drive ?? "ice";
-    kfCode = eprKfCode({ category, drive: d, year: vehicle.year, flat, originDigit: company.settings.eprOriginDigit ?? null });
+    kfCode = eprKfCode({ category, drive: d, year: vehicle.year, flat });
     rate = eprRate(placedOn!, category, d, flat);
-    rateLabel = `${rateTableFor(placedOn!).label} · ${flat ? "díjátalány" : "J01, átalány nélkül"}`;
+    rateLabel = `${rateTableFor(placedOn!).label} · díjátalány`;
     fee = massKg ? eprFee(massKg, rate) : null;
   }
 
   const checks: EprCard["checks"] = [];
   checks.push({ ok: status.liable !== null, text: status.reason });
   if (status.liable) {
-    if (!massKg) checks.push({ ok: false, text: "Hiányzik a tömeg (kg) – a díj nem számítható. Add meg a gépkocsinál a forgalmi engedély alapján." });
+    if (!massKg) checks.push({ ok: false, text: "Hiányzik a tömeg (kg) – a díj nem számítható. Add meg a gépkocsinál (forgalmi engedély G rovat, saját tömeg)." });
     if (!drive) checks.push({ ok: false, text: "Nincs megadva a hajtás – belső égésűként számolva." });
     if (!vehicle.year) checks.push({ ok: false, text: "Nincs évjárat – a KF csoportkód 1980 utáni gyártást feltételez." });
-    if (!company.settings.eprOriginDigit) checks.push({ ok: false, text: "A KF kód 8. karaktere (származáskód) nincs beállítva – Beállítások › EPR." });
     if (!rateTableFor(placedOn!).verified) checks.push({ ok: false, text: "A forgalomba hozatal napjára érvényes díjtétel nincs ellenőrizve (2025. október 1. előtti tábla)." });
-    if (!flat) checks.push({ ok: true, text: "Átalány nélkül: az akkumulátor, gumiabroncs és beépített elektromos eszközök EPR-díját külön KF kódon kell bevallani – ezt a karton nem számolja." });
     if (sale && !sale.partnerPrivate && !(sale.note ?? "").includes("kiterjesztett gyártói felelősségi díj"))
       checks.push({ ok: false, text: `Céges vevő: a számlán szerepelnie kell: „${EPR_INVOICE_TEXT}” (EPR-rendelet 21. § (2)).` });
   }
@@ -140,6 +138,8 @@ export type EprQuarter = {
   undecided: EprCard[]; // a negyedévben eladott, de nem eldönthető
   summary: EprSummaryRow[];
   totals: { count: number; massKg: number; fee: number };
+  /** Könyvelt MOHU-számlák (869-es sor) a negyedév elejétől a határidő utáni 90. napig – egyeztetéshez. */
+  mohu: { invoiceId: number; number: string; date: string; partner: string; netHuf: number }[];
 };
 
 /** Negyedéves EPR összesítő: a negyedévben eladott gépkocsik közül a kötelezettek, KF kódonként. */
@@ -175,8 +175,23 @@ export async function eprQuarter(companyId: number, quarter: Quarter): Promise<E
     map.set(k, s);
   }
   const summary = [...map.values()].sort((a, b) => a.kfCode.localeCompare(b.kfCode));
+  const deadline = eprDeadline(quarter);
+  const until = new Date(Date.parse(deadline + "T00:00:00Z") + 90 * 86400000).toISOString().slice(0, 10);
+  const mohuRows = await db
+    .select({ invoiceId: invoices.id, number: invoices.invoiceNumber, date: invoices.fulfillmentDate, partner: partners.name, net: invoiceLines.netHuf })
+    .from(invoiceLines)
+    .innerJoin(invoices, eq(invoices.id, invoiceLines.invoiceId))
+    .innerJoin(partners, eq(partners.id, invoices.partnerId))
+    .innerJoin(accounts, eq(accounts.id, invoiceLines.accountId))
+    .where(and(eq(invoices.companyId, companyId), eq(invoices.direction, "in"), eq(invoices.status, "posted"), eq(accounts.code, EPR_EXPENSE_ACCOUNT),
+      ilike(partners.name, `%${EPR_PARTNER_HINT}%`), between(invoices.fulfillmentDate, from, until)));
+  const mohu = [...mohuRows.reduce((m, r) => {
+    const x = m.get(r.invoiceId) ?? { invoiceId: r.invoiceId, number: r.number, date: r.date, partner: r.partner, netHuf: 0 };
+    x.netHuf += Number(r.net);
+    return m.set(r.invoiceId, x);
+  }, new Map<number, EprQuarter["mohu"][number]>()).values()];
   return {
-    company, quarter, deadline: eprDeadline(quarter), cards, undecided, summary,
+    company, quarter, deadline, cards, undecided, summary, mohu,
     totals: { count: cards.length, massKg: summary.reduce((a, s) => a + s.massKg, 0), fee: summary.reduce((a, s) => a + s.fee, 0) },
   };
 }

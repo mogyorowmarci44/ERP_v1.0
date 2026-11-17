@@ -1,7 +1,7 @@
 /** EPR karton (gépkocsinként) és negyedéves EPR összesítő – nyomtatható A4 álló lapok, a különbözeti ÁFA karton mintájára. */
 import Link from "next/link";
 import type { EprCard, EprDoc, EprQuarter } from "@/lib/epr-card";
-import { EPR_CATEGORY_LABEL, EPR_DRIVE_LABEL, quarterLabel, quarterRange } from "@/lib/epr";
+import { EPR_CATEGORY_LABEL, EPR_DRIVE_LABEL, EPR_EXPENSE_ACCOUNT, EPR_PARTNER_HINT, quarterLabel, quarterRange } from "@/lib/epr";
 import { fmtHuf, fmtNum } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
 import { vehicleIdent } from "@/lib/vehicle-id";
@@ -112,10 +112,13 @@ export function EprCardSheet({ card, cid, printedAt }: { card: EprCard; cid: num
 /** Negyedéves összesítő – az OKIR KG:KGYF-NÉ adatszolgáltatás kitöltéséhez, KF kódonként. */
 export function EprQuarterSheet({ data, cid, printedAt }: { data: EprQuarter; cid: number; printedAt: string }) {
   const { from, to } = quarterRange(data.quarter);
-  const flat = !!data.company.settings.eprFlatRate;
+  const mohuNet = data.mohu.reduce((a, m) => a + m.netHuf, 0);
+  const diff = mohuNet - data.totals.fee;
+  const q = `${data.quarter.year}. ${data.quarter.q}. n.év`;
+  const prefill = new URLSearchParams({ dir: "in", partner: EPR_PARTNER_HINT, acc: EPR_EXPENSE_ACCOUNT, vat: "27", desc: `EPR-díj gépjármű (díjátalány) ${q}`, amount: String(data.totals.fee), note: `EPR ${q} – ${data.totals.count} db, ${data.totals.massKg} kg` });
   return (
     <article className="mc-sheet">
-      <CompanyHead company={data.company} title="EPR negyedéves összesítő" sub={`Gépjármű termékáram · ${quarterLabel(data.quarter)} · ${flat ? "díjátalány" : "átalány nélkül"}`} />
+      <CompanyHead company={data.company} title="EPR negyedéves összesítő" sub={`Gépjármű termékáram · ${quarterLabel(data.quarter)} · díjátalány`} />
       <section className="mc-vehicle">
         <dl>
           <div><dt>Időszak</dt><dd>{fmtDate(from)} – {fmtDate(to)}</dd></div>
@@ -179,11 +182,26 @@ export function EprQuarterSheet({ data, cid, printedAt }: { data: EprQuarter; ci
         </>
       )}
 
+      <h2>{data.undecided.length > 0 ? "4" : "3"}. MOHU-számla és könyvelés</h2>
+      <p className="mc-note">
+        A díjat a MOHU számlázza az adatszolgáltatás alapján, a díj + 27% ÁFA (a koncessziós és az önkormányzati díjrész külön számlán érkezhet); fizetés a kézhezvételtől számított 15 napon belül.
+        Könyvelés: T {EPR_EXPENSE_ACCOUNT} Különféle egyéb ráfordítások (Szt. 81. § (2) e) – import áru első belföldi forgalomba hozatala) · T 466 előzetes ÁFA / K 454 szállító.
+      </p>
+      <table className="mc-calc">
+        <tbody>
+          <tr><td>Számított EPR-díj (nettó)</td><td className="num"><Ft v={data.totals.fee} /></td></tr>
+          {data.mohu.map((m) => (
+            <tr key={m.invoiceId}><td>Könyvelt MOHU-számla <Link href={`/c/${cid}/invoices/${m.invoiceId}`}>{m.number}</Link> · {fmtDate(m.date)}</td><td className="num"><Ft v={m.netHuf} /></td></tr>
+          ))}
+          {data.mohu.length === 0 && <tr className="muted-row"><td>Még nincs könyvelt MOHU-számla a {EPR_EXPENSE_ACCOUNT}-es számlán. <Link className="no-print" href={`/c/${cid}/invoices/new?${prefill}`}>Szállítói számla felvitele előkitöltve →</Link></td><td /></tr>}
+          {data.mohu.length > 0 && <tr className="sum"><td>Eltérés (MOHU − számított)</td><td className="num">{Math.abs(diff) < 1 ? "✓ egyezik" : <Ft v={diff} strong />}</td></tr>}
+        </tbody>
+      </table>
+
       <div className="mc-end">
         <p className="mc-note">
           Kötelezett: a külföldről behozott gépjármű első belföldi eladása. Belföldi beszerzésű és külföldre eladott gépkocsi nem szerepel.
-          A díjat a MOHU számlázza az adatszolgáltatás alapján – a számlát ezzel az összeggel egyeztesd.
-          {flat ? " A díjátalány a tartozékok, alkotórészek és a csomagolás díját is tartalmazza." : " Átalány nélkül az akkumulátor, gumiabroncs és beépített elektromos eszközök külön KF kódon szerepelnek – ezeket ez az összesítő nem tartalmazza."}
+          A díjátalány a tartozékok, alkotórészek (akkumulátor, gumiabroncs, elektromos eszközök) és a csomagolás díját is tartalmazza. A díjátalány választása egész naptári évre szól.
         </p>
         <Foot printedAt={printedAt} />
       </div>

@@ -85,10 +85,6 @@ export type CompanySettings = {
   representative?: string | null;
   representativeTitle?: string | null;
   signPlace?: string | null;
-  /** EPR – díjátalány-fizetés választása (egész naptári évre szól). */
-  eprFlatRate?: boolean | null;
-  /** EPR – a KF kód 8. karaktere (származáskód) külföldről behozott gépjárműre. */
-  eprOriginDigit?: string | null;
 };
 
 /** v2.0 – Adószámos magánszemély (pl. szálláshely-szolgáltatás) adózási profilja. */

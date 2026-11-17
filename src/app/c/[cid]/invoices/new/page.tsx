@@ -15,6 +15,8 @@ export default async function NewInvoicePage({ params, searchParams }: { params:
   const acc = (code: string) => o.accounts.find((a) => a.code === code)?.id ?? o.accounts[0]?.id ?? 0;
   const vat = (code: string) => o.vatCodes.find((v) => v.code === code)?.id ?? o.vatCodes[0]?.id ?? 0;
   const t = today();
+  // Előkitöltés query paraméterekből (pl. EPR összesítő → MOHU-számla): partner (névrészlet), acc, vat, desc, amount, note.
+  const pre = sp.partner ? o.partners.find((p) => p.name.toLowerCase().includes(sp.partner.toLowerCase())) : undefined;
   return (
     <>
       <h1>{dir === "out" ? "Új vevőszámla" : "Új szállítói számla / beszerzés"}</h1>
@@ -27,7 +29,7 @@ export default async function NewInvoicePage({ params, searchParams }: { params:
         defaults={d}
         {...o}
         initial={{
-          partnerId: null,
+          partnerId: pre?.id ?? null,
           invoiceNumber: "",
           issueDate: t,
           fulfillmentDate: t,
@@ -37,8 +39,15 @@ export default async function NewInvoicePage({ params, searchParams }: { params:
           exchangeRate: "",
           rateManual: false,
           periodic: false,
-          note: "",
-          lines: [{ description: "", quantity: "1", unitPrice: "", vatCodeId: vat(dir === "out" ? d.outVat : d.inVat), accountId: acc(dir === "out" ? d.outAcc : d.inAcc), vehicleId: null }],
+          note: sp.note ?? "",
+          lines: [{
+            description: sp.desc ?? "",
+            quantity: "1",
+            unitPrice: sp.amount ?? "",
+            vatCodeId: vat(sp.vat ?? (dir === "out" ? d.outVat : d.inVat)),
+            accountId: acc(sp.acc ?? (dir === "out" ? d.outAcc : d.inAcc)),
+            vehicleId: null,
+          }],
         }}
       />
     </>
