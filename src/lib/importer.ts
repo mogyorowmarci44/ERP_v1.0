@@ -8,6 +8,7 @@ import { db, schema, type Tx, type DbOrTx } from "@/db";
 import { addDaysIso } from "./dates";
 import { saveInvoiceDraft, postInvoice, payInvoice, manualEntry, invoiceOpenAmount, type InvoiceInput } from "./ledger";
 import { round2 } from "./money";
+import { saveAnnualReport } from "./annual-report";
 import { getMnbRate } from "./fx-service";
 import type { DraftLine } from "./posting";
 
@@ -110,6 +111,8 @@ export type ImportBundle = {
   log?: string[][];
   /** v2.0 – magánszemély (vendégház) adózási profiljának kiegészítése, pl. az ingatlan adatai. Csak a megadott kulcsok íródnak felül. */
   taxProfilePatch?: Partial<import("@/db/schema").TaxProfile>;
+  /** v2.2 – Éves beszámoló fejléc + kiegészítő melléklet évenként (upsert: a meglévő ugyanazon évi változatot felülírja). */
+  annualReports?: Array<{ year: number; meta: import("@/db/schema").AnnualReportMeta; sections: import("@/db/schema").AnnualSection[] }>;
 };
 
 export type ImportReport = {
@@ -350,6 +353,11 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
     if (bundle.memberLoanRepayments?.length) {
       const n = await writeLoanRepayments(tx, companyId, bundle.memberLoanRepayments, report.warnings);
       for (let i = 0; i < n; i++) count("tagi kölcsön visszafizetés");
+    }
+
+    for (const a of bundle.annualReports ?? []) {
+      await saveAnnualReport(companyId, a.year, a.meta, a.sections, userId ?? null, tx);
+      count("éves beszámoló / kiegészítő melléklet");
     }
 
     // ELÁBÉ összevetés: a forrás számított ELÁBÉ-ja vs. az app könyv szerinti értéke

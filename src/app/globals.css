@@ -658,6 +658,43 @@ a.lp-money:hover { filter: brightness(1.06); }
 .sk-click:hover .sk-node { opacity: 0.85; }
 .sk-toggle { fill: var(--accent); font-weight: 700; }
 
+/* v2.2 – Éves beszámoló (fedlap, mérleg, EK, kiegészítő melléklet) */
+.ar-sheet .ar-version { color: #b4471a; font-weight: 500; }
+.ar-docmark { grid-column: 1 / -1; }
+.ar-statement th.ar-no, .ar-statement td.ar-no { width: 34px; color: #8a96a6; font-variant-numeric: tabular-nums; }
+.ar-statement td.ar-indent { padding-left: 22px; }
+.ar-statement tr.ar-sub td { color: #3d4957; font-size: 0.94em; }
+.ar-statement tr.ar-subtotal td { font-weight: 600; }
+.ar-statement tr.ar-total td { font-weight: 700; border-top: 1px solid #c9d1dc; background: #f6f8fa; }
+.ar-statement tr.ar-check td { color: #b4471a; }
+.ar-statement td.num { font-variant-numeric: tabular-nums; }
+.ar-statement td.ar-diff { color: #b4471a; font-weight: 600; }
+.ar-cover { display: flex; flex-direction: column; min-height: 250mm; }
+.ar-cover-id dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0; font-size: 11.5px; }
+.ar-cover-id dt { color: #5b6878; }
+.ar-cover-id dd { margin: 0; font-family: var(--mono, ui-monospace, monospace); }
+.ar-cover-main { text-align: center; margin: 46mm 0 18mm; }
+.ar-cover-name { font-size: 22px; font-weight: 700; }
+.ar-cover-main h1 { font-size: 26px; color: var(--accent); margin: 26px 0 6px; }
+.ar-cover-period { font-size: 15px; font-weight: 500; }
+.ar-cover-version { margin-top: 14px; font-size: 12.5px; }
+.ar-cover-fig { margin: 0 auto; max-width: 380px; }
+.ar-cover-parts { margin-top: auto; font-size: 11px; color: #5b6878; display: grid; gap: 3px; }
+.ar-notes h2 { font-size: 13.5px; margin: 16px 0 6px; padding-bottom: 2px; border-bottom: 1px solid #e3e8ef; }
+.ar-notes h3 { font-size: 12px; margin: 10px 0 4px; }
+.ar-notes p { margin: 0 0 6px; line-height: 1.45; text-align: justify; }
+.ar-notes ul { margin: 0 0 6px; padding-left: 18px; line-height: 1.45; }
+.ar-table { margin: 4px 0 10px; }
+.ar-table td:first-child, .ar-table td:nth-child(2) { white-space: normal; }
+.ar-table tr.ar-total td { font-weight: 700; border-top: 1px solid #c9d1dc; }
+.ar-section { break-inside: auto; }
+.ar-editor textarea { width: 100%; min-height: 60vh; font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; line-height: 1.5; }
+.ar-editor .grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 14px; }
+@media print {
+  .ar-cover { min-height: 270mm; }
+  .ar-notes h2, .ar-notes h3 { break-after: avoid; }
+  .ar-table { break-inside: avoid; }
+
 /* v2.2 – Pénztár és bank: kattintható csempe, napi lenyíló jelentés */
 .click-card { cursor: pointer; transition: border-color .12s, box-shadow .12s; }
 .click-card:hover { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }

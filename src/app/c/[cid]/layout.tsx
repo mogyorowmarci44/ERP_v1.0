@@ -28,6 +28,7 @@ import {
   Star,
   ReceiptText,
   Recycle,
+  BookOpenCheck,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
 import { APP_VERSION } from "@/lib/version";
@@ -111,6 +112,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
 
           <div className="group">Kimutatások</div>
           <NavLink href={`${b}/reports/statements`}><ChartNoAxesCombined />P&amp;L, cash-flow, mérleg</NavLink>
+          <NavLink href={`${b}/reports/annual`}><BookOpenCheck />Éves beszámoló</NavLink>
           <NavLink href={`${b}/reports/trial-balance`}><Scale />Főkönyvi kivonat</NavLink>
           <NavLink href={`${b}/reports/vat`}><Percent />ÁFA analitika</NavLink>
           <NavLink href={`${b}/vehicles/kartonok`}><ReceiptText />Különbözeti ÁFA kartonok</NavLink>

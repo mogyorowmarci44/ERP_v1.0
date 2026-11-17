@@ -190,7 +190,11 @@ export function fiscalYearStartOf(date: string, startMonth: number): string {
   return `${year}-${String(startMonth).padStart(2, "0")}-01`;
 }
 
-export function buildBalanceSheet(rows: DailyRow[], cols: Bucket[], fiscalStartMonth: number, from: string): Statement {
+/**
+ * opts.netVat: az ÁFA számlák (466/467/468) nettó egyenlege egy tételként – az éves beszámolóban így (a fordulónapi
+ * bevallás szerinti elszámolással) kell kimutatni; az évközi kimutatás alapértelmezésben bruttó (követelés + kötelezettség).
+ */
+export function buildBalanceSheet(rows: DailyRow[], cols: Bucket[], fiscalStartMonth: number, from: string, opts: { netVat?: boolean } = {}): Statement {
   const L = new Ledger(rows);
   // Oszlopok: nyitó (from előtti nap vége) + minden időszak vége
   const dates = [addDays(from, -1), ...cols.map((c) => c.end)];
@@ -203,7 +207,12 @@ export function buildBalanceSheet(rows: DailyRow[], cols: Bucket[], fiscalStartM
   const tax46 = dates.map((d) => {
     let deb = 0,
       cred = 0;
-    for (const [, v] of L.balByGroup(pre("46"), d, 3)) v >= 0 ? (deb += v) : (cred += -v);
+    const g = new Map<string, number>();
+    for (const [k, v] of L.balByGroup(pre("46"), d, 3)) {
+      const key = opts.netVat && (k === "466" || k === "467" || k === "468") ? "46AFA" : k;
+      g.set(key, (g.get(key) ?? 0) + v);
+    }
+    for (const [, v] of g) v >= 0 ? (deb += v) : (cred += -v);
     return { deb: round2(deb), cred: round2(cred) };
   });
 
