@@ -6,13 +6,12 @@
  *   Használtautó-kereskedőnél: külföldről behozott autó belföldi eladása. Belföldön vett autó → már forgalomba hozták.
  *   Külföldre (export / Közösségen belüli) eladott autó → nincs belföldi forgalomba hozatal.
  * - Hatály: M1, N1 és háromkerekű (motoros tricikli kivételével) gépjármű.
- * - Díj: Ft/kg × tömeg. A cégek DÍJÁTALÁNYT fizetnek (80/2023. 20. § (3a)) – ez a tartozékok, alkotórészek
- *   (akkumulátor, gumi, elektromos eszközök) és a csomagolás díját is tartalmazza, ezért azokat nem kell külön bevallani.
- *   Az átalány nélküli (J01) ág csak a régi adatok / tesztek miatt maradt a függvényekben.
+ * - Díj: Ft/kg × tömeg. Választható díjátalány (egész naptári évre), ami a tartozékok, alkotórészek
+ *   (akkumulátor, gumi, elektromos eszközök) és a csomagolás díját is tartalmazza. Átalány nélkül azokat külön kell bevallani.
  * - Adatszolgáltatás: negyedévente, a tárgynegyedévet követő hónap 20-áig (OKIR, KG:KGYF-NÉ). A díjat a MOHU számlázza.
  *
- * KF kód: 80/2023. 1. melléklet 2.4.5 (csoportkód), 2.5 (7. karakter: 1 = kollektív), 2.6 (8. karakter: 5 = külföldről behozott, önálló).
- * ⚠ A 2025. október 1. előtti díjtábla nincs ellenőrizve.
+ * ⚠ DRAFT: a díjtáblák és a KF-kód 5–8. karaktere a nyilvános forrásokból összerakott állapot – élesítés előtt
+ *   a hatályos 80/2023. 1. melléklet 2.4.5 / 2.5 / 2.6 pontjával és a 8/2023. EM 1–2. mellékletével egyeztetendő.
  */
 
 export type EprCategory = "M1" | "N1" | "3W";
@@ -76,7 +75,7 @@ const ANYAGARAM: Record<EprCategory, string> = { M1: "10", N1: "20", "3W": "30" 
 /**
  * Csoportkód (5–6. karakter): 1980 előtt gyártott „1x”, utána „2x”; x = 0 átalány nélkül,
  * átalánynál 1 belső égésű, 2 M1 tölthető hibrid, 3 M1 nem tölthető hibrid, 4 N1/háromkerekű részben el., 5 tisztán el.
- * (80/2023. 1. melléklet 2.4.5, a 435/2023. Korm. rendelettel megállapított bontás.)
+ * (A 435/2023. Korm. rendelettel bevezetett bontás; az 5-ös kód következtetett – ellenőrizendő.)
  */
 export function eprGroupCode(year: number | null, flat: boolean, category: EprCategory, drive: EprDrive): string {
   const decade = year !== null && year < 1980 ? "1" : "2";
@@ -87,18 +86,13 @@ export function eprGroupCode(year: number | null, flat: boolean, category: EprCa
   return decade + x;
 }
 
-/** KF kód 7. karakter: 1 = kollektív teljesítés (MOHU). 8. karakter: 5 = külföldről behozott, önállóan forgalomba hozott termék. */
-export const EPR_OBLIGATION_CODE = "1";
-export const EPR_ORIGIN_IMPORT = "5";
-
-/** 8 jegyű KF kód: 15 (gépjármű) + anyagáram + csoport + kötelezettség + származás. */
-export function eprKfCode(args: { category: EprCategory; drive: EprDrive; year: number | null; flat: boolean }): string {
-  return "15" + ANYAGARAM[args.category] + eprGroupCode(args.year, args.flat, args.category, args.drive) + EPR_OBLIGATION_CODE + EPR_ORIGIN_IMPORT;
+/**
+ * 8 jegyű KF kód: 15 (gépjármű) + anyagáram + csoport + 7. kötelezettség (1 = kollektív teljesítés) + 8. származás.
+ * A származáskódot a cég beállításaiból kapjuk; ha nincs megadva, „?” kerül a helyére.
+ */
+export function eprKfCode(args: { category: EprCategory; drive: EprDrive; year: number | null; flat: boolean; originDigit: string | null }): string {
+  return "15" + ANYAGARAM[args.category] + eprGroupCode(args.year, args.flat, args.category, args.drive) + "1" + (args.originDigit?.trim() || "?");
 }
-
-/** Könyvelés: külföldről beszerzett áru első belföldi forgalomba hozatalának EPR-díja egyéb ráfordítás (Szt. 81. § (2) e)). */
-export const EPR_EXPENSE_ACCOUNT = "869";
-export const EPR_PARTNER_HINT = "MOHU";
 
 export function eprFee(massKg: number, rate: number): number {
   return Math.round(massKg * rate);

@@ -39,18 +39,20 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
-## v2.0.1 – EPR (kiterjesztett gyártói felelősség) – gépjármű, díjátalány
+## v2.0.1 – EPR (kiterjesztett gyártói felelősség) – gépjármű · DRAFT
 
 A különbözeti ÁFA karton mintájára: **EPR karton gépkocsinként** és **negyedéves EPR összesítő** (OKIR KG:KGYF-NÉ, határidő a negyedévet követő hónap 20-a).
 
 | Terület | Funkció |
 |---|---|
-| Gépkocsi adatok | EPR kategória (M1 / N1 / háromkerekű), hajtás (belső égésű / HEV / PHEV / BEV), tömeg (forgalmi G rovat, saját tömeg), származás (automatikus a beszerzési számla partnerének országából, vagy kézzel) |
+| Gépkocsi adatok | EPR kategória (M1 / N1 / háromkerekű), hajtás (belső égésű / HEV / PHEV / BEV), tömeg (kg), származás (automatikus a beszerzési számla partnerének országából, vagy kézzel) |
 | Kötelezettség | Külföldről behozott autó első belföldi eladása; belföldi beszerzés és külföldi vevő → nem kötelezett; hiányzó adat → „nem eldönthető” lista |
-| Díj | Csak díjátalány (tartalmazza az akku, gumi, elektromos alkatrészek és a csomagolás díját): Ft/kg × tömeg, a forgalomba hozatal napja szerinti táblából (2025. 10. 01-től pl. M1 belső égésű 44,89 Ft/kg) |
-| KF kód | 15 · anyagáram (10 M1 / 20 N1 / 30 háromkerekű) · csoport (21–25 hajtás szerint, 1980 előtt 11–15) · 1 kollektív · 5 import (80/2023. 1. melléklet 2.4.5, 2.5, 2.6) |
-| MOHU-számla | Előkitöltött szállítói számla (MOHU partner, 869, 27%), egyeztetés a számított díjjal az összesítőn |
-| Ellenőrzések | Hiányzó tömeg/évjárat/hajtás, ellenőrizetlen (2025. 10. 01. előtti) díjtábla, céges vevőnél a számla EPR-szövege |
+| Díj | Ft/kg × tömeg, díjtábla a forgalomba hozatal napja szerint (2025. 10. 01-től: 36 Ft/kg, ill. díjátalány pl. M1 belső égésű 44,89 Ft/kg) |
+| KF kód | 15 + anyagáram + csoport (1980 előtt/után, átalány szerint) + 1 (kollektív) + származáskód (Beállítások) |
+| Beállítások | Díjátalány választása (egész évre), KF 8. karakter |
+| Ellenőrzések | Hiányzó tömeg/évjárat/hajtás, ellenőrizetlen díjtábla, céges vevőnél a számla EPR-szövege |
+
+⚠ Élesítés előtt egyeztetendő: a KF csoport- és származáskód (80/2023. 1. melléklet 2.4.5, 2.6) és a 2025. október előtti díjtábla.
 
 ## Ütemterv
 

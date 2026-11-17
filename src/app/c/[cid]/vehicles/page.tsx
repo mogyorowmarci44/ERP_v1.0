@@ -58,7 +58,7 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
             {Object.entries(EPR_DRIVE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
         </label>
-        <label title="Forgalmi engedély G rovat (saját tömeg), kg – az EPR-díj alapja.">EPR tömeg (kg, forgalmi G)<input name="eprMassKg" type="number" min={0} className="num" defaultValue={edit?.eprMassKg ?? ""} /></label>
+        <label title="A forgalmi engedély szerinti tömeg kg-ban – a díj alapja.">EPR tömeg (kg)<input name="eprMassKg" type="number" min={0} className="num" defaultValue={edit?.eprMassKg ?? ""} /></label>
         <label title="Üresen: a beszerzési számla eladójának országából (HU = belföldi, egyéb = import).">EPR származás
           <select name="eprOrigin" defaultValue={edit?.eprOrigin ?? ""}>
             <option value="">automatikus (beszerzési számlából)</option>

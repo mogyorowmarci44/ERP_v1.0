@@ -342,7 +342,11 @@ export async function updateCompanyAction(fd: FormData) {
     await db
       .update(schema.companies)
       .set({
-        settings: { ...cur.settings, representative: optStr(fd, "representative"), representativeTitle: optStr(fd, "representativeTitle"), signPlace: optStr(fd, "signPlace") },
+        settings: {
+          ...cur.settings, representative: optStr(fd, "representative"), representativeTitle: optStr(fd, "representativeTitle"), signPlace: optStr(fd, "signPlace"),
+          // EPR mezők csak társaságnál szerepelnek az űrlapon – magánszemélynél a meglévő érték marad.
+          ...(fd.has("eprOriginDigit") ? { eprFlatRate: fd.get("eprFlatRate") === "on", eprOriginDigit: optStr(fd, "eprOriginDigit") } : {}),
+        },
         name: str(fd, "name"),
         taxNumber: optStr(fd, "taxNumber"),
         euVatNumber: optStr(fd, "euVatNumber"),

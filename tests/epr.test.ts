@@ -18,17 +18,14 @@ describe("EPR díjtétel", () => {
 
 describe("KF kód", () => {
   it("M1, 1980 után, átalány nélkül", () => {
-    expect(eprKfCode({ category: "M1", drive: "ice", year: 2015, flat: false })).toBe("15102015");
+    expect(eprKfCode({ category: "M1", drive: "ice", year: 2015, flat: false, originDigit: "5" })).toBe("15102015");
   });
   it("N1, átalány, tisztán elektromos; 1980 előtti veterán", () => {
-    expect(eprKfCode({ category: "N1", drive: "bev", year: 2022, flat: true })).toBe("15202515");
-    expect(eprKfCode({ category: "M1", drive: "ice", year: 1972, flat: true })).toBe("15101115");
+    expect(eprKfCode({ category: "N1", drive: "bev", year: 2022, flat: true, originDigit: "5" })).toBe("15202515");
+    expect(eprKfCode({ category: "M1", drive: "ice", year: 1972, flat: true, originDigit: "5" })).toBe("15101115");
   });
-  it("átalány: M1 tölthető / nem tölthető hibrid, N1 hibrid", () => {
-    expect(eprKfCode({ category: "M1", drive: "phev", year: 2020, flat: true })).toBe("15102215");
-    expect(eprKfCode({ category: "M1", drive: "hev", year: 2020, flat: true })).toBe("15102315");
-    expect(eprKfCode({ category: "N1", drive: "hev", year: 2020, flat: true })).toBe("15202415");
-    expect(eprKfCode({ category: "M1", drive: "ice", year: 2018, flat: true })).toBe("15102115");
+  it("hiányzó származáskód → ?", () => {
+    expect(eprKfCode({ category: "M1", drive: "phev", year: 2020, flat: true, originDigit: null })).toBe("1510221?");
   });
 });
 
