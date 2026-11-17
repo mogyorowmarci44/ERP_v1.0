@@ -39,7 +39,7 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
-## v2.0.1 – EPR (kiterjesztett gyártói felelősség) – gépjármű · DRAFT
+## v2.1.0 – EPR (kiterjesztett gyártói felelősség) – gépjármű · DRAFT
 
 A különbözeti ÁFA karton mintájára: **EPR karton gépkocsinként** és **negyedéves EPR összesítő** (OKIR KG:KGYF-NÉ, határidő a negyedévet követő hónap 20-a).
 
