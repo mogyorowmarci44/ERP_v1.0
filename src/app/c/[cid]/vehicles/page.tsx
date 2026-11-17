@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireCompany } from "@/lib/auth";
 import { vehicleStock } from "@/lib/reports";
-import { saveVehicleAction } from "../actions";
+import { saveVehicleAction, fillVehiclesFromVinAction } from "../actions";
 import { Flash } from "@/components/Flash";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
@@ -25,6 +25,10 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
         <div className="row">
           <Link className="btn" href={`/c/${cid}/vehicles/kartonok`}>Különbözeti ÁFA kartonok (időszak)</Link>
           <Link className="btn" href={`/c/${cid}/vehicles/epr`}>EPR összesítő (negyedév)</Link>
+          <form action={fillVehiclesFromVinAction}>
+            <input type="hidden" name="cid" value={cid} />
+            <button title="Csak az üres mezőket tölti: gyártmány, évjárat (VIN 10. karakter), EPR M1 / belső égésű. A tömeget nem.">Kitöltés alvázszám alapján</button>
+          </form>
           <Link className="btn" href={`/c/${cid}/vehicles${sp.all ? "" : "?all=1"}`}>{sp.all ? "Csak készleten" : "Eladottakkal együtt"}</Link>
         </div>
       </div>

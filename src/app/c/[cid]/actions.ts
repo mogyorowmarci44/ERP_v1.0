@@ -28,6 +28,7 @@ import { extendLoan, recordMemberLoan, revalueMemberLoans, setLoanDueDate, undoL
 import { invoiceAudit } from "@/lib/invoice-audit";
 import { updateEntryMeta, renameInvoiceLine, setEntryChecked, updateManualEntry, reopenInvoice, logInvoiceRepost, editPayment, type EntryLineInput } from "@/lib/journal-edit";
 import { DEFAULT_TAX_PROFILE, isPrivate, taxProfileFromForm } from "@/lib/entity";
+import { decodeVin, sameMake } from "@/lib/vin";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
@@ -85,6 +86,47 @@ export async function saveVehicleAction(fd: FormData) {
     else await db.insert(schema.vehicles).values(values);
     revalidatePath(`/c/${cid}/vehicles`);
     return `/c/${cid}/vehicles?ok=${encodeURIComponent("Gépkocsi mentve.")}`;
+  });
+}
+
+/**
+ * Alvázszám alapján kitölthető adatok az összes gépkocsin (csak az ÜRES mezők):
+ * gyártmány (ha üres / „Gépkocsi”), évjárat (VIN 10. karakter), EPR kategória M1, hajtás belső égésű.
+ * A tömeget a VIN nem tartalmazza – az kézi adat marad.
+ */
+export async function fillVehiclesFromVinAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/vehicles?all=1`, async () => {
+    const list = await db.select().from(schema.vehicles).where(eq(schema.vehicles.companyId, cid));
+    let years = 0, makes = 0, epr = 0, vins = 0;
+    const bad: string[] = [], mismatch: string[] = [];
+    for (const v of list) {
+      const set: Partial<typeof schema.vehicles.$inferInsert> = {};
+      if (!v.eprCategory) set.eprCategory = "M1";
+      if (!v.eprDrive) set.eprDrive = "ice";
+      if (set.eprCategory || set.eprDrive) epr++;
+      const d = decodeVin(v.vin);
+      if (v.vin?.trim() && !d) bad.push(`${v.make} ${v.model} (${v.vin})`);
+      if (d) {
+        if (d.vin !== v.vin) { set.vin = d.vin; vins++; }
+        if (!v.year && d.year) { set.year = d.year; years++; }
+        const placeholder = !v.make.trim() || v.make === "Gépkocsi";
+        if (d.make && placeholder) { set.make = d.make; makes++; }
+        else if (d.make && !sameMake(v.make, d.make)) mismatch.push(`${v.make} ${v.model}: VIN szerint ${d.make} (${d.vin})`);
+      }
+      if (Object.keys(set).length) await db.update(schema.vehicles).set(set).where(and(eq(schema.vehicles.id, v.id), eq(schema.vehicles.companyId, cid)));
+    }
+    revalidatePath(`/c/${cid}/vehicles`);
+    const msg = [
+      `${list.length} gépkocsi átnézve: évjárat ${years}, gyártmány ${makes}, EPR M1/belső égésű ${epr}, alvázszám formázva ${vins}.`,
+      "A tömeget (kg) a VIN nem tartalmazza – a forgalmi G rovatából kell beírni.",
+    ];
+    const warn = [
+      ...(mismatch.length ? [`⚠ ${mismatch.length} eltérő gyártmány: ${mismatch.slice(0, 5).join("; ")}${mismatch.length > 5 ? " …" : ""}`] : []),
+      ...(bad.length ? [`⚠ ${bad.length} hibás alvázszám (nem 17 karakter / I, O, Q betű): ${bad.slice(0, 5).join("; ")}${bad.length > 5 ? " …" : ""}`] : []),
+    ];
+    return `/c/${cid}/vehicles?all=1&ok=${encodeURIComponent(msg.join(" "))}${warn.length ? `&error=${encodeURIComponent(warn.join(" "))}` : ""}`;
   });
 }
 
