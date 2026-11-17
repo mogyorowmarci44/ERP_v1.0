@@ -10,6 +10,7 @@ import { fmtDate, monthEnd, monthStart, today, yearStart } from "@/lib/dates";
 import { isPrivate } from "@/lib/entity";
 import { nextVatDeadline } from "@/lib/vat-deadline";
 import { GhOverview } from "./gh/Overview";
+import { cashSplit } from "@/lib/cash-split";
 
 const INBOX_TODO = ["review", "error", "new", "extracted"];
 const STALE_DAYS = 90;
@@ -25,13 +26,14 @@ const toHuf = (r: { currency: string; openFx: number; grossHuf: string | number;
 /** Ezer forintra kerekítve, „eFt” egységgel. */
 const eFtFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0, useGrouping: "always" }); // 4 jegyű számot is tagol (8 412)
 const eFt = (n: number) => `${eFtFmt.format(Math.round(n / 1000) || 0)} eFt`;
+const eurFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0, useGrouping: "always" });
 
 export default async function Dashboard({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
   const { company } = await requireCompany(cid);
   const t = today();
   if (isPrivate(company)) return <GhOverview cid={cid} profile={company.taxProfile} sp={await searchParams} />;
-  const [tb, recv, pay, stock, vat, [inbox], [drafts], [last]] = await Promise.all([
+  const [tb, recv, pay, stock, vat, [inbox], [drafts], [last], money] = await Promise.all([
     trialBalance(cid, yearStart(t), t),
     openItems(cid, "out"),
     openItems(cid, "in"),
@@ -40,9 +42,9 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
     db.select({ n: count() }).from(schema.inboxDocuments).where(and(eq(schema.inboxDocuments.companyId, cid), inArray(schema.inboxDocuments.status, INBOX_TODO))),
     db.select({ n: count() }).from(schema.invoices).where(and(eq(schema.invoices.companyId, cid), eq(schema.invoices.status, "draft"))),
     db.select({ at: max(schema.journalEntries.createdAt) }).from(schema.journalEntries).where(eq(schema.journalEntries.companyId, cid)),
+    cashSplit(cid, t),
   ]);
   const bal = (pred: (code: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
-  const cash = bal((c) => c.startsWith("38"));
   const revenue = -bal((c) => c.startsWith("9"));
   const costs = bal((c) => c.startsWith("5") || c.startsWith("8"));
   const result = revenue - costs;
@@ -104,7 +106,16 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
       </div>
 
       <div className="grid cols-4 lp-kpi">
-        <div className="card stat primary"><div className="label">Pénzeszközök</div><div className="value">{eFt(cash)}</div></div>
+        {money.map((m) => (
+          <Link key={m.key} href={`${b}/money`} className="card stat primary lp-money" title={m.accounts.length ? `Számlák: ${m.accounts.join(", ")}` : "Nincs ilyen pénzeszköz-számla"}>
+            <div className="label">{m.label}</div>
+            {m.fx === null
+              ? <div className={m.huf < 0 ? "value neg" : "value"}>{eFt(m.huf)}</div>
+              : <div className={m.fx < 0 ? "value neg" : "value"}>{eurFmt.format(m.fx)} €<small>{eFt(m.huf)}</small></div>}
+          </Link>
+        ))}
+      </div>
+      <div className="grid cols-3 lp-kpi">
         <div className="card stat"><div className="label">Készlet ({inStock.length} db)</div><div className="value">{eFt(stockValue)}</div></div>
         <div className="card stat"><div className="label">Eredmény (év, adózás előtt)</div><div className={result < 0 ? "value neg" : "value"}>{eFt(result)}</div></div>
         <div className="card stat"><div className="label">ÁFA egyenleg (tárgyhó)</div><div className="value">{eFt(vat.balance)}</div></div>
