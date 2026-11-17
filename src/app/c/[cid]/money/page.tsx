@@ -3,6 +3,7 @@ import { requireCompany } from "@/lib/auth";
 import { moneyMonitor } from "@/lib/money-monitor";
 import { GRAN_LABEL, MAX_COLUMNS, type Granularity } from "@/lib/statements";
 import { MiniLine } from "@/components/MiniLine";
+import { ClickCard } from "@/components/ClickCard";
 import { fmtHuf, fmtMoney } from "@/lib/money";
 import { fmtDate, isDate, today } from "@/lib/dates";
 import { addDays } from "@/lib/fx";
@@ -61,7 +62,7 @@ export default async function MoneyPage({ params, searchParams }: { params: Prom
 
       <div className="money-grid">
         {active.map((a) => (
-          <div key={a.id} className="card money-card">
+          <ClickCard key={a.id} className="card money-card" href={`${base}/${a.id}?from=${from}&to=${to}`} label={`${a.code} ${a.name} – napi bontás`}>
             <div className="head">
               <Link href={`${base}/${a.id}?from=${from}&to=${to}`}><strong>{a.code} {a.name}</strong></Link>
               <span className={`bal${a.balanceHuf < 0 ? " neg" : ""}`}>
@@ -87,7 +88,7 @@ export default async function MoneyPage({ params, searchParams }: { params: Prom
                 points={a.series.map((s) => ({ label: s.label, value: s.close, sub: `Be: ${fmtHuf(s.inflow)} Ft, ki: ${fmtHuf(s.outflow)} Ft` }))}
               />
             )}
-          </div>
+          </ClickCard>
         ))}
       </div>
 
@@ -122,7 +123,7 @@ export default async function MoneyPage({ params, searchParams }: { params: Prom
         </>
       )}
       <p className="muted" style={{ marginTop: 12 }}>
-        Számlára kattintva napi pénztár- és bankjelentés nyílik (nyitó, bevételek, kiadások, záró). A devizás számlák nem realizált árfolyam-különbözete
+        Egy csempére vagy számlára kattintva napi pénztár- és bankjelentés nyílik (nyitó, bevétel, kiadás, záró naponta), a napra kattintva a tételekkel. A devizás számlák nem realizált árfolyam-különbözete
         tájékoztató jellegű; könyvelni év végén, a fordulónapi értékelésnél kell.
       </p>
     </>
