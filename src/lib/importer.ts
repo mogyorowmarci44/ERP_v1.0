@@ -103,7 +103,9 @@ export type ImportBundle = {
   vehicles: Array<{ key: string; make: string; model: string; plate?: string | null; vin?: string | null; vatTreatment?: "margin" | "normal";
     purchaseDate?: string | null; purchasePrice?: number | null; note?: string;
     /** Devizás beszerzési ár (különbözeti adóalaphoz): forintra MNB-árfolyamon a megadott napon. */
-    purchasePriceFx?: { currency: string; amount: number; date: string } | null }>;
+    purchasePriceFx?: { currency: string; amount: number; date: string } | null;
+    /** EPR-adatok (opcionális): kategória, hajtás, díjalap tömeg (kg), származás felülírása. */
+    eprCategory?: "M1" | "N1" | "3W" | null; eprDrive?: "ice" | "hev" | "phev" | "bev" | null; eprMassKg?: number | null; eprOrigin?: "import" | "domestic" | null }>;
   documents: BundleDoc[];
   memberLoanTerms?: LoanTermsInput[];
   /** Tagi kölcsön visszafizetések (TKV): bizonylatszám és párosítás a TK szerződésekhez. */
@@ -111,6 +113,8 @@ export type ImportBundle = {
   log?: string[][];
   /** v2.0 – magánszemély (vendégház) adózási profiljának kiegészítése, pl. az ingatlan adatai. Csak a megadott kulcsok íródnak felül. */
   taxProfilePatch?: Partial<import("@/db/schema").TaxProfile>;
+  /** Cég-beállítások kiegészítése (pl. EPR díjátalány, származáskód). Csak a megadott kulcsok íródnak felül. */
+  companySettingsPatch?: Partial<import("@/db/schema").CompanySettings>;
   /** v2.2 – Éves beszámoló fejléc + kiegészítő melléklet évenként (upsert: a meglévő ugyanazon évi változatot felülírja). */
   annualReports?: Array<{ year: number; meta: import("@/db/schema").AnnualReportMeta; sections: import("@/db/schema").AnnualSection[] }>;
 };
@@ -137,6 +141,12 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
         await tx.update(schema.companies).set({ taxProfile: { ...c.taxProfile, ...bundle.taxProfilePatch } }).where(eq(schema.companies.id, companyId));
         count("adózási profil kiegészítés");
       } else report.warnings.push("Az adózási profil kiegészítése csak adószámos magánszemélynél alkalmazható – kihagyva.");
+    }
+
+    if (bundle.companySettingsPatch) {
+      const [c] = await tx.select({ settings: schema.companies.settings }).from(schema.companies).where(eq(schema.companies.id, companyId));
+      await tx.update(schema.companies).set({ settings: { ...c.settings, ...bundle.companySettingsPatch } }).where(eq(schema.companies.id, companyId));
+      count("cégbeállítás kiegészítés");
     }
 
     // --- Számlák, ÁFA-kódok -------------------------------------------------
@@ -187,7 +197,8 @@ export async function importBundle(companyId: number, bundle: ImportBundle, user
       const [ins] = await tx
         .insert(schema.vehicles)
         .values({ companyId, make: v.make, model: v.model, plate: v.plate ?? null, vin: v.vin ?? null, vatTreatment: v.vatTreatment ?? "margin",
-          purchaseDate: v.purchaseDate ?? null, purchasePrice: v.purchasePrice ?? null, note: v.note ?? null })
+          purchaseDate: v.purchaseDate ?? null, purchasePrice: v.purchasePrice ?? null, note: v.note ?? null,
+          eprCategory: v.eprCategory ?? null, eprDrive: v.eprDrive ?? null, eprMassKg: v.eprMassKg ?? null, eprOrigin: v.eprOrigin ?? null })
         .returning({ id: schema.vehicles.id });
       vehicleIds.set(v.key, ins.id);
       count("gépkocsi");
