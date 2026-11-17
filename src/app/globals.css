@@ -428,6 +428,13 @@ button.chk:hover { border-color: var(--accent); }
 .mc-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 26px; align-items: end; }
 .mc-sign { border-top: 1px solid #17202b; padding-top: 4px; font-size: 11px; color: #5b6878; }
 .mc-meta { grid-column: 1 / -1; font-size: 10px; color: #8a96a6; text-align: right; }
+.epr-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 12px; }
+.epr-box { background: #f6f8fa; border-radius: 6px; padding: 6px 8px; }
+.epr-num { font-weight: 600; font-size: 15px; }
+.epr-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.epr-card { break-inside: avoid; }
+.epr-card.warn { background: #fdf3ee; }
+.epr-card-title { font-weight: 600; font-size: 12px; }
 @page karton { size: A4 portrait; margin: 10mm; }
 @media print {
   html, body, .shell, .main { background: #fff !important; }
@@ -445,6 +452,9 @@ button.chk:hover { border-color: var(--accent); }
   .mc-foot { margin-top: 14px; gap: 30px; }
   .mc-checks { margin-top: 6px; padding: 5px 8px; }
   .mc-sheet:last-of-type { break-after: auto; }
+  .epr-num { font-size: 13px; }
+  .epr-cards { gap: 5px; }
+  .epr-box { padding: 4px 6px; }
   .mc-sheet a { color: inherit; }
 }
 .nowrap { white-space: nowrap; }

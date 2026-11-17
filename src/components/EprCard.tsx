@@ -109,82 +109,66 @@ export function EprCardSheet({ card, cid, printedAt }: { card: EprCard; cid: num
   );
 }
 
-/** Negyedéves összesítő – az OKIR KG:KGYF-NÉ adatszolgáltatás kitöltéséhez, KF kódonként. */
+/** Negyedéves összesítő (C layout): fent a fő számok, alatta gépkocsinkénti mini kartonok, végül a KF kódonkénti bontás az OKIR-hoz. */
 export function EprQuarterSheet({ data, cid, printedAt }: { data: EprQuarter; cid: number; printedAt: string }) {
   const { from, to } = quarterRange(data.quarter);
   const flat = !!data.company.settings.eprFlatRate;
   return (
     <article className="mc-sheet">
-      <CompanyHead company={data.company} title="EPR negyedéves összesítő" sub={`Gépjármű termékáram · ${quarterLabel(data.quarter)} · ${flat ? "díjátalány" : "átalány nélkül"}`} />
-      <section className="mc-vehicle">
-        <dl>
-          <div><dt>Időszak</dt><dd>{fmtDate(from)} – {fmtDate(to)}</dd></div>
-          <div><dt>Adatszolgáltatás határideje</dt><dd>{fmtDate(data.deadline)}</dd></div>
-          <div><dt>Felület</dt><dd>OKIR-kapu · KG:KGYF-NÉ</dd></div>
-        </dl>
+      <CompanyHead company={data.company} title={`EPR ${data.quarter.year} Q${data.quarter.q}`} sub={`Gépjármű termékáram · ${fmtDate(from)} – ${fmtDate(to)} · ${flat ? "díjátalány" : "átalány nélkül"}`} />
+
+      <section className="epr-metrics">
+        <div className="epr-box"><div className="mc-sub">Autó</div><div className="epr-num">{data.totals.count} db</div></div>
+        <div className="epr-box"><div className="mc-sub">Díj</div><div className="epr-num">{fmtHuf(data.totals.fee)} Ft</div></div>
+        <div className="epr-box"><div className="mc-sub">Tömeg</div><div className="epr-num">{fmtNum(data.totals.massKg)} kg</div></div>
+        <div className="epr-box"><div className="mc-sub">Határidő (OKIR)</div><div className="epr-num">{fmtDate(data.deadline)}</div></div>
       </section>
 
-      <h2>1. Összesítés KF kódonként</h2>
-      <table className="mc-table">
-        <thead><tr><th>KF kód</th><th>Kategória</th><th className="num">Darab</th><th className="num">Mennyiség (kg)</th><th className="num">Díjtétel</th><th className="num">EPR-díj</th></tr></thead>
-        <tbody>
-          {data.summary.map((s) => (
-            <tr key={s.kfCode}>
-              <td className="mono">{s.kfCode}</td>
-              <td>{EPR_CATEGORY_LABEL[s.category]}{s.missingMass ? <div className="mc-sub">⚠ {s.missingMass} db tömeg nélkül</div> : null}</td>
-              <td className="num">{s.count}</td>
-              <td className="num">{fmtNum(s.massKg)}</td>
-              <td className="num">{s.rate !== null ? `${fmtNum(s.rate)} Ft/kg` : "vegyes"}</td>
-              <td className="num">{fmtHuf(s.fee)}</td>
-            </tr>
-          ))}
-          {data.summary.length === 0 && <tr><td colSpan={6} className="muted">A negyedévben nem volt EPR-köteles forgalomba hozatal – nemleges adatszolgáltatás.</td></tr>}
-        </tbody>
-        <tfoot><tr><td colSpan={2}>Összesen</td><td className="num">{data.totals.count}</td><td className="num">{fmtNum(data.totals.massKg)}</td><td /><td className="num"><Ft v={data.totals.fee} strong /></td></tr></tfoot>
-      </table>
-
-      <h2>2. Tételes lista</h2>
-      <table className="mc-table">
-        <thead><tr><th>Forgalomba hozatal</th><th>Gépkocsi</th><th>Azonosító</th><th>Vevőszámla</th><th className="num">kg</th><th className="num">Díj</th></tr></thead>
-        <tbody>
-          {data.cards.map((c) => (
-            <tr key={c.vehicle.id}>
-              <td>{fmtDate(c.placedOn)}</td>
-              <td><Link href={`/c/${cid}/vehicles/${c.vehicle.id}/epr`}>{c.vehicle.make} {c.vehicle.model}{c.vehicle.year ? ` (${c.vehicle.year})` : ""}</Link><div className="mc-sub mono">{c.kfCode}</div></td>
-              <td className="mono">{vehicleIdent(c.vehicle)}</td>
-              <td>{c.sales[0]?.number}</td>
-              <td className="num">{c.massKg ? fmtNum(c.massKg) : "⚠"}</td>
-              <td className="num">{c.fee !== null ? fmtHuf(c.fee) : "–"}</td>
-            </tr>
-          ))}
-          {data.cards.length === 0 && <tr><td colSpan={6} className="muted">Nincs tétel.</td></tr>}
-        </tbody>
-      </table>
+      <section className="epr-cards">
+        {data.cards.map((c) => (
+          <div key={c.vehicle.id} className="epr-box epr-card">
+            <div className="epr-card-title">
+              <Link href={`/c/${cid}/vehicles/${c.vehicle.id}/epr`}>{c.vehicle.make} {c.vehicle.model}</Link> · <span className="mono">{vehicleIdent(c.vehicle)}</span>
+            </div>
+            <div className="mc-sub">{c.purchases[0]?.partnerCountry ?? "?"} → {c.sales[0]?.partnerCountry ?? "HU"} · {fmtDate(c.placedOn)} · <span className="mono">{c.kfCode}</span></div>
+            <div className="mc-sub">{c.massKg ? `${fmtNum(c.massKg)} kg` : "⚠ nincs tömeg"} · {c.fee !== null ? `${fmtHuf(c.fee)} Ft` : "–"}</div>
+          </div>
+        ))}
+        {data.cards.length === 0 && <p className="mc-note">A negyedévben nem volt EPR-köteles forgalomba hozatal – nemleges adatszolgáltatás.</p>}
+      </section>
 
       {data.undecided.length > 0 && (
         <>
-          <h2>3. Nem eldönthető – pótolandó adat</h2>
-          <table className="mc-table">
-            <thead><tr><th>Gépkocsi</th><th>Azonosító</th><th>Ok</th></tr></thead>
-            <tbody>
-              {data.undecided.map((c) => (
-                <tr key={c.vehicle.id}>
-                  <td><Link href={`/c/${cid}/vehicles?edit=${c.vehicle.id}`}>{c.vehicle.make} {c.vehicle.model}</Link></td>
-                  <td className="mono">{vehicleIdent(c.vehicle)}</td>
-                  <td>{c.status.reason}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h2>Nem eldönthető – pótolandó adat</h2>
+          <section className="epr-cards">
+            {data.undecided.map((c) => (
+              <div key={c.vehicle.id} className="epr-box epr-card warn">
+                <div className="epr-card-title"><Link href={`/c/${cid}/vehicles?edit=${c.vehicle.id}`}>{c.vehicle.make} {c.vehicle.model}</Link> · <span className="mono">{vehicleIdent(c.vehicle)}</span></div>
+                <div className="mc-sub">⚠ {c.status.reason}</div>
+              </div>
+            ))}
+          </section>
         </>
       )}
 
       <div className="mc-end">
-        <p className="mc-note">
-          Kötelezett: a külföldről behozott gépjármű első belföldi eladása. Belföldi beszerzésű és külföldre eladott gépkocsi nem szerepel.
-          A díjat a MOHU számlázza az adatszolgáltatás alapján – a számlát ezzel az összeggel egyeztesd.
-          {flat ? " A díjátalány a tartozékok, alkotórészek és a csomagolás díját is tartalmazza." : " Átalány nélkül az akkumulátor, gumiabroncs és beépített elektromos eszközök külön KF kódon szerepelnek – ezeket ez az összesítő nem tartalmazza."}
-        </p>
+        <h2>KF kódonként (OKIR KG:KGYF-NÉ)</h2>
+        <table className="mc-table">
+          <thead><tr><th>KF kód</th><th>Kategória</th><th className="num">Darab</th><th className="num">kg</th><th className="num">Díjtétel</th><th className="num">Díj</th></tr></thead>
+          <tbody>
+            {data.summary.map((s) => (
+              <tr key={s.kfCode}>
+                <td className="mono">{s.kfCode}</td>
+                <td>{EPR_CATEGORY_LABEL[s.category]}{s.missingMass ? <div className="mc-sub">⚠ {s.missingMass} db tömeg nélkül</div> : null}</td>
+                <td className="num">{s.count}</td>
+                <td className="num">{fmtNum(s.massKg)}</td>
+                <td className="num">{s.rate !== null ? `${fmtNum(s.rate)} Ft/kg` : "vegyes"}</td>
+                <td className="num">{fmtHuf(s.fee)}</td>
+              </tr>
+            ))}
+            {data.summary.length === 0 && <tr><td colSpan={6} className="muted">Nincs tétel.</td></tr>}
+          </tbody>
+        </table>
         <Foot printedAt={printedAt} />
       </div>
       <DocMark />
