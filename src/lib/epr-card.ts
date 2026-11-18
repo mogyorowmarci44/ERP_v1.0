@@ -107,7 +107,8 @@ function build(company: EprCard["company"], vehicle: EprCard["vehicle"], rows: D
   if (status.liable) {
     if (!massKg) checks.push({ ok: false, text: "Hiányzik a tömeg (kg) – a díj nem számítható. Add meg a gépkocsinál a forgalmi engedély alapján." });
     if (!drive) checks.push({ ok: false, text: "Nincs megadva a hajtás – belső égésűként számolva." });
-    if (!vehicle.year) checks.push({ ok: false, text: "Nincs évjárat – a KF csoportkód 1980 utáni gyártást feltételez." });
+    // A cégek csak 1980 után gyártott autókkal kereskednek: évjárat nélkül 1980 utáni gyártásként kezeljük (nem hiba).
+    if (!vehicle.year) checks.push({ ok: true, text: "Évjárat nincs megadva – 1980 utáni gyártásként kezelve (KF csoportkód 2x)." });
     if (!company.settings.eprOriginDigit) checks.push({ ok: false, text: "A KF kód 8. karaktere (származáskód) nincs beállítva – Beállítások › EPR." });
     if (!rateTableFor(placedOn!).verified) checks.push({ ok: false, text: "A forgalomba hozatal napjára érvényes díjtétel nincs ellenőrizve (2025. október 1. előtti tábla)." });
     if (!flat) checks.push({ ok: true, text: "Átalány nélkül: az akkumulátor, gumiabroncs és beépített elektromos eszközök EPR-díját külön KF kódon kell bevallani – ezt a karton nem számolja." });
