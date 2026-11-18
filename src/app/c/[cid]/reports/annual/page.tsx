@@ -5,6 +5,14 @@ import { AnnualCover, AnnualNotes, AnnualStatements } from "@/components/AnnualR
 import { PrintButton } from "@/components/PrintButton";
 import { Flash } from "@/components/Flash";
 import { today } from "@/lib/dates";
+import { isPrivate } from "@/lib/entity";
+import { assetMirrorSection } from "@/lib/assets";
+
+/** A következő fejezetszám a melléklet utolsó (arab számos) fejezete után – ugyanabban a formában („7.” vagy „7”). */
+const nextNo = (nos: string[]) => {
+  const last = [...nos].reverse().map((n) => /^(\d+)(\.?)$/.exec(n)).find(Boolean);
+  return last ? `${Number(last[1]) + 1}${last[2]}` : "";
+};
 
 /** Éves beszámoló: fedlap + mérleg + eredménykimutatás (főkönyvből) + kiegészítő melléklet (szerkeszthető szöveg). */
 export default async function AnnualReportPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -20,6 +28,10 @@ export default async function AnnualReportPage({ params, searchParams }: { param
   const printedAt = new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" });
   const years = Array.from(new Set([...stored, cur, cur - 1, cur - 2])).sort((a, b) => b - a);
   const part = sp.part === "notes" || sp.part === "statements" ? sp.part : "all";
+  // az eszköztükör a főkönyvi nyilvántartásból automatikusan a melléklet végére kerül (ha a mellékletben nincs saját)
+  const baseSections = rep?.sections ?? [];
+  const mirror = isPrivate(company) || baseSections.some((x) => /eszközt[üu]k[öo]r/i.test(x.title)) ? null : await assetMirrorSection(cid, year);
+  const sections = mirror ? [...baseSections, { ...mirror, no: nextNo(baseSections.map((x) => x.no)) }] : baseSections;
   const co = { name: company.name, address: company.address, taxNumber: company.taxNumber, registrationNumber: company.registrationNumber };
   return (
     <>
@@ -49,7 +61,7 @@ export default async function AnnualReportPage({ params, searchParams }: { param
       </form>
       {part === "all" && <AnnualCover company={co} meta={meta} figures={figures} printedAt={printedAt} />}
       {part !== "notes" && <AnnualStatements balance={balance} income={income} company={co} meta={meta} printedAt={printedAt} />}
-      {part !== "statements" && <AnnualNotes sections={rep?.sections ?? []} company={co} meta={meta} printedAt={printedAt} />}
+      {part !== "statements" && <AnnualNotes sections={sections} company={co} meta={meta} printedAt={printedAt} />}
     </>
   );
 }

@@ -30,6 +30,7 @@ import {
   ReceiptText,
   Recycle,
   BookOpenCheck,
+  Package,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
 import { APP_VERSION } from "@/lib/version";
@@ -123,6 +124,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <div className="group">Főkönyv</div>
           <NavLink href={`${b}/journal`} exact><BookOpen />Napló</NavLink>
           <NavLink href={`${b}/reports/ledger`}><FileSpreadsheet />Számlakarton</NavLink>
+          <NavLink href={`${b}/assets`}><Package />Tárgyi eszközök</NavLink>
           <NavLink href={`${b}/closing`}><BookOpenCheck />Évzárás</NavLink>
 
           <div className="group">Törzsadatok</div>
