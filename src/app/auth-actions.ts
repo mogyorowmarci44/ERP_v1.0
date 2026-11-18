@@ -3,20 +3,102 @@
 import { redirect } from "next/navigation";
 import { and, eq, sql as dsql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { createSession, destroySession, hashPassword, verifyPassword, requireUser } from "@/lib/auth";
+import { createSession, destroySession, hashPassword, verifyPassword, requireUser, startMfa, getPendingMfa, clearPendingMfa } from "@/lib/auth";
+import { verifyTotp, normalizeRecoveryCode, hashRecoveryCode } from "@/lib/totp";
 import { createCompany } from "@/lib/ledger";
 import { taxProfileFromForm } from "@/lib/entity";
 import { wipeCompanyData } from "@/lib/importer";
 import { runOrRedirect, str, optStr } from "@/lib/action-utils";
 
+const MFA_MAX_FAILS = 5;
+const MFA_LOCK_MIN = 15;
+
+function assertNotLocked(u: { mfaLockedUntil: Date | null }) {
+  if (u.mfaLockedUntil && u.mfaLockedUntil > new Date()) {
+    const min = Math.ceil((u.mfaLockedUntil.getTime() - Date.now()) / 60000);
+    throw new Error(`Túl sok hibás kód – a belépés ${min} percig zárolva.`);
+  }
+}
+
+/** 1. lépés: jelszó. Siker esetén a 2FA kód megadására (vagy első alkalommal a 2FA beállítására) irányít. */
 export async function loginAction(fd: FormData) {
   await runOrRedirect("/login", async () => {
     const email = str(fd, "email").toLowerCase();
     const [u] = await db.select().from(schema.users).where(eq(schema.users.email, email));
     if (!u || !(await verifyPassword(str(fd, "password"), u.passwordHash))) throw new Error("Hibás e-mail cím vagy jelszó.");
-    await createSession(u.id);
-    return "/";
+    assertNotLocked(u);
+    return startMfa(u);
   });
+}
+
+async function finishLogin(u: { id: number; sessionVersion: number }, set: Partial<typeof schema.users.$inferInsert> = {}) {
+  await db.update(schema.users).set({ mfaFailedCount: 0, mfaLockedUntil: null, lastLoginAt: new Date(), ...set }).where(eq(schema.users.id, u.id));
+  await clearPendingMfa();
+  await createSession(u);
+}
+
+async function registerFail(u: { id: number; mfaFailedCount: number }) {
+  const n = u.mfaFailedCount + 1;
+  const lock = n >= MFA_MAX_FAILS;
+  await db.update(schema.users)
+    .set({ mfaFailedCount: lock ? 0 : n, mfaLockedUntil: lock ? new Date(Date.now() + MFA_LOCK_MIN * 60000) : null })
+    .where(eq(schema.users.id, u.id));
+  return lock ? `Túl sok hibás kód – a belépés ${MFA_LOCK_MIN} percig zárolva.` : `Hibás kód (még ${MFA_MAX_FAILS - n} próbálkozás).`;
+}
+
+/** 2. lépés: a hitelesítő alkalmazás 6 jegyű kódja, vagy egy tartalékkód. */
+export async function verifyMfaAction(fd: FormData) {
+  await runOrRedirect("/login/2fa", async () => {
+    const p = await getPendingMfa();
+    if (!p || p.pending.stage !== "verify" || !p.user.totpSecret) {
+      await clearPendingMfa();
+      return "/login?error=" + encodeURIComponent("A belépési idő lejárt – add meg újra a jelszavad.");
+    }
+    const u = p.user;
+    assertNotLocked(u);
+    const code = str(fd, "code");
+    if (/^\d[\d\s]*$/.test(code)) {
+      const step = verifyTotp(u.totpSecret!, code, { afterStep: u.totpLastStep });
+      if (step === null) throw new Error(await registerFail(u));
+      await finishLogin(u, { totpLastStep: step });
+      return "/";
+    }
+    const norm = normalizeRecoveryCode(code);
+    if (norm.length !== 10) throw new Error(await registerFail(u));
+    const h = hashRecoveryCode(norm);
+    for (let i = 0; i < u.recoveryCodes.length; i++) {
+      if (u.recoveryCodes[i] === h) {
+        const left = u.recoveryCodes.filter((_, j) => j !== i);
+        await finishLogin(u, { recoveryCodes: left });
+        return `/?ok=${encodeURIComponent(`Beléptél tartalékkóddal – ${left.length} tartalékkód maradt.${left.length <= 3 ? " Kérd az admint a 2FA újrabeállítására." : ""}`)}`;
+      }
+    }
+    throw new Error(await registerFail(u));
+  });
+}
+
+/** Első belépéskor: a hitelesítő alkalmazás hozzáadásának megerősítése egy kóddal. */
+export async function confirmMfaSetupAction(fd: FormData) {
+  await runOrRedirect("/login/2fa/setup", async () => {
+    const p = await getPendingMfa();
+    if (!p || p.pending.stage !== "setup") {
+      await clearPendingMfa();
+      return "/login?error=" + encodeURIComponent("A beállítási idő lejárt – lépj be újra.");
+    }
+    if (p.user.totpEnabledAt) throw new Error("A kétlépcsős azonosítás már be van állítva.");
+    if (fd.get("saved") !== "on") throw new Error("Jelöld be, hogy elmentetted a tartalékkódokat.");
+    const step = verifyTotp(p.pending.secret, str(fd, "code"));
+    if (step === null) throw new Error("Hibás kód – ellenőrizd, hogy a telefon órája pontos-e, és próbáld a következő kóddal.");
+    const hashes = p.pending.codes.map((c) => hashRecoveryCode(normalizeRecoveryCode(c)));
+    await finishLogin(p.user, { totpSecret: p.pending.secret, totpEnabledAt: new Date(), totpLastStep: step, recoveryCodes: hashes });
+    return `/?ok=${encodeURIComponent("Kétlépcsős azonosítás bekapcsolva.")}`;
+  });
+}
+
+/** Félbehagyott 2FA lépés megszakítása (vissza a jelszóhoz). */
+export async function cancelMfaAction() {
+  await clearPendingMfa();
+  redirect("/login");
 }
 
 export async function logoutAction() {
@@ -35,8 +117,7 @@ export async function setupAction(fd: FormData) {
       .insert(schema.users)
       .values({ email: str(fd, "email").toLowerCase(), name: str(fd, "name"), passwordHash: await hashPassword(pw), isAdmin: true })
       .returning();
-    await createSession(u.id);
-    return "/";
+    return startMfa(u);
   });
 }
 
@@ -110,7 +191,9 @@ export async function changePasswordAction(fd: FormData) {
     if (!(await verifyPassword(str(fd, "current"), user.passwordHash))) throw new Error("A jelenlegi jelszó hibás.");
     const pw = str(fd, "password");
     if (pw.length < 10) throw new Error("Az új jelszó legalább 10 karakter legyen.");
-    await db.update(schema.users).set({ passwordHash: await hashPassword(pw) }).where(eq(schema.users.id, user.id));
+    // a többi eszközön lévő munkamenet kilép, ez az eszköz bejelentkezve marad
+    const [u] = await db.update(schema.users).set({ passwordHash: await hashPassword(pw), sessionVersion: dsql`${schema.users.sessionVersion} + 1` }).where(eq(schema.users.id, user.id)).returning();
+    await createSession(u);
     return `/?ok=${encodeURIComponent("Jelszó módosítva.")}`;
   });
 }

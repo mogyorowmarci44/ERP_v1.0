@@ -756,3 +756,11 @@ a.lp-money:hover { filter: brightness(1.06); }
 .md-out { color: #a3410f; }
 .print-only { display: none; }
 @media print { .print-only { display: table; width: 100%; } }
+
+/* v2.2 – 2FA és admin */
+.qr { width: 200px; height: 200px; background: #fff; padding: 6px; border-radius: 8px; }
+.qr svg { display: block; width: 100%; height: 100%; }
+table.access-matrix th.co { min-width: 140px; }
+table.access-matrix td select { min-width: 130px; }
+.role-owner { color: var(--pos, inherit); font-weight: 600; }
+.role-none { color: var(--muted); }

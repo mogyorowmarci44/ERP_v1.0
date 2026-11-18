@@ -127,6 +127,13 @@
       "when": 1794917722285,
       "tag": "0017_v2_annual_report",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794991718941,
+      "tag": "0018_v2_2fa",
+      "breakpoints": true
     }
   ]
 }

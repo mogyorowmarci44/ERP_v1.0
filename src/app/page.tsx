@@ -42,6 +42,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           <span className="version-tag">v{APP_VERSION}</span>
         </div>
         <form action={logoutAction} className="row">
+          {user.isAdmin && <Link href="/admin">Admin – hozzáférések</Link>}
           <span className="muted">{user.name}</span>
           <button>Kilépés</button>
         </form>
