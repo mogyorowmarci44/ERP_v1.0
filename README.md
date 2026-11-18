@@ -39,7 +39,7 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
-## v2.2.1 – Kétlépcsős azonosítás, Admin hozzáférések, forecast törlés
+## v2.2.4 – KPI-Dashboard, Évzárás, Cégérték · v2.2.1 – Kétlépcsős azonosítás, Admin hozzáférések, forecast törlés
 
 | Terület | Funkció |
 |---|---|
