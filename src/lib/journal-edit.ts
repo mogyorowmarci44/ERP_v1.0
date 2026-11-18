@@ -228,6 +228,8 @@ export async function reopenInvoice(companyId: number, invoiceId: number, userId
     const [inv] = await tx.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
     if (!inv) throw new Error("A számla nem található.");
     if (inv.status !== "posted") throw new Error("Csak könyvelt számla nyitható újra.");
+    const [corr] = await tx.select({ n: invoices.invoiceNumber }).from(invoices).where(and(eq(invoices.correctsInvoiceId, invoiceId), eq(invoices.status, "posted")));
+    if (corr) throw new Error(`A számlához helyesbítő számla tartozik (${corr.n}) – előbb azt sztornózd, vagy a változást újabb helyesbítővel rögzítsd.`);
     const [c] = await tx.select({ at: invoiceChecks.checkedAt }).from(invoiceChecks).where(eq(invoiceChecks.invoiceId, invoiceId));
     if (c?.at) throw new Error("Ellenőrzöttnek jelölt számla nem nyitható újra – előbb vedd le a jelölést.");
     await assertPeriodOpen(tx, companyId, inv.fulfillmentDate);
@@ -257,6 +259,7 @@ export async function editPayment(companyId: number, paymentId: number, userId: 
   return db.transaction(async (tx) => {
     const [p] = await tx.select().from(payments).where(and(eq(payments.id, paymentId), eq(payments.companyId, companyId)));
     if (!p) throw new Error("A rendezés nem található.");
+    if (p.kind !== "payment") throw new Error(p.kind === "link" ? "Párosított tétel – a párosítást bontsd fel, a tételt a naplóban javítsd." : "Beszámítás nem javítható – sztornózd és rögzítsd újra.");
     const [c] = await tx.select({ at: invoiceChecks.checkedAt }).from(invoiceChecks).where(eq(invoiceChecks.invoiceId, p.invoiceId));
     if (c?.at) throw new Error("Ellenőrzöttnek jelölt számla rendezése nem módosítható – előbb vedd le a jelölést.");
     const [e] = p.journalEntryId ? await tx.select().from(journalEntries).where(eq(journalEntries.id, p.journalEntryId)) : [];

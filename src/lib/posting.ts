@@ -27,6 +27,11 @@ export type LineInput = {
   vatKind: VatKind;
   /** Különbözeti értékesítésnél: a gépkocsi beszerzési ára HUF-ban. */
   marginPurchaseHuf?: number | null;
+  /**
+   * Helyesbítő különbözeti tételnél: a tétel ÁFA-ja kívülről számolva (a gépkocsi összes eladásának új árrése alapján
+   * számított ÁFA mínusz a már könyvelt ÁFA), mert a helyesbítés önmagában nem értelmezhető árrésként.
+   */
+  marginVatOverrideHuf?: number | null;
 };
 
 export type LineAmounts = {
@@ -53,7 +58,9 @@ export function computeLine(input: LineInput, direction: Direction, fxRate: numb
     const grossFx = round2(quantity * unitPrice);
     const grossHuf = conv(grossFx);
     let vatHuf = 0;
-    if (direction === "out") {
+    if (direction === "out" && input.marginVatOverrideHuf !== null && input.marginVatOverrideHuf !== undefined) {
+      vatHuf = input.marginVatOverrideHuf;
+    } else if (direction === "out") {
       if (input.marginPurchaseHuf === null || input.marginPurchaseHuf === undefined) {
         throw new Error("Különbözeti értékesítéshez meg kell adni a gépkocsit / beszerzési árat.");
       }

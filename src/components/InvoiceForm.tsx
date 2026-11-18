@@ -37,6 +37,8 @@ export function InvoiceForm(props: {
   invoiceId?: number;
   /** v2.0 – új sor alapértelmezései az entitás szerint (pl. magánszemélynél AAM / 27NL). */
   defaults?: { outVat: string; inVat: string; outAcc: string; inAcc: string };
+  /** v2.2 – helyesbítő számla: az eredeti számla (partner, irány, pénznem rögzített). */
+  corrects?: { id: number; number: string } | null;
 }) {
   const { cid, direction, partners, accounts, vatCodes, vehicles } = props;
   const router = useRouter();
@@ -143,6 +145,7 @@ export function InvoiceForm(props: {
             rateManual: h.rateManual,
             periodic: h.periodic,
             note: h.note || null,
+            correctsInvoiceId: props.corrects?.id ?? null,
             lines: lines.map((l) => ({
               description: l.description,
               quantity: parseNumber(l.quantity),
@@ -168,9 +171,15 @@ export function InvoiceForm(props: {
   return (
     <div className="grid" style={{ gap: 16 }}>
       {error && <div className="flash error">{error}</div>}
+      {props.corrects && (
+        <div className="flash ok">
+          Helyesbítő számla a(z) <strong>{props.corrects.number}</strong> számlához. Csökkentésnél negatív egységárat (vagy mennyiséget) adj meg;
+          különbözeti tételnél az ÁFA a gépkocsi új árréséből számolódik, ELÁBÉ / készletmozgás nem keletkezik. Teljes visszavonáshoz a sztornót használd.
+        </div>
+      )}
       <div className="card form-grid">
         <label>Partner
-          <select value={h.partnerId ?? ""} onChange={(e) => setH({ ...h, partnerId: Number(e.target.value) || null })} required>
+          <select value={h.partnerId ?? ""} onChange={(e) => setH({ ...h, partnerId: Number(e.target.value) || null })} required disabled={!!props.corrects}>
             <option value="">– válassz –</option>
             {partners.map((p) => <option key={p.id} value={p.id}>{p.name}{p.country !== "HU" ? ` (${p.country})` : ""}</option>)}
           </select>

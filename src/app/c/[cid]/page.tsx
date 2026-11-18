@@ -12,6 +12,8 @@ import { nextVatDeadline } from "@/lib/vat-deadline";
 import { GhOverview } from "./gh/Overview";
 import { cashSplit } from "@/lib/cash-split";
 import { companyValue, valuationParamsFor } from "@/lib/company-value";
+import { unclosedVatPeriods } from "@/lib/vat-closing";
+import { dueAccruals } from "@/lib/accruals";
 
 const INBOX_TODO = ["review", "error", "new", "extracted"];
 const STALE_DAYS = 90;
@@ -68,6 +70,9 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   if (recvLate.length) todos.push({ icon: <Clock />, text: `${recvLate.length} lejárt vevőszámla · ${eFt(recvLate.reduce((s, r) => s + toHuf(r), 0))}`, href: `${b}/reports/open-items`, tag: "Lejárt", warn: true });
   if (payLate.length) todos.push({ icon: <Clock />, text: `${payLate.length} lejárt szállítói számla · ${eFt(payLate.reduce((s, r) => s + toHuf(r), 0))}`, href: `${b}/reports/open-items`, tag: "Fizetendő", warn: true });
   todos.push({ icon: <Percent />, text: `Következő ÁFA-bevallás határideje: ${fmtDate(vatDue)}`, href: `${b}/reports/vat`, tag: `${vatDays} nap`, warn: vatDays <= 5 });
+  const [vatOpen, accDue] = await Promise.all([unclosedVatPeriods(cid), dueAccruals(cid)]);
+  if (vatOpen.length) todos.push({ icon: <Percent />, text: `${vatOpen.length} lejárt ÁFA-időszak nincs lezárva (466 / 467 → 468)`, href: `${b}/reports/vat/closing?year=${vatOpen[0].to.slice(0, 4)}`, tag: "ÁFA-zárás", warn: true });
+  if (accDue.length) todos.push({ icon: <Clock />, text: `${accDue.length} időbeli elhatárolás feloldásra vár · ${eFt(accDue.reduce((s, a) => s + a.amount, 0))}`, href: `${b}/closing/accruals`, tag: "Elhatárolás", warn: true });
   if (stale.length) todos.push({ icon: <CarFront />, text: `${stale.length} gépkocsi több mint ${STALE_DAYS} napja készleten`, href: `${b}/vehicles`, tag: "Figyelj", warn: true });
   // az ÁFA-határidő csak akkor számít teendőnek, ha 5 napon belül van
   const open = todos.length - (vatDays <= 5 ? 0 : 1);
