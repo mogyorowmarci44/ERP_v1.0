@@ -2,8 +2,8 @@
  * v2.2 – KPI-Dashboard (kereskedő cégekre). Minden mutató a könyvelésből számol, az elmúlt 12 hónapra (TTM),
  * ha a cég fiatalabb, a meglévő időszakra (a havi átlagok ennyi hónapra vetítve).
  */
-import { sql } from "drizzle-orm";
-import { db } from "@/db";
+import { eq, sql } from "drizzle-orm";
+import { db, schema } from "@/db";
 import { trialBalance, type TrialBalanceRow } from "./reports";
 import { addDaysIso, today } from "./dates";
 import { firstEntryDate } from "./forecast-data";
@@ -32,6 +32,8 @@ const median = (xs: number[]): number | null => {
   return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
 };
 const sumBy = (tb: TrialBalanceRow[], pred: (c: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
+/** Időszaki forgalom (T − K) – eredményszámlákhoz: a kivonat záró egyenlege az üzleti év elejétől halmoz, nem az időszak elejétől. */
+const flowBy = (tb: TrialBalanceRow[], pred: (c: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.periodDebit - r.periodCredit, 0);
 const ymOf = (d: string) => d.slice(0, 7);
 const groupKey = (make: string, model: string) => {
   const m = (model.split(/\s+/)[0] ?? "").replace(/['’]/g, "").toLowerCase();
@@ -45,9 +47,11 @@ const groupKey = (make: string, model: string) => {
 export async function companyKpis(companyId: number, asOf = today()) {
   const t = asOf;
   const yearAgo = addDaysIso(t, -365);
-  const firstEntry = await firstEntryDate(companyId);
-  if (asOf !== today() && (!firstEntry || firstEntry > asOf)) return null;
-  const first = firstEntry ?? t;
+  const [firstEntry, opStart] = await Promise.all([firstEntryDate(companyId), operationStartOf(companyId)]);
+  // a működés kezdete előtti időszak (alakulás, első vásárlások) nem számít bele az időszakba és az évesítésbe
+  const start = firstEntry && opStart ? (opStart > firstEntry ? opStart : firstEntry) : firstEntry ?? opStart;
+  if (asOf !== today() && (!start || start > asOf)) return null;
+  const first = start && start <= t ? start : t;
   const from = first > yearAgo ? first : yearAgo;
   const months = Math.max(1, Math.min(12, (Date.parse(t) - Date.parse(from)) / (86400000 * 30.4375)));
 
@@ -116,13 +120,13 @@ export async function companyKpis(companyId: number, asOf = today()) {
   // --- Főkönyv: eredmény, rezsi, pénz ------------------------------------------------
   const [ttm, all, loans, epr] = await Promise.all([
     trialBalance(companyId, from, t),
-    trialBalance(companyId, first, t),
+    trialBalance(companyId, firstEntry && firstEntry <= t ? firstEntry : first, t),
     memberLoans(companyId, t).catch(() => null),
     eprQuarter(companyId, quarterOf(t)).catch(() => null),
   ]);
-  const preTax = -sumBy(ttm, (c) => c.startsWith("9")) - sumBy(ttm, (c) => c.startsWith("5") || c.startsWith("8"));
-  const overhead = sumBy(ttm, (c) => c.startsWith("5"));
-  const overheadCash = sumBy(ttm, (c) => c.startsWith("5") && !c.startsWith("57"));
+  const preTax = -flowBy(ttm, (c) => c.startsWith("9")) - flowBy(ttm, (c) => c.startsWith("5") || c.startsWith("8"));
+  const overhead = flowBy(ttm, (c) => c.startsWith("5"));
+  const overheadCash = flowBy(ttm, (c) => c.startsWith("5") && !c.startsWith("57"));
   const fixedMonthly = overheadCash / months;
   const cash = sumBy(all, (c) => c.startsWith("38") && !c.startsWith("389"));
   const payables = -sumBy(all, (c) => c.startsWith("45"));
@@ -279,3 +283,10 @@ export async function companyKpis(companyId: number, asOf = today()) {
   };
 }
 export type CompanyKpis = Awaited<ReturnType<typeof companyKpis>>;
+
+/** A cég beállított működési kezdete (Beállítások › Működés kezdete), ha van. */
+export async function operationStartOf(companyId: number): Promise<string | null> {
+  const [c] = await db.select({ s: schema.companies.settings }).from(schema.companies).where(eq(schema.companies.id, companyId));
+  const v = c?.s?.operationStart;
+  return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+}

@@ -346,6 +346,7 @@ export async function updateCompanyAction(fd: FormData) {
           ...cur.settings, representative: optStr(fd, "representative"), representativeTitle: optStr(fd, "representativeTitle"), signPlace: optStr(fd, "signPlace"),
           // EPR mezők csak társaságnál szerepelnek az űrlapon – magánszemélynél a meglévő érték marad.
           ...(fd.has("eprOriginDigit") ? { eprFlatRate: fd.get("eprFlatRate") === "on", eprOriginDigit: optStr(fd, "eprOriginDigit") } : {}),
+          ...(fd.has("operationStart") ? { operationStart: /^\d{4}-\d{2}-\d{2}$/.test(String(fd.get("operationStart"))) ? String(fd.get("operationStart")) : null } : {}),
         },
         name: str(fd, "name"),
         taxNumber: optStr(fd, "taxNumber"),

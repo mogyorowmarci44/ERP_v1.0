@@ -111,6 +111,9 @@ export type CompanySettings = {
   /** v2.2 – Cégérték: eredményszorzó (alap 3) és diszkontráta (alap 0,15 = 15%/év). */
   valuationMultiple?: number | null;
   valuationDiscountRate?: number | null;
+  /** v2.2 – A tényleges működés (operáció) kezdete, ISO dátum. A KPI-k és a cégérték időszaka ennél korábban nem kezdődik
+   *  (pl. a cég alakulása és az első vásárlás után, de az értékesítés megkezdése előtti hetek nem hígítják az átlagokat). */
+  operationStart?: string | null;
 };
 
 /** v2.0 – Adószámos magánszemély (pl. szálláshely-szolgáltatás) adózási profilja. */

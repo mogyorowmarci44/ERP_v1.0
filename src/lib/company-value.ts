@@ -11,6 +11,7 @@ import { addDaysIso, today } from "./dates";
 import { firstEntryDate, loadForecastInput, loadPlans, vehicleLabel } from "./forecast-data";
 import { runForecast, SCENARIOS, type Scenario } from "./forecast";
 import { round2 } from "./money";
+import { operationStartOf } from "./kpi";
 
 export const DEFAULT_VALUATION_MULTIPLE = 3;
 export const DEFAULT_DISCOUNT_RATE = 0.15;
@@ -29,15 +30,20 @@ export type CompanyValue = {
 
 const mv = (gross: number, base: number) => Math.max(0, Math.round(((gross - base) * 27) / 127));
 const sumBy = (tb: TrialBalanceRow[], pred: (code: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
+/** Időszaki forgalom (T − K) az eredményszámlákhoz (a kivonat záró egyenlege az üzleti év elejétől halmoz). */
+const flowBy = (tb: TrialBalanceRow[], pred: (code: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.periodDebit - r.periodCredit, 0);
 const monthsBetween = (a: string, b: string) => Math.max(0, (Date.parse(b) - Date.parse(a)) / (86400000 * 30.4375));
 
 export async function companyValue(companyId: number, opts: { multiple?: number; discountRate?: number } = {}): Promise<CompanyValue> {
   const t = today();
   const yearAgo = addDaysIso(t, -365);
-  const first = (await firstEntryDate(companyId)) ?? t;
+  const [firstEntry, opStart] = await Promise.all([firstEntryDate(companyId), operationStartOf(companyId)]);
+  const first = firstEntry ?? t;
+  // az eredményszorzós módszer 12 hónapja nem kezdődhet a működés kezdete előtt
+  const opFirst = opStart && opStart > first ? opStart : first;
   const [all, ttm, ytd, plans, input] = await Promise.all([
     trialBalance(companyId, first, t),
-    trialBalance(companyId, first > yearAgo ? first : yearAgo, t),
+    trialBalance(companyId, opFirst > yearAgo ? opFirst : yearAgo, t),
     trialBalance(companyId, `${t.slice(0, 4)}-01-01`, t),
     loadPlans(companyId),
     loadForecastInput(companyId),
@@ -66,18 +72,18 @@ export async function companyValue(companyId: number, opts: { multiple?: number;
     return { label: vehicleLabel(s.vehicle), bookValue: s.bookValue, salePrice: price, marginVat: vat, plannedCosts: price ? plannedCosts : 0, netRealizable, uplift: round2(netRealizable - s.bookValue) };
   });
   const uplift = round2(stock.reduce((a, s) => a + s.uplift, 0));
-  const ytdPreTax = -sumBy(ytd, (c) => c.startsWith("9")) - sumBy(ytd, (c) => c.startsWith("5") || c.startsWith("8"));
+  const ytdPreTax = -flowBy(ytd, (c) => c.startsWith("9")) - flowBy(ytd, (c) => c.startsWith("5") || c.startsWith("8"));
   const taxBase = Math.max(0, ytdPreTax + uplift);
   const tax = Math.round(taxBase * (tao + hipa));
   const navValue = round2(bookEquity + uplift - tax);
 
   // --- 2. Eredményszorzós -------------------------------------------------------------
-  const from = first > yearAgo ? first : yearAgo;
+  const from = opFirst > yearAgo ? opFirst : yearAgo;
   const months = Math.min(12, monthsBetween(from, t));
   const annualized = months < 11.5 && months > 0;
   const factor = annualized ? 12 / months : 1;
-  const preTaxTtm = -sumBy(ttm, (c) => c.startsWith("9")) - sumBy(ttm, (c) => c.startsWith("5") || c.startsWith("8"));
-  const depreciation = sumBy(ttm, (c) => c.startsWith("57"));
+  const preTaxTtm = -flowBy(ttm, (c) => c.startsWith("9")) - flowBy(ttm, (c) => c.startsWith("5") || c.startsWith("8"));
+  const depreciation = flowBy(ttm, (c) => c.startsWith("57"));
   const earnings = round2((preTaxTtm + depreciation) * factor);
   const multiple = opts.multiple ?? DEFAULT_VALUATION_MULTIPLE;
   const multValue = round2(multiple * Math.max(0, earnings) + cash - memberLoans - bankLoans);
