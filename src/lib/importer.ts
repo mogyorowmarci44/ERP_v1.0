@@ -440,5 +440,7 @@ export async function wipeCompanyData(companyId: number) {
     await tx.delete(schema.periodLocks).where(eq(schema.periodLocks.companyId, companyId));
     await tx.delete(schema.importBatches).where(eq(schema.importBatches.companyId, companyId));
     await tx.delete(schema.fixedAssets).where(eq(schema.fixedAssets.companyId, companyId));
+    await tx.delete(schema.payrollRuns).where(eq(schema.payrollRuns.companyId, companyId));
+    await tx.delete(schema.employees).where(eq(schema.employees.companyId, companyId));
   });
 }

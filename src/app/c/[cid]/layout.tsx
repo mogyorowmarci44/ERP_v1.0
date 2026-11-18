@@ -31,6 +31,7 @@ import {
   Recycle,
   BookOpenCheck,
   Package,
+  BadgeEuro,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
 import { APP_VERSION } from "@/lib/version";
@@ -109,6 +110,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <div className="group">Pénzügy</div>
           <NavLink href={`${b}/money`}><Wallet />Pénztár és bank</NavLink>
           <NavLink href={`${b}/member-loans`}><HandCoins />Tagi kölcsön</NavLink>
+          <NavLink href={`${b}/payroll`}><BadgeEuro />Bérszámfejtés</NavLink>
 
           <div className="group">Tervezés</div>
           <NavLink href={`${b}/forecast`}><TrendingUp />Forecast</NavLink>

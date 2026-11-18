@@ -74,7 +74,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
 
   const tiles: { title: string; icon: React.ReactNode; badge?: string; links: [string, string][] }[] = [
     { title: "Bizonylatok", icon: <Files />, badge: inbox.n ? `${inbox.n} új` : undefined, links: [["Beérkező bizonylatok", `${b}/inbox`], ["Vevőszámlák", `${b}/invoices?dir=out`], ["Szállítói számlák", `${b}/invoices?dir=in`], ["Vegyes / bank tétel", `${b}/journal/new`]] },
-    { title: "Pénzügy", icon: <PiggyBank />, links: [["Pénztár és bank", `${b}/money`], ["Tagi kölcsön", `${b}/member-loans`]] },
+    { title: "Pénzügy", icon: <PiggyBank />, links: [["Pénztár és bank", `${b}/money`], ["Tagi kölcsön", `${b}/member-loans`], ["Bérszámfejtés", `${b}/payroll`]] },
     { title: "Kimutatások", icon: <ChartNoAxesCombined />, links: [["KPI-Dashboard", `${b}/reports/kpi`], ["P&L, cash-flow, mérleg", `${b}/reports/statements`], ["ÁFA", `${b}/reports/vat`], ["EPR összesítő", `${b}/vehicles/epr`], ["Nyitott tételek", `${b}/reports/open-items`]] },
     { title: "Főkönyv", icon: <Library />, links: [["Napló", `${b}/journal`], ["Számlakarton", `${b}/reports/ledger`], ["Tárgyi eszközök", `${b}/assets`], ["Évzárás", `${b}/closing`]] },
     { title: "Törzsadatok", icon: <Database />, badge: `${inStock.length} autó`, links: [["Gépkocsi készlet", `${b}/vehicles`], ["Partnerek", `${b}/partners`], ["Számlatükör", `${b}/accounts`], ["Árfolyamok (MNB)", `${b}/fx`]] },

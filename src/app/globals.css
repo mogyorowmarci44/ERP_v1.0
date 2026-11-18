@@ -795,3 +795,9 @@ table.cv-calc tr.total td { font-weight: 700; border-top: 2px solid var(--ink, c
 .kpi-yoy.good { color: #15803d; }
 .kpi-yoy.bad { color: #b91c1c; }
 .kpi-yoy .muted { font-weight: 400; }
+
+/* v2.2 – bértábla */
+.pr-table td, .pr-table th { padding: 7px 8px; vertical-align: middle; }
+.pr-in { text-align: right; padding: 4px 6px; height: 30px; font-variant-numeric: tabular-nums; }
+.pr-warn td { background: color-mix(in srgb, var(--warn, #b7791f) 9%, var(--surface)); color: var(--warn, #8a5a0b); font-size: 12px; padding: 4px 10px; }
+.pr-total td { font-weight: 600; background: var(--surface-2); }
