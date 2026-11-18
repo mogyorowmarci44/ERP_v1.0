@@ -46,22 +46,25 @@ export default async function KpiPage({ params }: { params: Promise<{ cid: strin
       </div>
 
       <h2 className="kpi-h">Kiemelt mutatók</h2>
-      <div className="grid cols-3 lp-kpi">
-        <Stat label="Átlagos állásidő" value={k.turnover.avgDays == null ? "–" : `${k.turnover.avgDays} nap`} sub="vételtől eladásig, eladott autók" />
+      <div className="grid cols-4 lp-kpi">
+        <Stat label="Állásidő (medián)" value={k.turnover.medDaysAll == null ? "–" : `${k.turnover.medDaysAll} nap`} sub={`mind a ${k.stock.everCount} valaha készleten volt autó`} />
         <Stat label="90 napnál régebben álló autók" value={`${old90.count} db`} sub={eFt(old90.value)} tone={old90.count ? "warn" : undefined} />
-        <Stat label="Átlagos bruttó árrés / autó" value={eFt(k.profit.avgGrossMargin)} sub={`árrés: ${pct(k.profit.marginPct)}`} />
+        <Stat label="Fedezet II / autó (medián)" value={eFt(k.margin.medF2)} sub="nettó árbevétel − teljes bekerülési érték" />
+        <Stat label="Fedezeti hányad" value={pct(k.margin.ratio)} sub="fedezet / nettó árbevétel" />
+        <Stat label="Fix költségek fedezettsége" value={pct(k.margin.coverage)} tone={k.margin.coverage != null && k.margin.coverage < 1 ? "neg" : undefined} sub="az autók fedezete a rezsi %-ában" />
         <Stat label="Tőkearányos megtérülés" value={pct(k.money.roc)} sub="éves eredmény / átlagos készletbe kötött tőke" />
         <Stat label="Havi eladott darabszám" value={num(k.turnover.soldCount / k.months)} sub={`${k.turnover.soldCount} db az időszakban`} />
         <Stat label="Szabad pénz" value={eFt(k.money.free)} tone={k.money.free < 0 ? "neg" : undefined} sub="pénz − szállítók − 1 havi fix költség" />
       </div>
 
       <section className="card kpi-sec">
-        <h2>Készlet és forgás</h2>
+        <h2>Készlet és forgás <span className="muted">– mind a {k.stock.everCount} valaha készleten volt autó, mediánnal ({k.turnover.histMonths} hónap)</span></h2>
         <div className="grid cols-4 lp-kpi">
-          <Stat label="Átlagos állásidő" value={k.turnover.avgDays == null ? "–" : `${k.turnover.avgDays} nap`} />
-          <Stat label="Készletforgás" value={k.turnover.rate == null ? "–" : `${num(k.turnover.rate)}× / év`} sub={`átlagos készlet: ${num(k.turnover.avgStockCount)} db`} />
-          <Stat label="Készlet" value={`${k.stock.count} db · ${eFt(k.stock.value)}`} sub={k.stock.monthsOfSales == null ? undefined : `${num(k.stock.monthsOfSales)} havi eladásnak felel meg`} />
-          <Stat label="Lekötött tőke / autó" value={eFt(k.stock.avgTied)} sub="a készleten lévő autók átlagos bekerülési értéke" />
+          <Stat label="Állásidő (medián)" value={k.turnover.medDaysAll == null ? "–" : `${k.turnover.medDaysAll} nap`}
+            sub={<>eladott autók: {k.turnover.medDaysSold == null ? "–" : `${k.turnover.medDaysSold} nap`}; a készleten lévőknél a mai napig</>} />
+          <Stat label="Készletforgás" value={k.turnover.rateAll == null ? "–" : `${num(k.turnover.rateAll)}× / év`} sub={`${k.turnover.soldAll} eladott autó / medián készlet ${num(k.turnover.medStockCount)} db`} />
+          <Stat label="Készlet most" value={`${k.stock.count} db · ${eFt(k.stock.value)}`} sub={k.stock.monthsOfSales == null ? undefined : <>{num(k.stock.monthsOfSales)} havi eladásnak felel meg (medián {num(k.turnover.medSoldPerMonth)} db / hó)</>} />
+          <Stat label="Lekötött tőke / autó (medián)" value={eFt(k.stock.medTiedAll)} sub={<>bekerülési érték, összes autó · a mostani készleten átlag {eFt(k.stock.avgTied)}</>} />
         </div>
         <div className="kpi-buckets">
           {k.stock.buckets.map((bk, i) => (
@@ -108,12 +111,12 @@ export default async function KpiPage({ params }: { params: Promise<{ cid: strin
             <h3>Típusonként</h3>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Típus</th><th className="num">db</th><th className="num">Árrés / autó</th><th className="num">Árrés %</th><th className="num">Állásidő</th></tr></thead>
+                <thead><tr><th>Típus</th><th className="num">db</th><th className="num">Árrés / autó</th><th className="num">Fedezet II (medián)</th><th className="num">Árrés %</th><th className="num">Állásidő (medián)</th></tr></thead>
                 <tbody>
                   {k.profit.byModel.map((g) => (
-                    <tr key={g.key}><td>{g.key}</td><td className="num">{g.count}</td><td className={`num${g.avgMargin < 0 ? " neg" : ""}`}>{eFt(g.avgMargin)}</td><td className="num">{pct(g.marginPct)}</td><td className="num">{g.avgDays == null ? "–" : `${g.avgDays} nap`}</td></tr>
+                    <tr key={g.key}><td>{g.key}</td><td className="num">{g.count}</td><td className={`num${g.avgMargin < 0 ? " neg" : ""}`}>{eFt(g.avgMargin)}</td><td className={`num${(g.medF2 ?? 0) < 0 ? " neg" : ""}`}>{eFt(g.medF2)}</td><td className="num">{pct(g.marginPct)}</td><td className="num">{g.avgDays == null ? "–" : `${g.avgDays} nap`}</td></tr>
                   ))}
-                  {!k.profit.byModel.length && <tr><td colSpan={5} className="muted">Nincs eladás az időszakban.</td></tr>}
+                  {!k.profit.byModel.length && <tr><td colSpan={6} className="muted">Nincs eladás az időszakban.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -122,15 +125,35 @@ export default async function KpiPage({ params }: { params: Promise<{ cid: strin
             <h3>Beszerzési forrás szerint</h3>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Forrás</th><th className="num">db</th><th className="num">Árrés / autó</th><th className="num">Árrés %</th><th className="num">Állásidő</th></tr></thead>
+                <thead><tr><th>Forrás</th><th className="num">db</th><th className="num">Árrés / autó</th><th className="num">Fedezet II (medián)</th><th className="num">Árrés %</th><th className="num">Állásidő (medián)</th></tr></thead>
                 <tbody>
                   {k.profit.byOrigin.map((g) => (
-                    <tr key={g.key}><td>{g.key}</td><td className="num">{g.count}</td><td className={`num${g.avgMargin < 0 ? " neg" : ""}`}>{eFt(g.avgMargin)}</td><td className="num">{pct(g.marginPct)}</td><td className="num">{g.avgDays == null ? "–" : `${g.avgDays} nap`}</td></tr>
+                    <tr key={g.key}><td>{g.key}</td><td className="num">{g.count}</td><td className={`num${g.avgMargin < 0 ? " neg" : ""}`}>{eFt(g.avgMargin)}</td><td className={`num${(g.medF2 ?? 0) < 0 ? " neg" : ""}`}>{eFt(g.medF2)}</td><td className="num">{pct(g.marginPct)}</td><td className="num">{g.avgDays == null ? "–" : `${g.avgDays} nap`}</td></tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="card kpi-sec">
+        <h2>Fedezet <span className="muted">– az időszakban eladott {k.margin.soldCount} autó</span></h2>
+        <p className="muted" style={{ marginTop: -4, fontSize: 13 }}>
+          <strong>Fedezet I</strong> = nettó árbevétel (különbözeti ÁFA nélkül) − vételár · <strong>Fedezet II</strong> = nettó árbevétel − teljes bekerülési érték (vételár + felújítás + egyéb közvetlen költség).
+          A fedezetből kell kitermelni a rezsit (fix költségeket); ami fölötte marad, az a nyereség. Az autónkénti értékek mediánok.
+        </p>
+        <div className="grid cols-4 lp-kpi">
+          <Stat label="Fedezet I / autó (medián)" value={eFt(k.margin.medF1)} sub={`összesen ${eFt(k.margin.totalF1)}`} />
+          <Stat label="Fedezet II / autó (medián)" value={eFt(k.margin.medF2)} tone={(k.margin.medF2 ?? 0) < 0 ? "neg" : undefined} sub={`összesen ${eFt(k.margin.totalF2)}`} />
+          <Stat label="Fedezeti hányad" value={pct(k.margin.ratio)} sub={`Fedezet II / nettó árbevétel (${eFt(k.margin.netRevenue)})`} />
+          <Stat label="Fix költségek fedezettsége" value={pct(k.margin.coverage)} tone={k.margin.coverage != null && k.margin.coverage < 1 ? "neg" : undefined}
+            sub={<>Fedezet II {eFt(k.margin.totalF2)} / fix költség {eFt(k.margin.fixed)} · 100% fölött nyereséges</>} />
+          <Stat label="Fedezeti pont (árbevétel)" value={k.margin.beRevenueMonthly == null ? "–" : `${eFt(k.margin.beRevenueMonthly)} / hó`} sub={<>ennyi nettó árbevétel kell a rezsihez · most {eFt(k.margin.monthlyRevenue)} / hó</>} />
+          <Stat label="Fedezeti pont (darab)" value={k.ops.breakEven == null ? "–" : `${num(k.ops.breakEven)} autó / hó`} sub="havi fix költség / átlagos haszon autónként" />
+          <Stat label="Biztonsági tartalék" value={pct(k.margin.safety)} tone={k.margin.safety != null && k.margin.safety < 0 ? "neg" : undefined} sub="ennyivel eshet az árbevétel a fedezeti pontig" />
+          <Stat label="Napi fedezet / autó (medián)" value={k.margin.medDaily == null ? "–" : `${nf.format(Math.round(k.margin.medDaily))} Ft / nap`}
+            sub={<>Fedezet II / állásnap · tőkére vetítve {pct(k.margin.medOnCost)} / autó</>} />
         </div>
       </section>
 

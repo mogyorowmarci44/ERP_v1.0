@@ -20,10 +20,17 @@ export type KpiCar = {
   grossMargin: number | null; netProfit: number | null; days: number | null; cashDays: number | null;
   planPrice: number | null; planDate: string | null;
 };
-type GroupRow = { key: string; count: number; avgMargin: number; avgNet: number; avgDays: number | null; marginPct: number };
+type GroupRow = { key: string; count: number; avgMargin: number; avgNet: number; avgDays: number | null; marginPct: number; medF2: number | null };
 
 const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+/** Medián – a kiugró (pl. nagyon olcsó vagy nagyon drága, nagyon gyorsan vagy lassan eladott) autók nem húzzák el. */
+const median = (xs: number[]): number | null => {
+  const v = xs.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+  if (!v.length) return null;
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+};
 const sumBy = (tb: TrialBalanceRow[], pred: (c: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
 const ymOf = (d: string) => d.slice(0, 7);
 const groupKey = (make: string, model: string) => {
@@ -132,6 +139,35 @@ export async function companyKpis(companyId: number) {
   const avgStockCount = avg(stockRows.map((r) => cars.filter((c) => c.purchaseDate && c.purchaseDate <= r.me && (!c.saleDate || c.saleDate > r.me)).length));
   const soldPerMonth = soldTtm.length / months;
 
+  // --- Készlet a teljes múltra (minden valaha készleten volt autó), mediánnal --------------
+  const ever = cars.filter((c) => c.purchaseDate);
+  const holdAll = ever.map((c) => days(c.purchaseDate!, c.saleDate ?? t));
+  const holdSold = ever.filter((c) => c.saleDate).map((c) => days(c.purchaseDate!, c.saleDate!));
+  const costAll = ever.map((c) => c.cost).filter((x) => x > 0);
+  // hónapvégi darabszámok és havi eladások a cég teljes működésére
+  const histMonths: string[] = [];
+  {
+    let idx = Number(first.slice(0, 4)) * 12 + Number(first.slice(5, 7)) - 1;
+    const end = Number(t.slice(0, 4)) * 12 + Number(t.slice(5, 7)) - 1;
+    for (; idx <= end; idx++) histMonths.push(`${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`);
+  }
+  const monthEndOf = (ym: string) => { const [y, m] = ym.split("-").map(Number); const d = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); return d > t ? t : d; };
+  const histCounts = histMonths.map((ym) => { const me = monthEndOf(ym); return ever.filter((c) => c.purchaseDate! <= me && (!c.saleDate || c.saleDate > me)).length; });
+  const histSold = histMonths.map((ym) => ever.filter((c) => c.saleDate && ymOf(c.saleDate) === ym).length);
+  const medStockCount = median(histCounts);
+  const medSoldPerMonth = median(histSold);
+  const soldAll = ever.filter((c) => c.saleDate).length;
+  const histYears = Math.max(1 / 12, histMonths.length / 12);
+
+  // --- Fedezet (az időszakban eladott autók) -------------------------------------------
+  const netSold = soldTtm.reduce((s2, c) => s2 + c.saleNet, 0);
+  const f1 = soldTtm.map((c) => c.saleNet - c.base);
+  const f2 = soldTtm.map((c) => c.saleNet - c.cost);
+  const totalF1 = f1.reduce((a, b) => a + b, 0), totalF2 = f2.reduce((a, b) => a + b, 0);
+  const ratio = netSold ? totalF2 / netSold : null;
+  const monthlyRevenue = netSold / months;
+  const beRevenue = ratio && ratio > 0 ? fixedMonthly / ratio : null;
+
   // --- Havi trend (12 hónap) -----------------------------------------------------------
   const trend = Array.from({ length: 12 }, (_, i) => {
     // tisztán egész számokkal (időzóna- és nyári időszámítás-független)
@@ -149,7 +185,8 @@ export async function companyKpis(companyId: number) {
       const gross = xs.reduce((s, c) => s + c.saleGross, 0);
       const marg = xs.reduce((s, c) => s + (c.grossMargin ?? 0), 0);
       const dd = xs.map((c) => c.days).filter((x): x is number => x != null);
-      return { key: k, count: xs.length, avgMargin: round2(marg / xs.length), avgNet: round2(avg(xs.map((c) => c.netProfit ?? 0))), avgDays: dd.length ? Math.round(avg(dd)) : null, marginPct: gross ? marg / gross : 0 };
+      const f2 = median(xs.map((c) => c.saleNet - c.cost));
+      return { key: k, count: xs.length, avgMargin: round2(marg / xs.length), avgNet: round2(avg(xs.map((c) => c.netProfit ?? 0))), avgDays: dd.length ? Math.round(median(dd)!) : null, marginPct: gross ? marg / gross : 0, medF2: f2 == null ? null : round2(f2) };
     }).sort((a, b) => b.count - a.count || b.avgMargin - a.avgMargin);
   };
 
@@ -176,10 +213,15 @@ export async function companyKpis(companyId: number) {
     stock: {
       count: stock.length, value: round2(stock.reduce((s, c) => s + c.bookValue, 0)),
       avgTied: round2(avg(stock.map((c) => c.bookValue))), buckets,
+      medTiedAll: costAll.length ? round2(median(costAll)!) : null, everCount: ever.length,
       cars: stock.map((c) => ({ ...c, age: age(c) })).sort((a, b) => b.age - a.age),
-      monthsOfSales: soldPerMonth > 0 ? stock.length / soldPerMonth : null,
+      monthsOfSales: medSoldPerMonth ? stock.length / medSoldPerMonth : soldPerMonth > 0 ? stock.length / soldPerMonth : null,
     },
     turnover: {
+      medDaysAll: holdAll.length ? Math.round(median(holdAll)!) : null,
+      medDaysSold: holdSold.length ? Math.round(median(holdSold)!) : null,
+      medStockCount, medSoldPerMonth, soldAll, histMonths: histMonths.length,
+      rateAll: medStockCount ? soldAll / histYears / medStockCount : null,
       avgDays: soldTtm.some((c) => c.days != null) ? Math.round(avg(soldTtm.map((c) => c.days).filter((x): x is number => x != null))) : null,
       soldCount: soldTtm.length, avgStockCount: Math.round(avgStockCount * 10) / 10,
       rate: avgStockCount > 0 ? (soldTtm.length * (12 / months)) / avgStockCount : null,
@@ -193,6 +235,15 @@ export async function companyKpis(companyId: number) {
       refurbPct: baseSold ? (sum(soldTtm.map((c) => c.cost)) - baseSold) / baseSold : null,
       byModel: groupBy((c) => c.group),
       byOrigin: groupBy((c) => (c.origin === "import" ? "Import (nem HU)" : c.origin === "domestic" ? "Belföld (HU)" : "Nincs megadva")),
+    },
+    margin: {
+      soldCount: soldTtm.length, netRevenue: round2(netSold),
+      medF1: median(f1), medF2: median(f2), totalF1: round2(totalF1), totalF2: round2(totalF2),
+      ratio, fixed: round2(overhead), coverage: overhead > 0 ? totalF2 / overhead : null,
+      beRevenueMonthly: beRevenue == null ? null : round2(beRevenue), monthlyRevenue: round2(monthlyRevenue),
+      safety: beRevenue != null && monthlyRevenue > 0 ? (monthlyRevenue - beRevenue) / monthlyRevenue : null,
+      medDaily: median(soldTtm.filter((c) => c.days && c.days > 0).map((c) => (c.saleNet - c.cost) / c.days!)),
+      medOnCost: median(soldTtm.filter((c) => c.cost > 0).map((c) => (c.saleNet - c.cost) / c.cost)),
     },
     money: {
       cash: round2(cash), payables: round2(payables), fixedMonthly: round2(fixedMonthly),
