@@ -39,6 +39,14 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v2.2.1 – Kétlépcsős azonosítás, Admin hozzáférések, forecast törlés
+
+| Terület | Funkció |
+|---|---|
+| Kétlépcsős azonosítás | Kötelező mindenkinek: jelszó + hitelesítő alkalmazás (TOTP, 6 jegy / 30 mp). Első belépéskor QR-kódos beállítás és 10 egyszer használható tartalékkód; 5 hibás kód → 15 perc zárolás; jelszócsere és 2FA visszaállítás a többi eszközt kilépteti |
+| Admin (/admin) | Felhasználó × cég hozzáférési mátrix (szerepkör azonnal szerkeszthető, az utolsó tulajdonos védett), 2FA állapot, tartalékkódok, utolsó belépés, 2FA visszaállítása, kiléptetés |
+| Forecast | „Összes törlése” a tervezett beszerzéseknél és a költségeknél; „Visszaállítás” a Forgatókönyveknél (alapértékek) és a Kimutatáson (a teljes forecast kiürítése) |
+
 ## v2.1.0 – EPR (kiterjesztett gyártói felelősség) – gépjármű · DRAFT
 
 A különbözeti ÁFA karton mintájára: **EPR karton gépkocsinként** és **negyedéves EPR összesítő** (OKIR KG:KGYF-NÉ, határidő a negyedévet követő hónap 20-a).
