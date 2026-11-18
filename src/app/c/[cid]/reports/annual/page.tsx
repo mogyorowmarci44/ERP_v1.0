@@ -26,6 +26,7 @@ export default async function AnnualReportPage({ params, searchParams }: { param
       <div className="topbar no-print">
         <h1>Éves beszámoló – {year}</h1>
         <div className="row">
+          <Link className="btn" href={`/c/${cid}/closing`}>← Évzárás</Link>
           {role !== "viewer" && <Link className="btn" href={`/c/${cid}/reports/annual/edit?year=${year}`}>Kiegészítő melléklet szerkesztése</Link>}
           <PrintButton label="Nyomtatás / PDF" />
         </div>

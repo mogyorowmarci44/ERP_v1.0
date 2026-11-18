@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { VatTabs } from "@/components/VatTabs";
 import { requireCompany } from "@/lib/auth";
 import { marginCard, soldVehicleIds } from "@/lib/margin-card";
 import { MarginCardSheet } from "@/components/MarginCard";
@@ -26,6 +27,7 @@ export default async function MarginCardsPage({ params, searchParams }: { params
           {cards.length > 0 && <PrintButton label={`${cards.length} karton nyomtatása / PDF`} />}
         </div>
       </div>
+      <VatTabs cid={cid} active="margin" />
       <form className="row card no-print" style={{ marginBottom: 12 }}>
         <label>Eladás teljesítése -tól<input type="date" name="from" defaultValue={from} /></label>
         <label>-ig<input type="date" name="to" defaultValue={to} /></label>

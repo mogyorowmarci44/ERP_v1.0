@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireCompany } from "@/lib/auth";
+import { VatTabs } from "@/components/VatTabs";
 import { vatAnalytics } from "@/lib/reports";
 import { noInputVatDeduction } from "@/lib/entity";
 import { fmtHuf } from "@/lib/money";
@@ -23,6 +24,7 @@ export default async function VatPage({ params, searchParams }: { params: Promis
         <h1>ÁFA analitika</h1>
         <span className="muted">{company.name} · {company.taxNumber} · {fmtDate(from)} – {fmtDate(to)}</span>
       </div>
+      <VatTabs cid={cid} active="vat" />
       <form className="row card no-print" style={{ marginBottom: 12 }}>
         <label>Teljesítés-tól<input type="date" name="from" defaultValue={from} /></label>
         <label>-ig<input type="date" name="to" defaultValue={to} /></label>
