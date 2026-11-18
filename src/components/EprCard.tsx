@@ -130,7 +130,7 @@ export function EprQuarterSheet({ data, cid, printedAt }: { data: EprQuarter; ci
             <div className="epr-card-title">
               <Link href={`/c/${cid}/vehicles/${c.vehicle.id}/epr`}>{c.vehicle.make} {c.vehicle.model}</Link> · <span className="mono">{vehicleIdent(c.vehicle)}</span>
             </div>
-            <div className="mc-sub">{c.purchases[0]?.partnerCountry ?? "?"} → {c.sales[0]?.partnerCountry ?? "HU"} · {fmtDate(c.placedOn)} · <span className="mono">{c.kfCode}</span></div>
+            <div className="mc-sub">{c.origin === "import" ? "Import" : "HU"} → {c.sales[0]?.partnerCountry ?? "HU"} · {fmtDate(c.placedOn)} · <span className="mono">{c.kfCode}</span></div>
             <div className="mc-sub">{c.massKg ? `${fmtNum(c.massKg)} kg` : "⚠ nincs tömeg"} · {c.fee !== null ? `${fmtHuf(c.fee)} Ft` : "–"}</div>
           </div>
         ))}
