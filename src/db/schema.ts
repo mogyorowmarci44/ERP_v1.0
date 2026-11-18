@@ -65,6 +65,18 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   isAdmin: boolean("is_admin").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // v2.2 – kétlépcsős azonosítás (TOTP) és munkamenet-kezelés
+  totpSecret: text("totp_secret"),
+  totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
+  /** A legutóbb elfogadott TOTP lépés (visszajátszás ellen). */
+  totpLastStep: integer("totp_last_step"),
+  /** Egyszer használható tartalékkódok SHA-256 hash-ei. */
+  recoveryCodes: jsonb("recovery_codes").$type<string[]>().notNull().default([]),
+  mfaFailedCount: integer("mfa_failed_count").notNull().default(0),
+  mfaLockedUntil: timestamp("mfa_locked_until", { withTimezone: true }),
+  /** Növelése az összes korábbi munkamenetet érvényteleníti (jelszócsere, 2FA visszaállítás). */
+  sessionVersion: integer("session_version").notNull().default(0),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
 });
 
 /** Cégszintű könyvelési beállítások (alapértelmezett főkönyvi számlák kódjai). */

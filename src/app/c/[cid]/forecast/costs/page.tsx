@@ -6,7 +6,8 @@ import { ForecastTabs } from "@/components/Forecast";
 import { Flash } from "@/components/Flash";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
-import { saveItemAction, deleteItemAction, acceptSuggestionsAction, refreshSuggestedAction } from "../actions";
+import { saveItemAction, deleteItemAction, acceptSuggestionsAction, refreshSuggestedAction, deleteAllItemsAction } from "../actions";
+import { ConfirmButton } from "@/components/ConfirmButton";
 
 const CAT: Record<string, string> = {
   expense: "Költség", asset: "Tárgyi eszköz vásárlás", loan_in: "Tagi kölcsön be", loan_out: "Tagi kölcsön vissza",
@@ -98,6 +99,12 @@ export default async function ForecastCostsPage({ params, searchParams }: { para
         <h2 style={{ margin: 0 }}>Tervtételek</h2>
         {canWrite && items.some((i) => i.source === "suggested") && (
           <form action={refreshSuggestedAction}><input type="hidden" name="cid" value={cid} /><button>Javasolt tételek frissítése a legutóbbi adatokkal</button></form>
+        )}
+        {canWrite && items.length > 0 && (
+          <form action={deleteAllItemsAction}>
+            <input type="hidden" name="cid" value={cid} />
+            <ConfirmButton message={`Biztosan törlöd mind a ${items.length} tervtételt?`} pendingText="Törlés…">Összes törlése</ConfirmButton>
+          </form>
         )}
       </div>
       <div className="table-wrap">

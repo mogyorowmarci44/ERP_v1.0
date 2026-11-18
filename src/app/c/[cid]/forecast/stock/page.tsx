@@ -5,7 +5,8 @@ import { ForecastTabs } from "@/components/Forecast";
 import { Flash } from "@/components/Flash";
 import { fmtHuf, fmtNum } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
-import { savePlanAction, savePlansBulkAction, clearSalePlanAction, deletePlanAction, addPlanCostAction, deletePlanCostAction, fillSuggestionsAction, linkPlanAction } from "../actions";
+import { savePlanAction, savePlansBulkAction, clearSalePlanAction, deletePlanAction, addPlanCostAction, deletePlanCostAction, fillSuggestionsAction, linkPlanAction, deleteAllPlannedAction } from "../actions";
+import { ConfirmButton } from "@/components/ConfirmButton";
 
 type Cost = { id: number; description: string; date: string | null; net: number; vatRate: number; deductible: boolean; capitalize: boolean; payment: string };
 const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
@@ -147,7 +148,15 @@ export default async function ForecastStockPage({ params, searchParams }: { para
         </table>
       </div>
 
-      <h2>Tervezett beszerzések</h2>
+      <div className="fc-head" style={{ marginTop: 18 }}>
+        <h2 style={{ margin: 0 }}>Tervezett beszerzések</h2>
+        {canWrite && planned.length > 0 && (
+          <form action={deleteAllPlannedAction}>
+            <input type="hidden" name="cid" value={cid} />
+            <ConfirmButton message={`Biztosan törlöd mind a ${planned.length} tervezett beszerzést (a hozzájuk tartozó tervezett költségekkel együtt)? A készleten lévő autók eladási tervei megmaradnak.`} pendingText="Törlés…">Összes törlése</ConfirmButton>
+          </form>
+        )}
+      </div>
       <div className="table-wrap">
         <table className="fc-plan">
           <thead><tr><th>Megnevezés</th><th>Beszerzés (bruttó ár = ÁFA-alap, dátum, fizetés)</th><th>Eladás (bruttó ár, dátum, fizetés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Fedezet</th><th /></tr></thead>

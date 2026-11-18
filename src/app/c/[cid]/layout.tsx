@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  ShieldCheck,
   LayoutDashboard,
   FileOutput,
   FileInput,
@@ -90,6 +91,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
           <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
           <NavLink href={`${b}/import`}><Upload />Adatimport</NavLink>
+          {user.isAdmin && <NavLink href="/admin"><ShieldCheck />Admin – hozzáférések</NavLink>}
           </>
         ) : (
           <>
@@ -133,6 +135,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
           <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
           <NavLink href={`${b}/import`}><Upload />Adatimport</NavLink>
+          {user.isAdmin && <NavLink href="/admin"><ShieldCheck />Admin – hozzáférések</NavLink>}
           </>
         )}
         </div>
