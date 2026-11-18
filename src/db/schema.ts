@@ -101,6 +101,9 @@ export type CompanySettings = {
   eprFlatRate?: boolean | null;
   /** EPR – a KF kód 8. karaktere (származáskód) külföldről behozott gépjárműre. */
   eprOriginDigit?: string | null;
+  /** v2.2 – Cégérték: eredményszorzó (alap 3) és diszkontráta (alap 0,15 = 15%/év). */
+  valuationMultiple?: number | null;
+  valuationDiscountRate?: number | null;
 };
 
 /** v2.0 – Adószámos magánszemély (pl. szálláshely-szolgáltatás) adózási profilja. */
