@@ -3,6 +3,7 @@ import { calibrationFor, getForecastSettings } from "@/lib/forecast-data";
 import { MIN_CALIBRATION_SALES, quantile } from "@/lib/forecast";
 import { ForecastTabs } from "@/components/Forecast";
 import { Flash } from "@/components/Flash";
+import { ConfirmButton } from "@/components/ConfirmButton";
 import { saveScenarioSettingsAction, calibrateAction, resetScenarioAction } from "../actions";
 
 const pct = (x: number) => Math.round(x * 1000) / 10;
@@ -28,11 +29,19 @@ export default async function ForecastSettingsPage({ params, searchParams }: { p
       <ForecastTabs cid={cid} active="settings" />
       <Flash error={sp.error} ok={sp.ok} />
 
-      <p className="muted">
+      <div className="fc-head">
+        <p className="muted" style={{ margin: 0 }}>
         Az <strong>alap</strong> forgatókönyv a te inputod (Készlet és Költségek fül). A <span className="sc-pessimistic"><span className="sc-dot" />rosszabb</span> és a{" "}
         <span className="sc-optimistic"><span className="sc-dot" />jobb</span> forgatókönyv ezekkel az eltérésekkel számolódik az alapból. A kimutatásban egy gombbal váltasz köztük.
         {s.calibratedFrom && <> Jelenlegi beállítás forrása: <strong>{s.calibratedFrom}</strong>.</>}
-      </p>
+        </p>
+        {canWrite && (
+          <form action={resetScenarioAction}>
+            <input type="hidden" name="cid" value={cid} />
+            <ConfirmButton message="Biztosan visszaállítod a forgatókönyveket? Minden itteni beállítás (eltérések, horizont, HIPA, TAO) az alapértékre áll vissza." pendingText="Visszaállítás…">Visszaállítás</ConfirmButton>
+          </form>
+        )}
+      </div>
 
       <form action={saveScenarioSettingsAction}>
         <input type="hidden" name="cid" value={cid} />
@@ -86,10 +95,9 @@ export default async function ForecastSettingsPage({ params, searchParams }: { p
             (rosszabb: −5% ár, +30 nap, +20% autós és +10% ismétlődő költség; jobb: +3% ár, −14 nap, −10% autós költség).
           </p>
         )}
-        {canWrite && (
+        {canWrite && enough && (
           <div className="row">
-            {enough && <form action={calibrateAction}><input type="hidden" name="cid" value={cid} /><button className="primary">Kalibrálás a múltbeli eladásokból</button></form>}
-            <form action={resetScenarioAction}><input type="hidden" name="cid" value={cid} /><button>Alapértékek visszaállítása</button></form>
+            <form action={calibrateAction}><input type="hidden" name="cid" value={cid} /><button className="primary">Kalibrálás a múltbeli eladásokból</button></form>
           </div>
         )}
       </div>

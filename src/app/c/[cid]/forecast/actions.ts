@@ -1,16 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { runOrRedirect, str, optStr, intOrNull } from "@/lib/action-utils";
 import { parseNumber } from "@/lib/money";
 import { isDate, today } from "@/lib/dates";
 import { getForecastSettings, saveForecastSettings, loadPlans, soldHistory, suggestSale, costSuggestions, calibrationFor, vehicleLabel } from "@/lib/forecast-data";
-import { DEFAULT_FORECAST_SETTINGS } from "@/lib/forecast";
 
-const { forecastPlans, forecastPlanCosts, forecastItems, vehicles } = schema;
+const { forecastPlans, forecastPlanCosts, forecastItems, forecastSettings, vehicles } = schema;
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 const back = (cid: number, page: string) => `/c/${cid}/forecast${page ? `/${page}` : ""}`;
 const ok = (cid: number, page: string, msg: string) => `${back(cid, page)}?ok=${encodeURIComponent(msg)}`;
@@ -125,6 +124,18 @@ export async function clearSalePlanAction(fd: FormData) {
     else await db.delete(forecastPlans).where(eq(forecastPlans.id, id));
     refresh(cid);
     return ok(cid, "stock", c ? "Eladási terv törölve (a tervezett költségek megmaradtak)." : "Eladási terv törölve.");
+  });
+}
+
+/** Az összes tervezett beszerzés (gépkocsihoz nem kötött terv) törlése a hozzájuk tartozó tervezett költségekkel együtt.
+ *  A készleten lévő autók eladási tervei megmaradnak. */
+export async function deleteAllPlannedAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(back(cid, "stock"), async () => {
+    const del = await db.delete(forecastPlans).where(and(eq(forecastPlans.companyId, cid), isNull(forecastPlans.vehicleId))).returning({ id: forecastPlans.id });
+    refresh(cid);
+    return ok(cid, "stock", del.length ? `${del.length} tervezett beszerzés törölve.` : "Nem volt tervezett beszerzés.");
   });
 }
 
@@ -260,6 +271,17 @@ export async function deleteItemAction(fd: FormData) {
   });
 }
 
+/** A Költségek fül összes tervtételének törlése. */
+export async function deleteAllItemsAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(back(cid, "costs"), async () => {
+    const del = await db.delete(forecastItems).where(eq(forecastItems.companyId, cid)).returning({ id: forecastItems.id });
+    refresh(cid);
+    return ok(cid, "costs", del.length ? `${del.length} tervtétel törölve.` : "Nem volt tervtétel.");
+  });
+}
+
 /** Ismétlődő költség-javaslat(ok) felvétele (egy vagy az összes). */
 export async function acceptSuggestionsAction(fd: FormData) {
   const cid = cidOf(fd);
@@ -342,14 +364,30 @@ export async function calibrateAction(fd: FormData) {
   });
 }
 
+/** A Forgatókönyvek fül teljes visszaállítása: a mentett beállítás törlődik, így minden (eltérések, horizont, HIPA, TAO)
+ *  az alapértékre áll vissza. */
 export async function resetScenarioAction(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "settings"), async () => {
-    const cur = await getForecastSettings(cid);
-    await saveForecastSettings(cid, { ...cur, pessimistic: DEFAULT_FORECAST_SETTINGS.pessimistic, optimistic: DEFAULT_FORECAST_SETTINGS.optimistic, calibratedFrom: null });
+    await db.delete(forecastSettings).where(eq(forecastSettings.companyId, cid));
     refresh(cid);
-    return ok(cid, "settings", "Visszaállítva az alapértékekre.");
+    return ok(cid, "settings", "Forgatókönyvek visszaállítva az alapértékekre.");
   });
 }
 
+/** A teljes forecast kiürítése: minden eladási terv és tervezett beszerzés (a tervezett költségekkel), minden költség-tervtétel
+ *  és a forgatókönyv-beállítás. A könyvelési (tény) adatokat nem érinti. */
+export async function resetForecastAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(back(cid, ""), async () => {
+    await db.transaction(async (tx) => {
+      await tx.delete(forecastPlans).where(eq(forecastPlans.companyId, cid));
+      await tx.delete(forecastItems).where(eq(forecastItems.companyId, cid));
+      await tx.delete(forecastSettings).where(eq(forecastSettings.companyId, cid));
+    });
+    refresh(cid);
+    return ok(cid, "", "A forecast kiürítve – minden terv, költségtétel és forgatókönyv-beállítás törölve.");
+  });
+}

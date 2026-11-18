@@ -6,6 +6,8 @@ import { addDaysIso } from "@/lib/dates";
 import { runForecast, applyScope, SCENARIOS, SCENARIO_LABEL, GRAN_HU, SCOPE_HU, type Scenario, type FcMonth, type FcResult, type Granularity, type Scope } from "@/lib/forecast";
 import { ForecastTabs, ScenarioSwitch, ScenarioChart } from "@/components/Forecast";
 import { Flash } from "@/components/Flash";
+import { ConfirmButton } from "@/components/ConfirmButton";
+import { resetForecastAction } from "./actions";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
 
@@ -80,7 +82,8 @@ function MonthTable({ r, gran }: { r: FcResult; gran: Granularity }) {
 export default async function ForecastPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
   const sp = await searchParams;
-  await requireCompany(cid);
+  const { role } = await requireCompany(cid);
+  const canWrite = role !== "viewer";
   const view = sp.view === "compare" ? "compare" : "single";
   const sc: Scenario = (SCENARIOS as string[]).includes(sp.sc) ? (sp.sc as Scenario) : "base";
   const gran: Granularity = sp.gran === "week" || sp.gran === "quarter" ? sp.gran : "month";
@@ -103,7 +106,15 @@ export default async function ForecastPage({ params, searchParams }: { params: P
 
   return (
     <div className="viz-sc">
-      <h1>Forecast</h1>
+      <div className="fc-head" style={{ marginBottom: 0 }}>
+        <h1 style={{ margin: 0 }}>Forecast</h1>
+        {canWrite && (
+          <form action={resetForecastAction} className="no-print">
+            <input type="hidden" name="cid" value={cid} />
+            <ConfirmButton message="Biztosan visszaállítod a teljes forecastot? Minden eladási terv, tervezett beszerzés, tervezett autós költség, költség-tervtétel és forgatókönyv-beállítás törlődik. A könyvelési adatokat ez nem érinti." pendingText="Visszaállítás…">Visszaállítás</ConfirmButton>
+          </form>
+        )}
+      </div>
       <ForecastTabs cid={cid} active="" />
       <Flash error={sp.error} ok={sp.ok} />
 
