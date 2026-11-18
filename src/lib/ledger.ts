@@ -255,7 +255,8 @@ export async function vehicleBookValues(tx: DbOrTx, companyId: number, vehicleId
 
 /**
  * Különbözeti ÁFA alap: a gépkocsin megadott beszerzési ár, ha nincs megadva,
- * akkor a gépkocsira könyvelt különbözeti (ÁFA nélküli) beszerzési számlák végösszege.
+ * akkor a gépkocsira könyvelt különbözeti (KÜL) beszerzési számlák végösszege – Áfa tv.: az eladónak fizetett ellenérték.
+ * A hatályon kívüli (TAH) és adómentes tételek (hatósági díj, regisztrációs adó, eredetiségvizsga) NEM részei az alapnak.
  */
 export async function marginPurchaseBase(tx: DbOrTx, companyId: number, vehicleId: number): Promise<number> {
   const [v] = await tx.select().from(vehicles).where(and(eq(vehicles.id, vehicleId), eq(vehicles.companyId, companyId)));
@@ -272,7 +273,8 @@ export async function marginPurchaseBase(tx: DbOrTx, companyId: number, vehicleI
         eq(invoices.direction, "in"),
         eq(invoices.status, "posted"),
         eq(invoiceLines.vehicleId, vehicleId),
-        inArray(vatCodes.kind, ["margin", "out_of_scope", "exempt"]),
+        // csak az eladónak fizetett ellenérték (különbözeti beszerzés) – a hatósági díj, regisztrációs adó stb. nem része
+        eq(vatCodes.kind, "margin"),
       ),
     );
   return Number(row?.s ?? 0);

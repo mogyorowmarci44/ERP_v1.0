@@ -56,6 +56,8 @@ export async function updateEntryMeta(companyId: number, entryId: number, userId
       if (d !== (l.description ?? null)) { patch.description = d; changes.push({ companyId, entryId, lineId: l.id, field: "description", oldValue: l.description, newValue: d, userId }); }
       if (x.partnerId !== l.partnerId) { patch.partnerId = x.partnerId; changes.push({ companyId, entryId, lineId: l.id, field: "partner", oldValue: pName(l.partnerId), newValue: pName(x.partnerId), userId }); }
       if (x.vehicleId !== l.vehicleId) { patch.vehicleId = x.vehicleId; changes.push({ companyId, entryId, lineId: l.id, field: "vehicle", oldValue: vName(l.vehicleId), newValue: vName(x.vehicleId), userId }); }
+      // partner / gépkocsi átírása a lezárt időszak analitikáját (karton, nyitott tételek) változtatná – ott tiltott
+      if ((patch.partnerId !== undefined || patch.vehicleId !== undefined)) await assertPeriodOpen(tx, companyId, e.date);
       if (Object.keys(patch).length) await tx.update(journalLines).set(patch).where(eq(journalLines.id, l.id));
     }
     if (changes.length) await tx.insert(journalLineChanges).values(changes);

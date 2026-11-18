@@ -7,7 +7,7 @@ import { requireCompany } from "@/lib/auth";
 import { errMsg, runOrRedirect, str, optStr } from "@/lib/action-utils";
 import { parseNumber } from "@/lib/money";
 import { isDate } from "@/lib/dates";
-import { deleteEmployee, deleteEmployment, postMonth, saveMonth, saveParams, unpostMonth } from "@/lib/payroll";
+import { deleteEmployee, deleteEmployment, markExternal, postMonth, saveMonth, saveParams, unpostMonth } from "@/lib/payroll";
 import { KIND_LABEL, PARAM_LABELS, defaultParams, type EmploymentKind, type PayrollInput, type PayrollParams } from "@/lib/payroll-calc";
 
 const isPeriod = (p: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(p);
@@ -30,9 +30,21 @@ export async function postPayrollAction(fd: FormData) {
   const { user } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/payroll?period=${period}`;
   await runOrRedirect(back, async () => {
-    const e = await postMonth(cid, period, user.id);
+    const e = await postMonth(cid, period, user.id, { force: fd.get("force") === "1" });
     revalidatePath(`/c/${cid}`, "layout");
     return ok(back, `Bérszámfejtés ${period} könyvelve: ${e.number}.`);
+  });
+}
+
+export async function markExternalAction(fd: FormData) {
+  const cid = Number(fd.get("cid")), period = str(fd, "period"), on = fd.get("on") === "1";
+  await requireCompany(cid, { write: true });
+  const back = `/c/${cid}/payroll?period=${period}`;
+  await runOrRedirect(back, async () => {
+    if (!isPeriod(period)) throw new Error("Hibás hónap.");
+    await markExternal(cid, period, on);
+    revalidatePath(`/c/${cid}`, "layout");
+    return ok(back, on ? `${period}: kézzel könyveltként jelölve – a modul nem könyvel rá.` : `${period}: jelölés levéve.`);
   });
 }
 
