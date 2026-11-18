@@ -12,6 +12,7 @@ import { Scale, BookOpenCheck, Lock, LockOpen } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 const sumBy = (tb: TrialBalanceRow[], pred: (c: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
+const flowBy = (tb: TrialBalanceRow[], pred: (c: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.periodDebit - r.periodCredit, 0);
 
 /** Évzárás: a főkönyvi kivonat és az éves beszámoló évenként – külön a lezárt (előző) évek és a folyó év. */
 export default async function ClosingPage({ params }: { params: Promise<{ cid: string }> }) {
@@ -29,7 +30,7 @@ export default async function ClosingPage({ params }: { params: Promise<{ cid: s
   const data = await Promise.all(years.map(async (y) => {
     const from = `${y}-01-01`, to = y === cur ? monthEnd(t) : `${y}-12-31`;
     const [period, closing] = await Promise.all([trialBalance(cid, from, to), trialBalance(cid, first ?? from, to)]);
-    const preTax = -sumBy(period, (c) => c.startsWith("9")) - sumBy(period, (c) => c.startsWith("5") || c.startsWith("8"));
+    const preTax = -flowBy(period, (c) => c.startsWith("9")) - flowBy(period, (c) => c.startsWith("5") || c.startsWith("8"));
     const total = sumBy(closing, (c) => /^[123]/.test(c));
     const locked = locks.filter((l) => l.year === y).length;
     return { y, from, to, preTax, total, locked, report: stored.includes(y) };
