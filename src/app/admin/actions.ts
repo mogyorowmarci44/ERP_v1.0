@@ -5,6 +5,7 @@ import { and, eq, ne, sql as dsql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
 import { runOrRedirect, str } from "@/lib/action-utils";
+import { setMfaRequired } from "@/lib/app-settings";
 
 const { users, memberships } = schema;
 const ROLES = new Set(["owner", "accountant", "viewer"]);
@@ -63,5 +64,17 @@ export async function logoutEverywhereAction(fd: FormData) {
     if (userId === admin.id) return "/login";
     revalidatePath("/admin");
     return ok(`${u.name} kiléptetve minden eszközről.`);
+  });
+}
+
+/** A kötelező kétlépcsős azonosítás be- és kikapcsolása az egész rendszerre. A beállított hitelesítők megmaradnak. */
+export async function setMfaRequiredAction(fd: FormData) {
+  await requireAdmin();
+  await runOrRedirect("/admin", async () => {
+    const on = fd.get("on") === "1";
+    await setMfaRequired(on);
+    revalidatePath("/admin");
+    // bekapcsoláskor a csak jelszóval szerzett munkamenetek érvénytelenné válnak – ha az adminé is ilyen, újra be kell lépnie
+    return on ? "/admin?ok=" + encodeURIComponent("Kétlépcsős azonosítás bekapcsolva – mindenkinek kötelező.") : "/admin?ok=" + encodeURIComponent("Kétlépcsős azonosítás kikapcsolva – a belépéshez elég a jelszó.");
   });
 }
