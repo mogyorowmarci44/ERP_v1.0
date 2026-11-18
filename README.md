@@ -84,7 +84,10 @@ npm run db:migrate
 npm run dev                     # http://localhost:3000 → első indításkor /setup
 ```
 
-Tesztek: `npm test` (kontírozási logika) és `npm run db:seed-demo` (teljes gépkocsi-életút egy valódi adatbázison, egyensúly- és ÁFA-ellenőrzéssel — **csak teszt adatbázison futtasd**, demó céget hoz létre).
+Tesztek: `npm test` (kontírozási logika, adatbázis nélkül), `npm run test:integration` (teljes könyvelési folyamat egy friss tesztcégen:
+különbözeti ÁFA, helyesbítő számla, beszámítás, párosítás, deviza, sztornó, időszakzár, eszköz, bér, elhatárolás, ÁFA-zárás, kiegészítő import,
+főkönyv / mérleg / ÁFA egyeztetés — `TEST_DATABASE_URL` kell, előtte `DATABASE_URL=… npm run db:migrate`; **soha ne az éles adatbázisra**;
+GitHub Actions minden PR-en lefuttatja egy üres Postgresen) és `npm run db:seed-demo` (teljes gépkocsi-életút egy valódi adatbázison, egyensúly- és ÁFA-ellenőrzéssel — **csak teszt adatbázison futtasd**, demó céget hoz létre).
 
 Séma módosítás: `src/db/schema.ts` szerkesztése → `npm run db:generate` → a generált SQL a `drizzle/` mappába kerül, deploykor automatikusan lefut.
 

@@ -310,6 +310,8 @@ export type InvoiceInput = {
   lines: InvoiceLineInput[];
   /** Belső: a már eltárolt MNB árfolyam újrahasznosítása könyveléskor. */
   storedRate?: { rate: number; rateDate: string | null } | null;
+  /** v2.2 – helyesbítő számla: a helyesbített (eredeti) számla. */
+  correctsInvoiceId?: number | null;
 };
 
 async function loadPostingContext(tx: DbOrTx, companyId: number, partnerId: number, direction: "out" | "in") {
@@ -333,8 +335,32 @@ async function loadPostingContext(tx: DbOrTx, companyId: number, partnerId: numb
   };
 }
 
+/** Egy gépkocsi könyvelt különbözeti eladásai (eredeti + korábbi helyesbítések) – bruttó és ÁFA összesen. */
+async function marginSalesOf(tx: DbOrTx, companyId: number, vehicleId: number, originalInvoiceId: number) {
+  const [r] = await tx
+    .select({ g: sql<number>`coalesce(sum(${invoiceLines.grossHuf}), 0)::float8`, v: sql<number>`coalesce(sum(${invoiceLines.vatHuf}), 0)::float8` })
+    .from(invoiceLines)
+    .innerJoin(invoices, eq(invoices.id, invoiceLines.invoiceId))
+    .innerJoin(vatCodes, eq(vatCodes.id, invoiceLines.vatCodeId))
+    .where(and(eq(invoices.companyId, companyId), eq(invoices.direction, "out"), eq(invoices.status, "posted"), eq(invoiceLines.vehicleId, vehicleId), eq(vatCodes.kind, "margin"),
+      sql`(${invoices.id} = ${originalInvoiceId} or ${invoices.correctsInvoiceId} = ${originalInvoiceId})`));
+  return { gross: Number(r?.g ?? 0), vat: Number(r?.v ?? 0) };
+}
+
+/** Helyesbítő számla: az eredeti létezik, könyvelt, ugyanaz a partner és irány. */
+async function assertCorrectable(tx: DbOrTx, companyId: number, input: InvoiceInput) {
+  if (!input.correctsInvoiceId) return;
+  const [o] = await tx.select().from(invoices).where(and(eq(invoices.id, input.correctsInvoiceId), eq(invoices.companyId, companyId)));
+  if (!o) throw new Error("A helyesbített számla nem található.");
+  if (o.status !== "posted") throw new Error("Csak könyvelt számla helyesbíthető.");
+  if (o.correctsInvoiceId) throw new Error("Helyesbítő számlát nem lehet helyesbíteni – az eredeti számlát helyesbítsd.");
+  if (o.direction !== input.direction || o.partnerId !== input.partnerId) throw new Error("A helyesbítő számla partnere és iránya egyezzen az eredetivel.");
+  if (o.currency !== input.currency) throw new Error("A helyesbítő számla pénzneme egyezzen az eredetivel.");
+}
+
 async function buildFromInput(tx: DbOrTx, companyId: number, input: InvoiceInput, withBookValues: boolean) {
   if (input.lines.length === 0) throw new Error("A számlának legalább egy tétele kell legyen.");
+  await assertCorrectable(tx, companyId, input);
   const ctx = await loadPostingContext(tx, companyId, input.partnerId, input.direction);
   const codeIds = [...new Set(input.lines.map((l) => l.vatCodeId))];
   const codes = await tx.select().from(vatCodes).where(and(eq(vatCodes.companyId, companyId), inArray(vatCodes.id, codeIds)));
@@ -347,13 +373,24 @@ async function buildFromInput(tx: DbOrTx, companyId: number, input: InvoiceInput
     const vc = codeMap.get(l.vatCodeId);
     if (!vc) throw new Error("Ismeretlen ÁFA-kód.");
     let marginPurchaseHuf: number | null = null;
+    let marginVatOverrideHuf: number | null = null;
     if (vc.kind === "margin" && input.direction === "out") {
       if (!l.vehicleId) throw new Error(`Különbözeti tételhez gépkocsit kell választani: „${l.description}”`);
       marginPurchaseHuf = await marginPurchaseBase(tx, companyId, l.vehicleId);
+      if (input.correctsInvoiceId) {
+        // Helyesbítés: a gépkocsi összes (könyvelt) különbözeti eladásának új árrése alapján számolt ÁFA − a már könyvelt ÁFA
+        const prev = await marginSalesOf(tx, companyId, l.vehicleId, input.correctsInvoiceId);
+        const grossNow = roundHuf(Number(l.quantity) * Number(l.unitPrice) * (input.currency === "HUF" ? 1 : Number(input.exchangeRate)));
+        const rate = Number(vc.rate);
+        const newMargin = prev.gross + grossNow - marginPurchaseHuf;
+        const vatTotal = newMargin > 0 ? roundHuf((newMargin * rate) / (100 + rate)) : 0;
+        marginVatOverrideHuf = vatTotal - prev.vat;
+      }
     }
-    lines.push({ ...l, vatRate: Number(vc.rate), vatKind: vc.kind as VatKind, marginPurchaseHuf });
+    lines.push({ ...l, vatRate: Number(vc.rate), vatKind: vc.kind as VatKind, marginPurchaseHuf, marginVatOverrideHuf });
   }
-  const vehicleIds = input.direction === "out" ? lines.filter((l) => l.vehicleId).map((l) => l.vehicleId!) : [];
+  // Helyesbítő számla nem ad el újra gépkocsit: nincs ELÁBÉ / készletcsökkenés (teljes visszavonáshoz a sztornó való)
+  const vehicleIds = input.direction === "out" && !input.correctsInvoiceId ? lines.filter((l) => l.vehicleId).map((l) => l.vehicleId!) : [];
   const bv = withBookValues ? await vehicleBookValues(tx, companyId, vehicleIds) : new Map<number, number>();
   const posting = buildInvoicePosting(
     { direction: input.direction, partnerId: input.partnerId, currency: input.currency, fxRate, invoiceNumber: input.invoiceNumber, lines },
@@ -405,6 +442,7 @@ export async function saveInvoiceDraft(companyId: number, input: InvoiceInput, i
       grossHuf: posting.totals.payableHuf,
       grossFx: posting.totals.payableFx,
       note: input.note ?? null,
+      correctsInvoiceId: input.correctsInvoiceId ?? null,
     };
     let id = invoiceId;
     if (id) {
@@ -455,6 +493,7 @@ async function loadInvoiceInput(tx: DbOrTx, companyId: number, invoiceId: number
     periodic: inv.periodic,
     storedRate: { rate: Number(inv.exchangeRate), rateDate: inv.rateDate },
     note: inv.note,
+    correctsInvoiceId: inv.correctsInvoiceId,
     lines: ls.map((l) => ({
       description: l.description,
       quantity: Number(l.quantity),
@@ -475,7 +514,7 @@ export async function postInvoice(companyId: number, invoiceId: number, userId?:
     if (inv.status !== "draft") throw new Error("A számla már könyvelve vagy sztornózva van.");
     const { posting, lines, ctx, rateInfo } = await buildFromInput(tx, companyId, input, true);
 
-    if (inv.direction === "out") {
+    if (inv.direction === "out" && !inv.correctsInvoiceId) {
       const soldIds = lines.filter((l) => l.vehicleId).map((l) => l.vehicleId!);
       if (soldIds.length) {
         const sold = await tx.select().from(vehicles).where(and(inArray(vehicles.id, soldIds), eq(vehicles.status, "sold")));
@@ -520,7 +559,7 @@ export async function postInvoice(companyId: number, invoiceId: number, userId?:
       .where(eq(invoices.id, inv.id));
 
     if (inv.direction === "out") {
-      const soldIds = lines.filter((l) => l.vehicleId).map((l) => l.vehicleId!);
+      const soldIds = inv.correctsInvoiceId ? [] : lines.filter((l) => l.vehicleId).map((l) => l.vehicleId!);
       if (soldIds.length) await tx.update(vehicles).set({ status: "sold" }).where(inArray(vehicles.id, soldIds));
     } else {
       // Beszerzési dátum kitöltése, ha még üres
@@ -545,6 +584,8 @@ export async function cancelInvoice(companyId: number, invoiceId: number, date: 
       return null;
     }
     if (inv.status === "cancelled") throw new Error("A számla már sztornózva van.");
+    const [corr] = await tx.select({ n: invoices.invoiceNumber }).from(invoices).where(and(eq(invoices.correctsInvoiceId, invoiceId), eq(invoices.status, "posted")));
+    if (corr) throw new Error(`A számlához helyesbítő számla tartozik (${corr.n}) – előbb azt sztornózd.`);
     const pays = await tx.select().from(payments).where(eq(payments.invoiceId, inv.id));
     const activePays = [];
     for (const p of pays) {
@@ -610,9 +651,16 @@ export async function payInvoice(companyId: number, invoiceId: number, input: Pa
     await tx.execute(sql`select id from invoices where id = ${invoiceId} for update`);
     const [inv] = await tx.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
     if (!inv || inv.status !== "posted") throw new Error("Csak könyvelt számla rendezhető.");
-    if (!(input.amountFx > 0)) throw new Error("A kifizetett összeg legyen pozitív.");
     const open = await invoiceOpenAmount(tx, invoiceId);
-    if (input.amountFx > open.openFx + 0.001) throw new Error(`A kifizetés meghaladja a nyitott összeget (${open.openFx} ${inv.currency}).`);
+    // Negatív nyitott összeg (helyesbítő / jóváíró számla): visszatérítés negatív összeggel
+    if (open.openFx < 0) {
+      if (!(input.amountFx < 0)) throw new Error("Jóváíró számlánál a visszatérítés összege negatív (pl. −50 000).");
+      if (input.amountFx < open.openFx - 0.001) throw new Error(`A visszatérítés meghaladja a nyitott összeget (${open.openFx} ${inv.currency}).`);
+      if (inv.currency !== "HUF") throw new Error("Devizás jóváíró számla visszatérítése még nem támogatott – használd a beszámítást vagy vegyes tételt.");
+    } else {
+      if (!(input.amountFx > 0)) throw new Error("A kifizetett összeg legyen pozitív.");
+      if (input.amountFx > open.openFx + 0.001) throw new Error(`A kifizetés meghaladja a nyitott összeget (${open.openFx} ${inv.currency}).`);
+    }
     const settles = Math.abs(open.openFx - input.amountFx) < 0.005;
     const ctx = await loadPostingContext(tx, companyId, inv.partnerId, inv.direction);
     const s = ctx.company.settings;
@@ -699,7 +747,13 @@ export async function reversePayment(companyId: number, paymentId: number, date:
   return db.transaction(async (tx) => {
     const [p] = await tx.select().from(payments).where(and(eq(payments.id, paymentId), eq(payments.companyId, companyId)));
     if (!p) throw new Error("A rendezés nem található.");
-    return reverseEntry(tx, companyId, p.journalEntryId!, date, userId, "pénzügyi rendezés sztornó");
+    if (p.kind === "link") {
+      // Meglévő (kézi) tételhez párosítás: csak a párosítás szűnik meg, a tétel marad
+      await assertPeriodOpen(tx, companyId, p.date);
+      await tx.delete(payments).where(eq(payments.id, p.id));
+      return null;
+    }
+    return reverseEntry(tx, companyId, p.journalEntryId!, date, userId, p.kind === "offset" ? "beszámítás sztornó" : "pénzügyi rendezés sztornó");
   });
 }
 

@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { linkEntryToInvoice, offsetInvoices } from "@/lib/matching";
+import { closeVatPeriod, reopenVatPeriod } from "@/lib/vat-closing";
+import { releaseAccrual } from "@/lib/accruals";
 import { parseDelta, runDelta, type DeltaReport } from "@/lib/delta-import";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -237,6 +240,69 @@ export async function reversePaymentAction(fd: FormData) {
   await runOrRedirect(`/c/${cid}/invoices/${id}`, async () => {
     await reversePayment(cid, Number(fd.get("paymentId")), str(fd, "date") || today(), user.id);
     return `/c/${cid}/invoices/${id}?ok=${encodeURIComponent("Rendezés sztornózva.")}`;
+  });
+}
+
+// --- Párosítás, beszámítás (v2.2) -------------------------------------------
+
+export async function linkEntryAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  const id = Number(fd.get("id"));
+  await runOrRedirect(`/c/${cid}/invoices/${id}`, async () => {
+    const r = await linkEntryToInvoice(cid, id, Number(fd.get("entryId")), parseNumber(fd.get("amount")) || null);
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/invoices/${id}?ok=${encodeURIComponent(`Párosítva: ${r.number} (${r.amount} Ft).`)}`;
+  });
+}
+
+export async function offsetInvoiceAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const id = Number(fd.get("id"));
+  await runOrRedirect(`/c/${cid}/invoices/${id}`, async () => {
+    const date = str(fd, "date");
+    if (!isDate(date)) throw new Error("Hibás dátum.");
+    const e = await offsetInvoices(cid, id, Number(fd.get("otherId")), date, parseNumber(fd.get("amount")) || null, user.id);
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/invoices/${id}?ok=${encodeURIComponent(`Beszámítás könyvelve: ${e.number}.`)}`;
+  });
+}
+
+// --- ÁFA-zárás, elhatárolások (v2.2) ------------------------------------------
+
+export async function closeVatAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const back = `/c/${cid}/reports/vat/closing?year=${str(fd, "to").slice(0, 4)}`;
+  await runOrRedirect(back, async () => {
+    const r = await closeVatPeriod(cid, str(fd, "from"), str(fd, "to"), user.id);
+    revalidatePath(`/c/${cid}`, "layout");
+    return `${back}&ok=${encodeURIComponent(`ÁFA-zárás könyvelve: ${r.entry.number} – ${r.net >= 0 ? "fizetendő" : "visszaigényelhető"} ${Math.abs(r.net)} Ft (468).`)}`;
+  });
+}
+
+export async function reopenVatAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const back = `/c/${cid}/reports/vat/closing?year=${str(fd, "year")}`;
+  await runOrRedirect(back, async () => {
+    await reopenVatPeriod(cid, Number(fd.get("closingId")), user.id);
+    revalidatePath(`/c/${cid}`, "layout");
+    return `${back}&ok=${encodeURIComponent("ÁFA-zárás visszavonva (storno).")}`;
+  });
+}
+
+export async function releaseAccrualAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  const back = `/c/${cid}/closing/accruals`;
+  await runOrRedirect(back, async () => {
+    const date = str(fd, "date");
+    if (!isDate(date)) throw new Error("Hibás dátum.");
+    const e = await releaseAccrual(cid, Number(fd.get("entryId")), date, user.id);
+    revalidatePath(`/c/${cid}`, "layout");
+    return `${back}?ok=${encodeURIComponent(`Elhatárolás feloldva: ${e.number}.`)}`;
   });
 }
 

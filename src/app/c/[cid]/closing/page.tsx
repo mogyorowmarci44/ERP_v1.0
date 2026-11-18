@@ -73,7 +73,11 @@ export default async function ClosingPage({ params }: { params: Promise<{ cid: s
           <h1>Évzárás</h1>
           <span className="muted">{company.name} · főkönyvi kivonat és éves beszámoló évenként</span>
         </div>
-        <Link className="btn" href={`/c/${cid}/settings`}>Időszakok lezárása (Beállítások)</Link>
+        <div className="row">
+          <Link className="btn" href={`/c/${cid}/reports/vat/closing`}>ÁFA-zárás</Link>
+          <Link className="btn" href={`/c/${cid}/closing/accruals`}>Időbeli elhatárolások</Link>
+          <Link className="btn" href={`/c/${cid}/settings`}>Időszakok lezárása (Beállítások)</Link>
+        </div>
       </div>
 
       <h2>Folyó év</h2>

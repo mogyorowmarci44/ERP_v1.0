@@ -16,6 +16,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ ci
   if (inv.status !== "draft") redirect(`/c/${cid}/invoices/${id}?error=${encodeURIComponent("Csak piszkozat szerkeszthető.")}`);
   const lines = await db.select().from(schema.invoiceLines).where(eq(schema.invoiceLines.invoiceId, id)).orderBy(asc(schema.invoiceLines.position));
   const o = await formOptions(cid, lines.filter((l) => l.vehicleId).map((l) => l.vehicleId!));
+  const [orig] = inv.correctsInvoiceId ? await db.select({ id: schema.invoices.id, number: schema.invoices.invoiceNumber }).from(schema.invoices).where(eq(schema.invoices.id, inv.correctsInvoiceId)) : [];
   return (
     <>
       <h1>Számla szerkesztése – {inv.invoiceNumber}</h1>
@@ -28,6 +29,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ ci
         invoiceId={id}
         defaults={lineDefaults(company)}
         {...o}
+        corrects={orig ?? null}
         initial={{
           partnerId: inv.partnerId,
           invoiceNumber: inv.invoiceNumber,

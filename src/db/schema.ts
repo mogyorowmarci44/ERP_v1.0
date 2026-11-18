@@ -134,6 +134,17 @@ export const assetDepreciation = pgTable(
   (t) => [uniqueIndex("asset_depreciation_period").on(t.assetId, t.period)],
 );
 
+/** v2.2 – ÁFA-zárás: a bevallási időszak 466 / 467 egyenlegének átvezetése a 468-ra. */
+export const vatClosings = pgTable("vat_closings", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  fromDate: date("from_date").notNull(),
+  toDate: date("to_date").notNull(),
+  payable: money("payable").notNull(), // + fizetendő, − visszaigényelhető / levonható többlet
+  journalEntryId: integer("journal_entry_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("vat_closings_period").on(t.companyId, t.toDate)]);
+
 /** v2.2 – Bérszámfejtés: évenkénti paraméterek (felülírják a beépített alapértékeket; országos, nem cégenkénti). */
 export const payrollParams = pgTable("payroll_params", {
   year: integer("year").primaryKey(),
@@ -562,6 +573,8 @@ export const invoices = pgTable(
     reuseEntryNumber: varchar("reuse_entry_number", { length: 32 }),
     journalEntryId: integer("journal_entry_id").references(() => journalEntries.id),
     note: text("note"),
+    /** v2.2 – helyesbítő számla: az eredeti (helyesbített) számla. */
+    correctsInvoiceId: integer("corrects_invoice_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -610,8 +623,10 @@ export const payments = pgTable(
     partnerHuf: money("partner_huf").notNull(), // vevő/szállító oldali HUF (számla árfolyamán)
     journalEntryId: integer("journal_entry_id").references(() => journalEntries.id),
     note: text("note"),
+    /** v2.2 – payment: a rendezés saját tétele · link: meglévő (kézi) tételhez párosítva · offset: beszámítás (helyesbítővel). */
+    kind: varchar("kind", { length: 12 }).notNull().default("payment"),
   },
-  (t) => [index("payments_invoice").on(t.invoiceId)],
+  (t) => [index("payments_invoice").on(t.invoiceId), index("payments_entry").on(t.journalEntryId)],
 );
 
 /** Tagi kölcsön befizetések lejárata (a tételek maguk a főkönyvben, a 4791-es számlán vannak). */

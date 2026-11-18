@@ -5,7 +5,8 @@ import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { invoiceOpenAmount } from "@/lib/ledger";
 import { invoicePayments } from "@/lib/reports";
-import { postInvoiceAction, cancelInvoiceAction, renameInvoiceLineAction, reopenInvoiceAction, editPaymentAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction } from "../../actions";
+import { postInvoiceAction, cancelInvoiceAction, renameInvoiceLineAction, reopenInvoiceAction, editPaymentAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction, linkEntryAction, offsetInvoiceAction } from "../../actions";
+import { matchCandidates, offsetCandidates } from "@/lib/matching";
 import { invoiceAudit } from "@/lib/invoice-audit";
 import { vehicleIdent, vehicleTitle } from "@/lib/vehicle-id";
 import { PaymentForm } from "@/components/PaymentForm";
@@ -72,6 +73,12 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
     .orderBy(asc(schema.accounts.code));
   const [audit] = await invoiceAudit(cid, { ids: [id] });
   const isMarginSale = inv.direction === "out" && lines.some((x) => x.vat.kind === "margin");
+  // v2.2 – helyesbítések, párosítás, beszámítás
+  const [corrected] = inv.correctsInvoiceId ? await db.select({ id: schema.invoices.id, number: schema.invoices.invoiceNumber }).from(schema.invoices).where(eq(schema.invoices.id, inv.correctsInvoiceId)) : [];
+  const corrections = await db.select({ id: schema.invoices.id, number: schema.invoices.invoiceNumber, status: schema.invoices.status, gross: schema.invoices.grossFx }).from(schema.invoices).where(and(eq(schema.invoices.companyId, cid), eq(schema.invoices.correctsInvoiceId, id)));
+  const openNonZero = !!open && Math.abs(open.openFx) >= 0.005;
+  const match = openNonZero && canWrite ? await matchCandidates(cid, id) : { candidates: [] };
+  const offsets = openNonZero && canWrite ? await offsetCandidates(cid, id) : [];
 
   return (
     <>
@@ -82,6 +89,9 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
           {[...new Set(lines.filter((x) => x.vat.kind === "margin" && x.veh).map((x) => x.veh!.id))].map((vid) => (
             <Link key={vid} className="btn" href={`/c/${cid}/vehicles/${vid}/karton`}>Különbözeti ÁFA karton{lines.filter((x) => x.veh).length > 1 ? ` (${vehicleIdent(lines.find((x) => x.veh?.id === vid)!.veh!) || vid})` : ""}</Link>
           ))}
+          {canWrite && inv.status === "posted" && !inv.correctsInvoiceId && (
+            <Link className="btn" href={`/c/${cid}/invoices/new?corrects=${id}`}>Helyesbítő számla</Link>
+          )}
           {canWrite && inv.status === "draft" && (
             <>
               <Link className="btn" href={`/c/${cid}/invoices/${id}/edit`}>Szerkesztés</Link>
@@ -150,6 +160,10 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
           {open && <div style={{ marginTop: 6 }}>Nyitott: <strong>{fmtMoney(open.openFx, inv.currency)}</strong></div>}
         </div>
       </div>
+      {corrected && <p>Helyesbítő számla – helyesbíti: <Link href={`/c/${cid}/invoices/${corrected.id}`}>{corrected.number}</Link></p>}
+      {corrections.length > 0 && (
+        <p>Helyesbítések: {corrections.map((c, k) => <span key={c.id}>{k ? ", " : ""}<Link href={`/c/${cid}/invoices/${c.id}`}>{c.number}</Link> ({fmtMoney(c.gross, inv.currency)}{c.status !== "posted" ? `, ${statusHu[c.status]}` : ""})</span>)}</p>
+      )}
       {isMarginSale && <p className="muted">Számlán feltüntetendő: „Különbözet szerinti szabályozás – használt cikkek”. Az ÁFA összege a számlán nem szerepel.</p>}
 
       {canReopen && (
@@ -196,7 +210,8 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
       {inv.status === "posted" && canWrite && (
         <>
           <h2>Pénzügyi rendezés</h2>
-          {open && open.openFx > 0 && (
+          {open && open.openFx < 0 && <p className="muted">Jóváíró (negatív) számla: visszatérítésnél negatív összeget adj meg, vagy számítsd be egy nyitott számlával.</p>}
+          {openNonZero && (
             <PaymentForm
               cid={cid}
               invoiceId={id}
@@ -206,6 +221,44 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
               today={today()}
               moneyAccounts={moneyAccounts.map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency }))}
             />
+          )}
+          {openNonZero && match.candidates.length > 0 && (
+            <details className="card" style={{ marginTop: 12 }} open={match.candidates.some((c) => c.exact)}>
+              <summary><strong>Párosítás meglévő könyvelési tétellel</strong> <span className="muted">– ha a fizetést kézi (bank / pénztár / vegyes) tétellel könyvelted ({match.candidates.length} jelölt)</span></summary>
+              <table style={{ marginTop: 8 }}>
+                <thead><tr><th>Tétel</th><th>Dátum</th><th>Szöveg</th><th className="num">Összeg</th><th className="num">Párosítható</th><th></th></tr></thead>
+                <tbody>
+                  {match.candidates.map((c) => (
+                    <tr key={c.entryId}>
+                      <td className="mono">{c.number}{c.exact && <span className="badge posted" style={{ marginLeft: 6 }}>egyező összeg</span>}{!c.partnerMatch && <span className="badge" style={{ marginLeft: 6 }} title="A tételsorban nincs partner – párosításkor a számla partnere kerül rá">partner nélkül</span>}</td>
+                      <td>{fmtDate(c.date)}</td><td>{c.description}</td>
+                      <td className="num">{fmtHuf(c.amount)}</td><td className="num">{fmtHuf(c.remaining)}</td>
+                      <td>
+                        <form action={linkEntryAction} className="row" style={{ gap: 6 }}>
+                          <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} /><input type="hidden" name="entryId" value={c.entryId} />
+                          <input name="amount" className="num" style={{ width: 110 }} defaultValue={String(Math.min(c.remaining, Math.abs(open!.openFx)))} aria-label="Párosított összeg" />
+                          <button className="primary">Párosítás</button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          )}
+          {openNonZero && offsets.length > 0 && (
+            <details className="card" style={{ marginTop: 12 }}>
+              <summary><strong>Beszámítás</strong> <span className="muted">– ellentétes előjelű nyitott számla ugyanennél a partnernél ({offsets.length})</span></summary>
+              {offsets.map((o) => (
+                <form key={o.id} action={offsetInvoiceAction} className="row" style={{ gap: 8, marginTop: 8, alignItems: "end" }}>
+                  <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} /><input type="hidden" name="otherId" value={o.id} />
+                  <span><Link href={`/c/${cid}/invoices/${o.id}`}>{o.number}</Link> · nyitott {fmtHuf(o.open)} Ft</span>
+                  <label>Összeg<input name="amount" className="num" style={{ width: 110 }} defaultValue={String(Math.min(Math.abs(o.open), Math.abs(open!.openFx)))} /></label>
+                  <label>Dátum<input type="date" name="date" defaultValue={today()} /></label>
+                  <button>Beszámítás könyvelése</button>
+                </form>
+              ))}
+            </details>
           )}
         </>
       )}
@@ -217,10 +270,10 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
               <tr key={x.p.id} className={x.reversed ? "reversed" : undefined}>
                 <td>{fmtDate(x.p.date)}</td><td>{x.accountCode} {x.accountName}</td>
                 <td className="num">{fmtMoney(x.p.amountFx, inv.currency)}</td><td className="num">{inv.currency !== "HUF" ? x.p.fxRate : ""}</td>
-                <td className="num">{fmtHuf(x.p.amountHuf)}</td><td className="mono">{x.entryNumber}</td>
+                <td className="num">{fmtHuf(x.p.amountHuf)}</td><td className="mono">{x.entryNumber}{x.p.kind !== "payment" && <span className="badge" style={{ marginLeft: 6 }}>{x.p.kind === "link" ? "párosítva" : "beszámítás"}</span>}</td>
                 <td>{!x.reversed && canWrite && (
                   <div className="row" style={{ gap: 6, alignItems: "flex-start" }}>
-                    {!locked && !(x.p.journalEntryId && entryById.get(x.p.journalEntryId)?.checkedAt) && (
+                    {x.p.kind === "payment" && !locked && !(x.p.journalEntryId && entryById.get(x.p.journalEntryId)?.checkedAt) && (
                       <details className="fc-more">
                         <summary>javítás</summary>
                         <form action={editPaymentAction} className="row" style={{ gap: 6, marginTop: 6, flexWrap: "wrap" }}>
@@ -235,7 +288,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                         </form>
                       </details>
                     )}
-                    <form action={reversePaymentAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="invoiceId" value={id} /><input type="hidden" name="paymentId" value={x.p.id} /><button className="danger">Sztornó</button></form>
+                    <form action={reversePaymentAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="invoiceId" value={id} /><input type="hidden" name="paymentId" value={x.p.id} /><button className="danger">{x.p.kind === "link" ? "Párosítás bontása" : "Sztornó"}</button></form>
                   </div>
                 )}</td>
               </tr>
