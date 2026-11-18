@@ -8,7 +8,7 @@ import { PayrollGrid } from "@/components/PayrollGrid";
 import { fmtHuf } from "@/lib/money";
 import { today } from "@/lib/dates";
 import { loadMonth, openMonths, periodEnd } from "@/lib/payroll";
-import { postPayrollAction, unpostPayrollAction } from "./actions";
+import { postPayrollAction, unpostPayrollAction, markExternalAction } from "./actions";
 import { Users, SlidersHorizontal, ChevronLeft, ChevronRight, CircleCheck, TriangleAlert } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +28,7 @@ export default async function PayrollPage({ params, searchParams }: { params: Pr
   const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.period ?? "") ? sp.period : cur;
   const [m, open] = await Promise.all([loadMonth(cid, period), openMonths(cid, Number(period.slice(0, 4)))]);
   const posted = m.run?.status === "posted";
+  const external = m.run?.status === "external";
   const t = m.totals;
 
   return (
@@ -49,7 +50,8 @@ export default async function PayrollPage({ params, searchParams }: { params: Pr
         <form className="row" style={{ gap: 6 }}><input type="month" name="period" defaultValue={period} /><button>Ugrás</button></form>
         <Link className="btn" href={`?period=${shift(period, 1)}`}>{MONTH[Number(shift(period, 1).slice(5)) - 1]} <ChevronRight size={16} /></Link>
         {posted
-          ? <span className="badge posted"><CircleCheck size={12} /> könyvelve{m.run?.journalEntryId ? "" : ""}</span>
+          ? <span className="badge posted"><CircleCheck size={12} /> könyvelve</span>
+          : external ? <span className="badge posted"><CircleCheck size={12} /> kézzel könyvelve</span>
           : <span className="badge draft">nincs könyvelve</span>}
         {open.filter((p) => p !== period).length > 0 && (
           <span className="badge overdue" title="Élő jogviszony mellett nem könyvelt hónapok">
@@ -58,9 +60,28 @@ export default async function PayrollPage({ params, searchParams }: { params: Pr
         )}
       </div>
 
+      {!posted && m.manualHits.length > 0 && (
+        <div className={`flash ${external ? "ok" : "error"}`} style={{ marginBottom: 12 }}>
+          {external ? "Ennek a hónapnak a bére kézi tétellel van könyvelve: " : "Ebben a hónapban már van kézzel könyvelt bértétel – a modul nem könyvel rá (dupla könyvelés lenne): "}
+          {m.manualHits.map((h, i) => <span key={h.id}>{i ? ", " : ""}<Link href={`/c/${cid}/journal/${h.id}/edit`} title={h.description}>{h.number}</Link></span>)}.
+          {!external && canWrite && (
+            <form action={markExternalAction} style={{ display: "inline", marginLeft: 8 }}>
+              <input type="hidden" name="cid" value={cid} /><input type="hidden" name="period" value={period} /><input type="hidden" name="on" value="1" />
+              <button className="primary small">Kézzel könyveltnek jelölöm</button>
+            </form>
+          )}
+        </div>
+      )}
+      {external && canWrite && (
+        <form action={markExternalAction} className="row" style={{ marginBottom: 12 }}>
+          <input type="hidden" name="cid" value={cid} /><input type="hidden" name="period" value={period} /><input type="hidden" name="on" value="0" />
+          <button className="small">„Kézzel könyvelve” jelölés levétele</button>
+        </form>
+      )}
+
       <PayrollGrid
-        key={`${period}-${posted ? "posted" : "open"}`}
-        cid={cid} period={period} params={m.params} locked={posted || !canWrite}
+        key={`${period}-${posted ? "posted" : external ? "external" : "open"}`}
+        cid={cid} period={period} params={m.params} locked={posted || external || !canWrite}
         rows={m.rows.map((r) => ({ employmentId: r.employmentId, name: r.name, position: r.position, employment: r.employment, input: r.input, ytd: r.ytd }))}
       />
 
@@ -109,10 +130,13 @@ export default async function PayrollPage({ params, searchParams }: { params: Pr
                       <input type="hidden" name="cid" value={cid} /><input type="hidden" name="period" value={period} />
                       <ConfirmButton message={`Visszavonod a(z) ${period} bérszámfejtés könyvelését? Storno tétel készül ${periodEnd(period)} dátummal.`} pendingText="Visszavonás…">Könyvelés visszavonása</ConfirmButton>
                     </form>
+                  ) : external ? (
+                    <span className="muted small">Kézzel könyvelt hónap – a modul nem könyvel.</span>
                   ) : (
                     <form action={postPayrollAction}>
                       <input type="hidden" name="cid" value={cid} /><input type="hidden" name="period" value={period} />
-                      <ConfirmButton className="primary" message={`Könyveljem a(z) ${period} bérszámfejtést (${periodEnd(period)}, VN)? Előtte mentsd a bértáblát.`} pendingText="Könyvelés…">Hónap könyvelése</ConfirmButton>
+                      {m.manualHits.length > 0 && <input type="hidden" name="force" value="1" />}
+                      <ConfirmButton className={m.manualHits.length ? "danger" : "primary"} message={m.manualHits.length ? `FIGYELEM: ebben a hónapban már van kézi bértétel (${m.manualHits.map((h) => h.number).join(", ")}). Csak akkor könyveld, ha az nem ugyanennek a bérnek a könyvelése. Mégis könyveljem?` : `Könyveljem a(z) ${period} bérszámfejtést (${periodEnd(period)}, VN)? Előtte mentsd a bértáblát.`} pendingText="Könyvelés…">{m.manualHits.length ? "Mégis könyvelem" : "Hónap könyvelése"}</ConfirmButton>
                     </form>
                   )}
                 </div>

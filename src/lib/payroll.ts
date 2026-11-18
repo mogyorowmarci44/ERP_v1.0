@@ -10,7 +10,7 @@
  *   béren kívüli juttatás          T 551 / K 471, közterhe T 551 / K 462 és T 561 / K 463
  * A kifizetés (T 471 / K 38x) és az adók befizetése (T 462, 463 / K 38x) a bank-/pénztártételekkel megy.
  */
-import { and, asc, eq, inArray, like } from "drizzle-orm";
+import { and, asc, eq, inArray, like, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { accountIdByCode, postEntry, reverseEntry } from "./ledger";
 import { today } from "./dates";
@@ -85,7 +85,22 @@ export async function loadMonth(companyId: number, period: string) {
       rows.push({ employmentId: e.id, employeeId: p.id, name: p.name, position: p.position, employment: emp, input, ytd, result: calcPayroll(emp, input, params, period, ytd) });
     }
   }
-  return { period, params, run, rows, totals: sumResults(rows.map((r) => r.result)) };
+  return { period, params, run, rows, totals: sumResults(rows.map((r) => r.result)), manualHits: await manualPayrollEntries(companyId, period) };
+}
+
+/**
+ * Kézzel (nem a bérmodulból) könyvelt bértételek a hónapban – 541 / 551 / 561 / 471 számlán.
+ * Ha vannak, a modul nem könyvel automatikusan (dupla könyvelés veszélye), csak „kézzel könyveltnek” jelölhető.
+ */
+export async function manualPayrollEntries(companyId: number, period: string) {
+  const rows = (await db.execute(sql`
+    select distinct e.id, e.number, e.description from journal_entries e
+    join journal_lines l on l.entry_id = e.id join accounts a on a.id = l.account_id
+    where e.company_id = ${companyId} and e.date between ${`${period}-01`} and ${periodEnd(period)}
+      and coalesce(e.source_type, '') not in ('payroll', 'storno') and e.reversed_by_id is null
+      and (a.code like '541%' or a.code like '551%' or a.code like '561%' or a.code like '471%')
+    order by e.number`)) as unknown as Array<{ id: number; number: string; description: string }>;
+  return rows;
 }
 
 async function ensureRun(companyId: number, period: string) {
@@ -97,7 +112,7 @@ async function ensureRun(companyId: number, period: string) {
 
 export async function saveMonth(companyId: number, period: string, inputs: Record<number, PayrollInput>) {
   const run = await ensureRun(companyId, period);
-  if (run.status === "posted") throw new Error("A hónap már könyvelve van – előbb vond vissza a könyvelést.");
+  if (run.status !== "draft") throw new Error(run.status === "external" ? "A hónap kézzel könyveltként van jelölve – előbb vedd le a jelölést." : "A hónap már könyvelve van – előbb vond vissza a könyvelést.");
   const ids = Object.keys(inputs).map(Number);
   const owned = ids.length ? await db.select({ id: s.employments.id }).from(s.employments).where(and(eq(s.employments.companyId, companyId), inArray(s.employments.id, ids))) : [];
   for (const { id } of owned) {
@@ -115,10 +130,13 @@ function sanitize(x: PayrollInput | undefined): PayrollInput {
 }
 
 /** Könyvelés: egy VN tétel a hónap utolsó napjával. */
-export async function postMonth(companyId: number, period: string, userId?: number) {
+export async function postMonth(companyId: number, period: string, userId?: number, opts: { force?: boolean } = {}) {
   const m = await loadMonth(companyId, period);
   if (!m.rows.length) throw new Error("Ebben a hónapban nincs élő jogviszony.");
   if (m.run?.status === "posted") throw new Error("A hónap már könyvelve van.");
+  if (m.run?.status === "external") throw new Error("A hónap kézzel könyveltként van jelölve – előbb vedd le a jelölést.");
+  if (m.manualHits.length && !opts.force)
+    throw new Error(`Ebben a hónapban már van kézzel könyvelt bértétel (${m.manualHits.map((h) => h.number).join(", ")}) – dupla könyvelés lenne. Jelöld a hónapot „kézzel könyveltnek”, vagy előbb stornózd a kézi tételt.`);
   const run = m.run ?? (await ensureRun(companyId, period));
   return db.transaction(async (tx) => {
     const acc = async (code: string) => accountIdByCode(tx, companyId, code);
@@ -150,6 +168,13 @@ export async function postMonth(companyId: number, period: string, userId?: numb
   });
 }
 
+/** A hónap jelölése: a bérét kézzel (vegyes tétellel) könyvelték – a modul nem könyvel rá, és nem jelzi könyveletlennek. */
+export async function markExternal(companyId: number, period: string, on: boolean) {
+  const run = await ensureRun(companyId, period);
+  if (run.status === "posted") throw new Error("A hónapot a bérmodul könyvelte – ott a visszavonás a helyes út.");
+  await db.update(s.payrollRuns).set({ status: on ? "external" : "draft" }).where(eq(s.payrollRuns.id, run.id));
+}
+
 /** Könyvelés visszavonása: storno a hónap utolsó napjával, a hónap újra szerkeszthető. */
 export async function unpostMonth(companyId: number, period: string, userId?: number) {
   const [run] = await db.select().from(s.payrollRuns).where(and(eq(s.payrollRuns.companyId, companyId), eq(s.payrollRuns.period, period)));
@@ -165,7 +190,7 @@ export async function unpostMonth(companyId: number, period: string, userId?: nu
 export async function openMonths(companyId: number, year: number) {
   const emps = await db.select().from(s.employments).where(eq(s.employments.companyId, companyId));
   if (!emps.length) return [];
-  const runs = await db.select().from(s.payrollRuns).where(and(eq(s.payrollRuns.companyId, companyId), like(s.payrollRuns.period, `${year}-%`), eq(s.payrollRuns.status, "posted")));
+  const runs = await db.select().from(s.payrollRuns).where(and(eq(s.payrollRuns.companyId, companyId), like(s.payrollRuns.period, `${year}-%`), inArray(s.payrollRuns.status, ["posted", "external"])));
   const cur = today().slice(0, 7);
   const out: string[] = [];
   for (let m = 1; m <= 12; m++) {
