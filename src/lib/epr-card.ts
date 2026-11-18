@@ -54,7 +54,7 @@ async function vehicleDocs(companyId: number, vehicleIds: number[]) {
   return db
     .select({
       vehicleId: invoiceLines.vehicleId, dir: invoices.direction, invoiceId: invoices.id, date: invoices.fulfillmentDate, number: invoices.invoiceNumber,
-      note: invoices.note, currency: invoices.currency, description: invoiceLines.description, grossHuf: invoiceLines.grossHuf, vatCode: vatCodes.code,
+      note: invoices.note, currency: invoices.currency, description: invoiceLines.description, grossHuf: invoiceLines.grossHuf, vatCode: vatCodes.code, vatKind: vatCodes.kind,
       pName: partners.name, pCountry: partners.country, pPriv: partners.isPrivatePerson, pTax: partners.taxNumber,
     })
     .from(invoiceLines)
@@ -79,7 +79,10 @@ function build(company: EprCard["company"], vehicle: EprCard["vehicle"], rows: D
 
   // Származás: kézi felülírás > az első beszerzési számla eladójának országa.
   const override = vehicle.eprOrigin === "import" || vehicle.eprOrigin === "domestic" ? (vehicle.eprOrigin as EprOrigin) : null;
-  const firstPurchase = purchases[0];
+  // Az autó tényleges beszerzése a különbözeti adózású (margin) beszerzési sor – nem az olajcsere, alkatrész vagy tankolás,
+  // ami a vételnél korábbi dátumú is lehet. Ha nincs ilyen, a legkorábbi beszerzési bizonylat.
+  const marginIds = new Set(rows.filter((r) => r.dir === "in" && r.vatKind === "margin").map((r) => r.invoiceId));
+  const firstPurchase = purchases.find((p) => marginIds.has(p.invoiceId)) ?? purchases[0];
   const origin: EprOrigin | null = override ?? (firstPurchase ? (firstPurchase.partnerCountry === "HU" ? "domestic" : "import") : null);
   const originSource: EprCard["originSource"] = override ? "override" : firstPurchase ? "invoice" : "none";
 
