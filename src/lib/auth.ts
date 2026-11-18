@@ -5,6 +5,7 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { and, eq, getTableColumns } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { mfaRequired } from "@/lib/app-settings";
 
 const COOKIE = "mmerp_session";
 const MAX_AGE = 60 * 60 * 12; // 12 óra
@@ -25,9 +26,9 @@ export async function verifyPassword(pw: string, hash: string) {
 
 type SessionUser = { id: number; sessionVersion: number };
 
-/** Teljes (jelszó + 2FA után kiadott) munkamenet. */
-export async function createSession(u: SessionUser) {
-  const token = await new SignJWT({ uid: u.id, tv: u.sessionVersion, mfa: true })
+/** Teljes munkamenet. `method`: "totp" = jelszó + 2FA, "none" = csak jelszó (amikor az admin kikapcsolta a kötelező 2FA-t). */
+export async function createSession(u: SessionUser, method: "totp" | "none" = "totp") {
+  const token = await new SignJWT({ uid: u.id, tv: u.sessionVersion, mfa: method })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
@@ -53,7 +54,9 @@ export async function getUser() {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
-    if (payload.mfa !== true) return null;
+    // 2FA-val szerzett munkamenet mindig érvényes; csak jelszavas csak akkor, ha a 2FA nincs kötelezővé téve
+    const viaTotp = payload.mfa === true || payload.mfa === "totp";
+    if (!viaTotp && !(payload.mfa === "none" && !(await mfaRequired()))) return null;
     const uid = Number(payload.uid);
     const [u] = await db.select().from(schema.users).where(eq(schema.users.id, uid));
     if (!u || Number(payload.tv) !== u.sessionVersion) return null;

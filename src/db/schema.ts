@@ -79,6 +79,13 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
 });
 
+/** v2.2 – Rendszerszintű beállítások (kulcs → JSON), pl. a kétlépcsős azonosítás kötelezősége. */
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Cégszintű könyvelési beállítások (alapértelmezett főkönyvi számlák kódjai). */
 export type CompanySettings = {
   receivableDomestic: string; // 311
@@ -101,6 +108,9 @@ export type CompanySettings = {
   eprFlatRate?: boolean | null;
   /** EPR – a KF kód 8. karaktere (származáskód) külföldről behozott gépjárműre. */
   eprOriginDigit?: string | null;
+  /** v2.2 – Cégérték: eredményszorzó (alap 3) és diszkontráta (alap 0,15 = 15%/év). */
+  valuationMultiple?: number | null;
+  valuationDiscountRate?: number | null;
 };
 
 /** v2.0 – Adószámos magánszemély (pl. szálláshely-szolgáltatás) adózási profilja. */

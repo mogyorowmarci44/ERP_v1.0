@@ -3,7 +3,8 @@ import { asc } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
 import { logoutAction } from "../auth-actions";
-import { setAccessAction, resetMfaAction, logoutEverywhereAction } from "./actions";
+import { setAccessAction, resetMfaAction, logoutEverywhereAction, setMfaRequiredAction } from "./actions";
+import { mfaRequired } from "@/lib/app-settings";
 import { RoleSelect } from "./RoleSelect";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { Flash } from "@/components/Flash";
@@ -24,6 +25,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     db.select({ id: schema.companies.id, name: schema.companies.name, entityType: schema.companies.entityType }).from(schema.companies).orderBy(asc(schema.companies.name)),
     db.select().from(schema.memberships),
   ]);
+  const required = await mfaRequired();
   const roleOf = (uid: number, cid: number) => members.find((m) => m.userId === uid && m.companyId === cid)?.role ?? "none";
   const now = new Date();
 
@@ -42,6 +44,24 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </form>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
+
+      <div className="card fc-head" style={{ marginTop: 6 }}>
+        <div>
+          <strong>Kétlépcsős azonosítás:</strong>{" "}
+          {required ? <span className="badge posted">kötelező mindenkinek</span> : <span className="badge draft">kikapcsolva – elég a jelszó</span>}
+          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            {required
+              ? "Kikapcsolva a belépéshez csak a jelszó kell. A már beállított hitelesítő alkalmazások megmaradnak, visszakapcsoláskor nem kell újra beállítani."
+              : "Bekapcsoláskor mindenkinek kötelező lesz; aki csak jelszóval van bent, annak újra be kell lépnie (és ha még nincs 2FA-ja, beállítania)."}
+          </div>
+        </div>
+        <form action={setMfaRequiredAction}>
+          <input type="hidden" name="on" value={required ? "0" : "1"} />
+          {required
+            ? <ConfirmButton message="Biztosan kikapcsolod a kétlépcsős azonosítást az egész ERP-re? Ezután a belépéshez elég lesz a jelszó.">2FA kikapcsolása</ConfirmButton>
+            : <ConfirmButton className="primary" message="Bekapcsolod a kötelező kétlépcsős azonosítást? Aki csak jelszóval van bent, annak újra be kell lépnie.">2FA bekapcsolása</ConfirmButton>}
+        </form>
+      </div>
 
       <h2>Ki mihez fér hozzá</h2>
       <p className="muted" style={{ marginTop: -4 }}>

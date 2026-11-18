@@ -45,6 +45,7 @@ Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Air
 |---|---|
 | Kétlépcsős azonosítás | Kötelező mindenkinek: jelszó + hitelesítő alkalmazás (TOTP, 6 jegy / 30 mp). Első belépéskor QR-kódos beállítás és 10 egyszer használható tartalékkód; 5 hibás kód → 15 perc zárolás; jelszócsere és 2FA visszaállítás a többi eszközt kilépteti |
 | Admin (/admin) | Felhasználó × cég hozzáférési mátrix (szerepkör azonnal szerkeszthető, az utolsó tulajdonos védett), 2FA állapot, tartalékkódok, utolsó belépés, 2FA visszaállítása, kiléptetés |
+| Cégérték | Új csempe az Áttekintésen (csak Bt / Kft / Zrt): korrigált nettó eszközérték; kattintásra a részletező oldal mindhárom számítással – korrigált nettó eszközérték, eredményszorzós (szorzó beállítható, alap 3), előretekintő (Forecast, három forgatókönyv, diszkontráta beállítható) |
 | Forecast | „Összes törlése” a tervezett beszerzéseknél és a költségeknél; „Visszaállítás” a Forgatókönyveknél (alapértékek) és a Kimutatáson (a teljes forecast kiürítése) |
 
 ## v2.1.0 – EPR (kiterjesztett gyártói felelősség) – gépjármű · DRAFT

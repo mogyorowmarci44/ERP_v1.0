@@ -134,6 +134,13 @@
       "when": 1794991718941,
       "tag": "0018_v2_2fa",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795000127887,
+      "tag": "0019_v2_app_settings",
+      "breakpoints": true
     }
   ]
 }

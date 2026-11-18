@@ -5,6 +5,7 @@ import { and, eq, sql as dsql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { createSession, destroySession, hashPassword, verifyPassword, requireUser, startMfa, getPendingMfa, clearPendingMfa } from "@/lib/auth";
 import { verifyTotp, normalizeRecoveryCode, hashRecoveryCode } from "@/lib/totp";
+import { mfaRequired } from "@/lib/app-settings";
 import { createCompany } from "@/lib/ledger";
 import { taxProfileFromForm } from "@/lib/entity";
 import { wipeCompanyData } from "@/lib/importer";
@@ -26,6 +27,12 @@ export async function loginAction(fd: FormData) {
     const email = str(fd, "email").toLowerCase();
     const [u] = await db.select().from(schema.users).where(eq(schema.users.email, email));
     if (!u || !(await verifyPassword(str(fd, "password"), u.passwordHash))) throw new Error("Hibás e-mail cím vagy jelszó.");
+    if (!(await mfaRequired())) {
+      // az admin kikapcsolta a kötelező 2FA-t: elég a jelszó
+      await db.update(schema.users).set({ lastLoginAt: new Date() }).where(eq(schema.users.id, u.id));
+      await createSession(u, "none");
+      return "/";
+    }
     assertNotLocked(u);
     return startMfa(u);
   });
@@ -117,6 +124,7 @@ export async function setupAction(fd: FormData) {
       .insert(schema.users)
       .values({ email: str(fd, "email").toLowerCase(), name: str(fd, "name"), passwordHash: await hashPassword(pw), isAdmin: true })
       .returning();
+    if (!(await mfaRequired())) { await createSession(u, "none"); return "/"; }
     return startMfa(u);
   });
 }
@@ -193,7 +201,7 @@ export async function changePasswordAction(fd: FormData) {
     if (pw.length < 10) throw new Error("Az új jelszó legalább 10 karakter legyen.");
     // a többi eszközön lévő munkamenet kilép, ez az eszköz bejelentkezve marad
     const [u] = await db.update(schema.users).set({ passwordHash: await hashPassword(pw), sessionVersion: dsql`${schema.users.sessionVersion} + 1` }).where(eq(schema.users.id, user.id)).returning();
-    await createSession(u);
+    await createSession(u, (await mfaRequired()) ? "totp" : "none");
     return `/?ok=${encodeURIComponent("Jelszó módosítva.")}`;
   });
 }
