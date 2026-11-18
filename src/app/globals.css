@@ -764,3 +764,10 @@ table.access-matrix th.co { min-width: 140px; }
 table.access-matrix td select { min-width: 130px; }
 .role-owner { color: var(--pos, inherit); font-weight: 600; }
 .role-none { color: var(--muted); }
+a.lp-value { text-decoration: none; color: inherit; cursor: pointer; }
+a.lp-value:hover { border-color: var(--accent); }
+.cv-sec { margin-top: 14px; }
+.cv-sec h2 { margin-top: 0; }
+table.cv-calc { width: 100%; max-width: 760px; }
+table.cv-calc td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.cv-calc tr.total td { font-weight: 700; border-top: 2px solid var(--ink, currentColor); border-bottom: none; }

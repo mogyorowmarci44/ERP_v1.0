@@ -11,6 +11,7 @@ import { isPrivate } from "@/lib/entity";
 import { nextVatDeadline } from "@/lib/vat-deadline";
 import { GhOverview } from "./gh/Overview";
 import { cashSplit } from "@/lib/cash-split";
+import { companyValue, valuationParamsFor } from "@/lib/company-value";
 
 const INBOX_TODO = ["review", "error", "new", "extracted"];
 const STALE_DAYS = 90;
@@ -44,6 +45,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
     db.select({ at: max(schema.journalEntries.createdAt) }).from(schema.journalEntries).where(eq(schema.journalEntries.companyId, cid)),
     cashSplit(cid, t),
   ]);
+  const cv = await companyValue(cid, await valuationParamsFor(cid));
   const bal = (pred: (code: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
   const revenue = -bal((c) => c.startsWith("9"));
   const costs = bal((c) => c.startsWith("5") || c.startsWith("8"));
@@ -115,7 +117,11 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
           </Link>
         ))}
       </div>
-      <div className="grid cols-3 lp-kpi">
+      <div className="grid cols-4 lp-kpi">
+        <Link href={`${b}/value`} className="card stat lp-value" title="Korrigált nettó eszközérték – kattints a három számításért">
+          <div className="label">Cégérték</div>
+          <div className={cv.nav.value < 0 ? "value neg" : "value"}>{eFt(cv.nav.value)}</div>
+        </Link>
         <div className="card stat"><div className="label">Készlet ({inStock.length} db)</div><div className="value">{eFt(stockValue)}</div></div>
         <div className="card stat"><div className="label">Eredmény (év, adózás előtt)</div><div className={result < 0 ? "value neg" : "value"}>{eFt(result)}</div></div>
         <div className="card stat"><div className="label">ÁFA egyenleg (tárgyhó)</div><div className="value">{eFt(vat.balance)}</div></div>

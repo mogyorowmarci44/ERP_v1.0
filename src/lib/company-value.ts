@@ -1,0 +1,144 @@
+/**
+ * v2.2 – Cégérték (kereskedő cégekre) – három módszer:
+ *  1. Korrigált nettó eszközérték: könyv szerinti saját tőke, a készlet a várható nettó eladási értéken, a becsült adóval.
+ *  2. Eredményszorzós: (elmúlt 12 hónap adózás előtti eredménye + értékcsökkenés) × szorzó + pénzeszközök − hitelek / tagi kölcsön.
+ *  3. Előretekintő: könyv szerinti saját tőke + a Forecast következő 12 havi adózott eredményének jelenértéke (három forgatókönyv).
+ */
+import { db, schema } from "@/db";
+import { eq } from "drizzle-orm";
+import { trialBalance, type TrialBalanceRow } from "./reports";
+import { addDaysIso, today } from "./dates";
+import { firstEntryDate, loadForecastInput, loadPlans, vehicleLabel } from "./forecast-data";
+import { runForecast, SCENARIOS, type Scenario } from "./forecast";
+import { round2 } from "./money";
+
+export const DEFAULT_VALUATION_MULTIPLE = 3;
+export const DEFAULT_DISCOUNT_RATE = 0.15;
+
+type Line = { label: string; amount: number; hint?: string };
+export type StockRevaluation = { label: string; bookValue: number; salePrice: number | null; marginVat: number; plannedCosts: number; netRealizable: number; uplift: number };
+
+export type CompanyValue = {
+  asOf: string;
+  rates: { tao: number; hipa: number };
+  balance: { assets: number; liabilities: number; bookEquity: number; cash: number; stockBook: number; receivables: number; payables: number; memberLoans: number; bankLoans: number; vatPayable: number };
+  nav: { lines: Line[]; stock: StockRevaluation[]; uplift: number; taxBase: number; tax: number; value: number };
+  multiple: { lines: Line[]; from: string; months: number; annualized: boolean; preTax: number; depreciation: number; earnings: number; multiple: number; value: number };
+  forward: { lines: Line[]; discountRate: number; months: number; empty: boolean; scenarios: Record<Scenario, { preTax: number; afterTax: number; pv: number; value: number }> };
+};
+
+const mv = (gross: number, base: number) => Math.max(0, Math.round(((gross - base) * 27) / 127));
+const sumBy = (tb: TrialBalanceRow[], pred: (code: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
+const monthsBetween = (a: string, b: string) => Math.max(0, (Date.parse(b) - Date.parse(a)) / (86400000 * 30.4375));
+
+export async function companyValue(companyId: number, opts: { multiple?: number; discountRate?: number } = {}): Promise<CompanyValue> {
+  const t = today();
+  const yearAgo = addDaysIso(t, -365);
+  const first = (await firstEntryDate(companyId)) ?? t;
+  const [all, ttm, ytd, plans, input] = await Promise.all([
+    trialBalance(companyId, first, t),
+    trialBalance(companyId, first > yearAgo ? first : yearAgo, t),
+    trialBalance(companyId, `${t.slice(0, 4)}-01-01`, t),
+    loadPlans(companyId),
+    loadForecastInput(companyId),
+  ]);
+  const tao = input.settings.taoRate, hipa = input.settings.hipaRate;
+
+  // --- Mérleg (a könyvek szerint, mai nap) ------------------------------------------
+  const assets = sumBy(all, (c) => /^[123]/.test(c));
+  const liabilities = -sumBy(all, (c) => /^4[2-9]/.test(c));
+  const bookEquity = assets - liabilities; // tartalmazza a még le nem zárt tárgyévi eredményt is
+  const cash = sumBy(all, (c) => c.startsWith("38") && !c.startsWith("389"));
+  const stockBook = sumBy(all, (c) => c.startsWith("26"));
+  const receivables = sumBy(all, (c) => c.startsWith("31"));
+  const payables = -sumBy(all, (c) => c.startsWith("45"));
+  const memberLoans = -sumBy(all, (c) => c.startsWith("479"));
+  const bankLoans = -sumBy(all, (c) => c.startsWith("44"));
+  const vatPayable = -sumBy(all, (c) => c.startsWith("466") || c.startsWith("467") || c.startsWith("468"));
+
+  // --- 1. Korrigált nettó eszközérték -------------------------------------------------
+  const stock: StockRevaluation[] = plans.stock.map((s) => {
+    const p = s.plan;
+    const price = p?.salePrice && p?.saleDate ? Number(p.salePrice) : null;
+    const plannedCosts = round2((p?.costs ?? []).reduce((a, c) => a + Number(c.net) + (c.deductible ? 0 : (Number(c.net) * c.vatRate) / 100), 0));
+    const vat = price ? mv(price, s.marginBase) : 0;
+    const netRealizable = price ? round2(price - vat - plannedCosts) : s.bookValue;
+    return { label: vehicleLabel(s.vehicle), bookValue: s.bookValue, salePrice: price, marginVat: vat, plannedCosts: price ? plannedCosts : 0, netRealizable, uplift: round2(netRealizable - s.bookValue) };
+  });
+  const uplift = round2(stock.reduce((a, s) => a + s.uplift, 0));
+  const ytdPreTax = -sumBy(ytd, (c) => c.startsWith("9")) - sumBy(ytd, (c) => c.startsWith("5") || c.startsWith("8"));
+  const taxBase = Math.max(0, ytdPreTax + uplift);
+  const tax = Math.round(taxBase * (tao + hipa));
+  const navValue = round2(bookEquity + uplift - tax);
+
+  // --- 2. Eredményszorzós -------------------------------------------------------------
+  const from = first > yearAgo ? first : yearAgo;
+  const months = Math.min(12, monthsBetween(from, t));
+  const annualized = months < 11.5 && months > 0;
+  const factor = annualized ? 12 / months : 1;
+  const preTaxTtm = -sumBy(ttm, (c) => c.startsWith("9")) - sumBy(ttm, (c) => c.startsWith("5") || c.startsWith("8"));
+  const depreciation = sumBy(ttm, (c) => c.startsWith("57"));
+  const earnings = round2((preTaxTtm + depreciation) * factor);
+  const multiple = opts.multiple ?? DEFAULT_VALUATION_MULTIPLE;
+  const multValue = round2(multiple * Math.max(0, earnings) + cash - memberLoans - bankLoans);
+
+  // --- 3. Előretekintő (Forecast) -----------------------------------------------------
+  const r = opts.discountRate ?? DEFAULT_DISCOUNT_RATE;
+  const monthly = Math.pow(1 + r, 1 / 12) - 1;
+  const empty = input.plans.length === 0 && input.items.length === 0;
+  let fwdMonths = 0;
+  const scenarios = Object.fromEntries(SCENARIOS.map((sc) => {
+    const months12 = runForecast(input, sc, "month").months.slice(0, 12);
+    fwdMonths = months12.length;
+    const preTax = months12.reduce((a, m) => a + m.preTax, 0);
+    const afterTax = preTax - Math.max(0, preTax) * (tao + hipa);
+    // havi diszkontálás: az egyes hónapok adózott eredménye a hónap végén
+    const ratio = preTax !== 0 ? afterTax / preTax : 1;
+    const pv = months12.reduce((a, m, i) => a + (m.preTax * ratio) / Math.pow(1 + monthly, i + 1), 0);
+    return [sc, { preTax: round2(preTax), afterTax: round2(afterTax), pv: round2(pv), value: round2(bookEquity + pv) }];
+  })) as CompanyValue["forward"]["scenarios"];
+
+  const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
+  return {
+    asOf: t,
+    rates: { tao, hipa },
+    balance: { assets: round2(assets), liabilities: round2(liabilities), bookEquity: round2(bookEquity), cash: round2(cash), stockBook: round2(stockBook), receivables: round2(receivables), payables: round2(payables), memberLoans: round2(memberLoans), bankLoans: round2(bankLoans), vatPayable: round2(vatPayable) },
+    nav: {
+      stock, uplift, taxBase: round2(taxBase), tax, value: navValue,
+      lines: [
+        { label: "Eszközök összesen (könyv szerint)", amount: round2(assets), hint: "1–3. számlaosztály" },
+        { label: "Kötelezettségek összesen", amount: -round2(liabilities), hint: "42–49. számlacsoport (tagi kölcsön, szállítók, ÁFA, adók …)" },
+        { label: "Könyv szerinti saját tőke", amount: round2(bookEquity), hint: "a tárgyévi, még le nem zárt eredménnyel" },
+        { label: "Készlet átértékelése várható nettó eladási értékre", amount: uplift, hint: "Forecast eladási ár − különbözeti ÁFA − hátralévő tervezett költség; terv nélkül könyv szerinti érték" },
+        { label: `Becsült TAO + HIPA (${pct(tao)} + ${pct(hipa)})`, amount: -tax, hint: `adóalap: tárgyévi eredmény (${Math.round(ytdPreTax).toLocaleString("hu-HU")} Ft) + átértékelés` },
+      ],
+    },
+    multiple: {
+      from, months: Math.round(months * 10) / 10, annualized, preTax: round2(preTaxTtm), depreciation: round2(depreciation), earnings, multiple, value: multValue,
+      lines: [
+        { label: `Adózás előtti eredmény (${from} – ${t})`, amount: round2(preTaxTtm) },
+        { label: "+ Értékcsökkenés (57x)", amount: round2(depreciation) },
+        ...(annualized ? [{ label: `Évesítés (${Math.round(months * 10) / 10} hónap adatából × ${(12 / months).toFixed(2)})`, amount: round2(earnings - preTaxTtm - depreciation) }] : []),
+        { label: "Éves működési eredmény", amount: earnings },
+        { label: `× ${multiple} szorzó`, amount: round2(multiple * Math.max(0, earnings)), hint: earnings < 0 ? "negatív eredmény: 0-val számolva" : undefined },
+        { label: "+ Pénzeszközök (pénztár + bank)", amount: round2(cash) },
+        { label: "− Tagi kölcsön (479x)", amount: -round2(memberLoans) },
+        ...(bankLoans ? [{ label: "− Hitelek (44x)", amount: -round2(bankLoans) }] : []),
+      ],
+    },
+    forward: {
+      discountRate: r, months: fwdMonths, empty, scenarios,
+      lines: [
+        { label: "Könyv szerinti saját tőke", amount: round2(bookEquity), hint: "nem a korrigált érték: a készlet eladásának haszna már a Forecast eredményében van" },
+        { label: `+ Következő ${fwdMonths} hónap adózott eredményének jelenértéke (alap)`, amount: scenarios.base.pv, hint: `diszkontráta ${pct(r)} / év` },
+      ],
+    },
+  };
+}
+
+/** Szorzó és diszkontráta a cégbeállításokból (Cégérték oldal), alapértelmezés 3 és 15%. */
+export async function valuationParamsFor(companyId: number) {
+  const [c] = await db.select({ s: schema.companies.settings }).from(schema.companies).where(eq(schema.companies.id, companyId));
+  const m = Number(c?.s?.valuationMultiple), r = Number(c?.s?.valuationDiscountRate);
+  return { multiple: m > 0 && m <= 20 ? m : DEFAULT_VALUATION_MULTIPLE, discountRate: r >= 0 && r <= 1 && c?.s?.valuationDiscountRate != null ? r : DEFAULT_DISCOUNT_RATE };
+}
