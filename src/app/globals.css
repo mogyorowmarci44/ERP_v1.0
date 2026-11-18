@@ -791,3 +791,7 @@ table.cv-calc tr.total td { font-weight: 700; border-top: 2px solid var(--ink, c
 @media (max-width: 900px) { .kpi-buckets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .cl-year { margin-bottom: 12px; }
 .cl-year .badge svg { vertical-align: -1px; }
+.kpi-yoy { font-size: 12px; font-weight: 600; margin: 2px 0 2px; }
+.kpi-yoy.good { color: #15803d; }
+.kpi-yoy.bad { color: #b91c1c; }
+.kpi-yoy .muted { font-weight: 400; }
