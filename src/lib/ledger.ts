@@ -23,7 +23,7 @@ const { accounts, companies, memberships, vatCodes, journals, journalEntries, jo
   schema;
 
 /** Meglévő tranzakcióban fut, vagy újat nyit (az importálás egyetlen tranzakcióban viszi végig az egészet). */
-function inTx<T>(tx: Tx | undefined, fn: (tx: Tx) => Promise<T>): Promise<T> {
+export function inTx<T>(tx: Tx | undefined, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return tx ? fn(tx) : db.transaction(fn);
 }
 
@@ -202,6 +202,8 @@ export async function reverseEntry(tx: Tx, companyId: number, entryId: number, d
     lines: stornoLines(lines),
   });
   await tx.update(journalEntries).set({ reversedById: rev.id }).where(eq(journalEntries.id, orig.id));
+  // a stornózott ÉCS-tétel hónapja újra elszámolhatóvá válik
+  if (orig.sourceType === "depreciation" || orig.sourceType === "asset") await tx.delete(schema.assetDepreciation).where(eq(schema.assetDepreciation.journalEntryId, orig.id));
   return rev;
 }
 
@@ -532,8 +534,8 @@ export async function postInvoice(companyId: number, invoiceId: number, userId?:
 }
 
 /** Könyvelt számla sztornózása (piros storno). Csak akkor, ha nincs hozzá pénzügyi rendezés. */
-export async function cancelInvoice(companyId: number, invoiceId: number, date: string, userId?: number) {
-  return db.transaction(async (tx) => {
+export async function cancelInvoice(companyId: number, invoiceId: number, date: string, userId?: number, outerTx?: Tx) {
+  return inTx(outerTx, async (tx) => {
     const [inv] = await tx.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
     if (!inv) throw new Error("A számla nem található.");
     if (inv.status === "draft") {

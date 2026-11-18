@@ -31,6 +31,7 @@ import {
   Recycle,
   BookOpenCheck,
   Package,
+  BadgeEuro,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
 import { APP_VERSION } from "@/lib/version";
@@ -91,7 +92,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/partners`}><Users />Partnerek</NavLink>
           <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
           <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
-          <NavLink href={`${b}/import`}><Upload />Adatimport</NavLink>
+          <NavLink href={`${b}/import`}><Upload />Adatimport / export</NavLink>
           {user.isAdmin && <NavLink href="/admin"><ShieldCheck />Admin – hozzáférések</NavLink>}
           </>
         ) : (
@@ -109,6 +110,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <div className="group">Pénzügy</div>
           <NavLink href={`${b}/money`}><Wallet />Pénztár és bank</NavLink>
           <NavLink href={`${b}/member-loans`}><HandCoins />Tagi kölcsön</NavLink>
+          <NavLink href={`${b}/payroll`}><BadgeEuro />Bérszámfejtés</NavLink>
 
           <div className="group">Tervezés</div>
           <NavLink href={`${b}/forecast`}><TrendingUp />Forecast</NavLink>
@@ -136,7 +138,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <div className="group">Rendszer</div>
           <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
           <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
-          <NavLink href={`${b}/import`}><Upload />Adatimport</NavLink>
+          <NavLink href={`${b}/import`}><Upload />Adatimport / export</NavLink>
           {user.isAdmin && <NavLink href="/admin"><ShieldCheck />Admin – hozzáférések</NavLink>}
           </>
         )}

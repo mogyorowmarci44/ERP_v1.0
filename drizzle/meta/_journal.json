@@ -148,6 +148,20 @@
       "when": 1795010112615,
       "tag": "0020_v2_fixed_assets",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795011396847,
+      "tag": "0021_v2_import_batches",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795012350458,
+      "tag": "0022_v2_payroll",
+      "breakpoints": true
     }
   ]
 }

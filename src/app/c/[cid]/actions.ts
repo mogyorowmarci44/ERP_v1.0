@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { parseDelta, runDelta, type DeltaReport } from "@/lib/delta-import";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
@@ -542,6 +543,21 @@ export async function importBundleAction(cid: number, json: string): Promise<{ e
       }
     }
     revalidatePath(`/c/${cid}`, "layout");
+    return { report };
+  } catch (e) {
+    return { error: errMsg(e) };
+  }
+}
+
+// --- Kiegészítő import (mm-erp-delta/1) -------------------------------------------------
+
+export async function deltaImportAction(cid: number, json: string, fileName: string, apply: boolean): Promise<{ error?: string; report?: DeltaReport }> {
+  const { user, role } = await requireCompany(cid, { write: true });
+  if (role !== "owner") return { error: "Kiegészítő csomagot csak a cég tulajdonosa tölthet be." };
+  try {
+    const bundle = parseDelta(json);
+    const report = await runDelta(cid, bundle, { dryRun: !apply, userId: user.id, fileName });
+    if (report.applied) revalidatePath(`/c/${cid}`, "layout");
     return { report };
   } catch (e) {
     return { error: errMsg(e) };
