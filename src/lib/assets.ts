@@ -258,7 +258,8 @@ export async function assetMirror(companyId: number, year: number) {
   return { year, rows, yearAcc: round2(yearAcc), yearTax: round2(yearTax), taoCorrection: round2(yearAcc - yearTax) };
 }
 
-const hu = (n: number) => Math.round(n).toLocaleString("hu-HU").replace(/ /g, " ");
+const huFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0, useGrouping: "always" });
+const hu = (n: number) => huFmt.format(Math.round(n) || 0).replace(/\s/g, " ");
 
 /** Eszköztükör a kiegészítő mellékletbe (szöveges táblázat, ugyanabban a formában, mint a melléklet többi táblája). */
 export async function assetMirrorSection(companyId: number, year: number) {
