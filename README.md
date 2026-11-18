@@ -45,6 +45,9 @@ Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Air
 |---|---|
 | Kétlépcsős azonosítás | Kötelező mindenkinek: jelszó + hitelesítő alkalmazás (TOTP, 6 jegy / 30 mp). Első belépéskor QR-kódos beállítás és 10 egyszer használható tartalékkód; 5 hibás kód → 15 perc zárolás; jelszócsere és 2FA visszaállítás a többi eszközt kilépteti |
 | Admin (/admin) | Felhasználó × cég hozzáférési mátrix (szerepkör azonnal szerkeszthető, az utolsó tulajdonos védett), 2FA állapot, tartalékkódok, utolsó belépés, 2FA visszaállítása, kiléptetés |
+| KPI-Dashboard | Kimutatások › KPI-Dashboard (csak Bt / Kft / Zrt): állásidő és 30/60/90 napos bontás, készletforgás, lekötött tőke, árrés (Ft, %), nettó haszon rezsivel, felújítási arány, típusonként és beszerzési forrás szerint, szabad pénz, tőkearányos megtérülés, készpénzciklus, tagi kölcsön, havi vett/eladott trend, fedezeti pont, terv vs. tény, különbözeti ÁFA negyedévente, várható EPR-díj |
+| Évzárás | Új menüpont a Főkönyv alatt: főkönyvi kivonat és éves beszámoló évenként, külön a folyó év és a lezárt évek (lezárt hónapok, mentett beszámoló, eredmény, mérlegfőösszeg) |
+| Menü | Éves beszámoló és Főkönyvi kivonat az Évzárásba került; a kezdőlapon az ÁFA analitika és a különbözeti ÁFA kartonok egy „ÁFA” pontban, a két oldal között fülekkel |
 | Cégérték | Új csempe az Áttekintésen (csak Bt / Kft / Zrt): korrigált nettó eszközérték; kattintásra a részletező oldal mindhárom számítással – korrigált nettó eszközérték, eredményszorzós (szorzó beállítható, alap 3), előretekintő (Forecast, három forgatókönyv, diszkontráta beállítható) |
 | Forecast | „Összes törlése” a tervezett beszerzéseknél és a költségeknél; „Visszaállítás” a Forgatókönyveknél (alapértékek) és a Kimutatáson (a teljes forecast kiürítése) |
 

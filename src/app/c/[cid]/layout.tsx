@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Gauge,
   ShieldCheck,
   LayoutDashboard,
   FileOutput,
@@ -11,7 +12,6 @@ import {
   ListTree,
   Coins,
   BookOpen,
-  Scale,
   FileSpreadsheet,
   Clock,
   Percent,
@@ -113,9 +113,8 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/forecast`}><TrendingUp />Forecast</NavLink>
 
           <div className="group">Kimutatások</div>
+          <NavLink href={`${b}/reports/kpi`}><Gauge />KPI-Dashboard</NavLink>
           <NavLink href={`${b}/reports/statements`}><ChartNoAxesCombined />P&amp;L, cash-flow, mérleg</NavLink>
-          <NavLink href={`${b}/reports/annual`}><BookOpenCheck />Éves beszámoló</NavLink>
-          <NavLink href={`${b}/reports/trial-balance`}><Scale />Főkönyvi kivonat</NavLink>
           <NavLink href={`${b}/reports/vat`}><Percent />ÁFA analitika</NavLink>
           <NavLink href={`${b}/vehicles/kartonok`}><ReceiptText />Különbözeti ÁFA kartonok</NavLink>
           <NavLink href={`${b}/vehicles/epr`}><Recycle />EPR összesítő</NavLink>
@@ -124,6 +123,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <div className="group">Főkönyv</div>
           <NavLink href={`${b}/journal`} exact><BookOpen />Napló</NavLink>
           <NavLink href={`${b}/reports/ledger`}><FileSpreadsheet />Számlakarton</NavLink>
+          <NavLink href={`${b}/closing`}><BookOpenCheck />Évzárás</NavLink>
 
           <div className="group">Törzsadatok</div>
           <NavLink href={`${b}/vehicles`} exact><CarFront />Gépkocsi készlet</NavLink>

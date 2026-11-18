@@ -32,6 +32,7 @@ export default async function TrialBalancePage({ params, searchParams }: { param
       <div className="topbar">
         <h1>Főkönyvi kivonat</h1>
         <span className="muted">{company.name} · {fmtDate(from)} – {fmtDate(to)}</span>
+        <Link className="btn no-print" href={`/c/${cid}/closing`}>← Évzárás</Link>
       </div>
       <form className="row card no-print" style={{ marginBottom: 12 }}>
         <label>Dátum-tól<input type="date" name="from" defaultValue={from} /></label>
