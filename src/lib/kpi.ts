@@ -38,10 +38,16 @@ const groupKey = (make: string, model: string) => {
   return `${make} ${m.charAt(0).toUpperCase()}${m.slice(1)}`;
 };
 
-export async function companyKpis(companyId: number) {
-  const t = today();
+/**
+ * `asOf`: a számítás napja – a tavalyi összehasonlításhoz egy évvel korábbi nappal is lefut, ugyanazzal a módszerrel
+ * (akkori készlet, akkor eladott autók, akkori egyenlegek). Ha a cégnek akkor még nem volt könyvelése: null.
+ */
+export async function companyKpis(companyId: number, asOf = today()) {
+  const t = asOf;
   const yearAgo = addDaysIso(t, -365);
-  const first = (await firstEntryDate(companyId)) ?? t;
+  const firstEntry = await firstEntryDate(companyId);
+  if (asOf !== today() && (!firstEntry || firstEntry > asOf)) return null;
+  const first = firstEntry ?? t;
   const from = first > yearAgo ? first : yearAgo;
   const months = Math.max(1, Math.min(12, (Date.parse(t) - Date.parse(from)) / (86400000 * 30.4375)));
 
@@ -80,7 +86,9 @@ export async function companyKpis(companyId: number) {
     where v.company_id = ${companyId}`)) as unknown as Array<Record<string, string | number | null>>;
 
   const cars: KpiCar[] = rows.map((r) => {
-    const sold = r.status === "sold" && !!r.sale_date;
+    // az `asOf` napon: eladott, ha addig kiszámlázták; a később eladott autó akkor még készleten volt
+    const sold = r.status === "sold" && !!r.sale_date && String(r.sale_date) <= t;
+    const soldLater = r.status === "sold" && !sold;
     const base = r.pp != null ? Number(r.pp) : Number(r.base_inv);
     const cost = sold ? Number(r.cogs) || Number(r.cost_in) : Number(r.cost_in);
     const saleGross = Number(r.sale_gross), saleNet = Number(r.sale_net);
@@ -91,8 +99,8 @@ export async function companyKpis(companyId: number) {
       label: `${r.make} ${r.model}${r.plate ? ` (${r.plate})` : ""}`,
       group: groupKey(String(r.make), String(r.model)),
       origin: (r.origin as KpiCar["origin"]) ?? null,
-      purchaseDate: pd, saleDate: sold ? sd : null, status: String(r.status),
-      base: round2(base), cost: round2(cost), bookValue: round2(Number(r.book)),
+      purchaseDate: pd, saleDate: sold ? sd : null, status: sold ? "sold" : "in_stock",
+      base: round2(base), cost: round2(cost), bookValue: round2(soldLater ? Number(r.cost_in) : Number(r.book)),
       saleGross: round2(saleGross), saleNet: round2(saleNet), marginVat: round2(saleGross - saleNet),
       grossMargin: sold ? round2(saleGross - cost) : null,
       netProfit: sold ? round2(saleNet - cost) : null,
@@ -103,13 +111,13 @@ export async function companyKpis(companyId: number) {
   });
 
   const soldTtm = cars.filter((c) => c.saleDate && c.saleDate >= from && c.saleDate <= t);
-  const stock = cars.filter((c) => c.status !== "sold");
+  const stock = cars.filter((c) => c.status !== "sold" && c.purchaseDate && c.purchaseDate <= t);
 
   // --- Főkönyv: eredmény, rezsi, pénz ------------------------------------------------
   const [ttm, all, loans, epr] = await Promise.all([
     trialBalance(companyId, from, t),
     trialBalance(companyId, first, t),
-    memberLoans(companyId).catch(() => null),
+    memberLoans(companyId, t).catch(() => null),
     eprQuarter(companyId, quarterOf(t)).catch(() => null),
   ]);
   const preTax = -sumBy(ttm, (c) => c.startsWith("9")) - sumBy(ttm, (c) => c.startsWith("5") || c.startsWith("8"));
@@ -140,7 +148,7 @@ export async function companyKpis(companyId: number) {
   const soldPerMonth = soldTtm.length / months;
 
   // --- Készlet a teljes múltra (minden valaha készleten volt autó), mediánnal --------------
-  const ever = cars.filter((c) => c.purchaseDate);
+  const ever = cars.filter((c) => c.purchaseDate && c.purchaseDate <= t);
   const holdAll = ever.map((c) => days(c.purchaseDate!, c.saleDate ?? t));
   const holdSold = ever.filter((c) => c.saleDate).map((c) => days(c.purchaseDate!, c.saleDate!));
   const costAll = ever.map((c) => c.cost).filter((x) => x > 0);
