@@ -7,7 +7,8 @@ import { listAnnualYears } from "@/lib/annual-report";
 import { firstEntryDate } from "@/lib/forecast-data";
 import { fmtHuf } from "@/lib/money";
 import { today, monthEnd } from "@/lib/dates";
-import { Scale, BookOpenCheck, Lock, LockOpen } from "lucide-react";
+import { depreciationStatus } from "@/lib/assets";
+import { Scale, BookOpenCheck, Lock, LockOpen, Package } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,8 @@ export default async function ClosingPage({ params }: { params: Promise<{ cid: s
     const preTax = -flowBy(period, (c) => c.startsWith("9")) - flowBy(period, (c) => c.startsWith("5") || c.startsWith("8"));
     const total = sumBy(closing, (c) => /^[123]/.test(c));
     const locked = locks.filter((l) => l.year === y).length;
-    return { y, from, to, preTax, total, locked, report: stored.includes(y) };
+    const dep = await depreciationStatus(cid, y);
+    return { y, from, to, preTax, total, locked, report: stored.includes(y), dep };
   }));
   const closed = data.filter((d) => d.y < cur);
   const current = data.find((d) => d.y === cur)!;
@@ -46,6 +48,9 @@ export default async function ClosingPage({ params }: { params: Promise<{ cid: s
           {d.locked === 12
             ? <span className="badge posted"><Lock size={12} /> mind a 12 hónap lezárva</span>
             : <span className={`badge ${isCur ? "draft" : "overdue"}`}><LockOpen size={12} /> {d.locked}/12 hónap lezárva</span>}
+          {d.dep.hasAssets && (d.dep.openMonths.length
+            ? <Link href={`/c/${cid}/assets?to=${d.dep.upTo}`} className="badge overdue"><Package size={12} /> ÉCS elszámolatlan: {d.dep.openMonths.length} hónap</Link>
+            : <span className="badge posted"><Package size={12} /> ÉCS elszámolva ({d.dep.upTo}-ig)</span>)}
           {d.report ? <span className="badge posted">beszámoló mentve</span> : !isCur && <span className="badge draft">beszámoló nincs mentve</span>}
         </div>
       </div>
@@ -55,6 +60,7 @@ export default async function ClosingPage({ params }: { params: Promise<{ cid: s
       </div>
       <div className="row" style={{ marginTop: 10, gap: 8 }}>
         <Link className="btn" href={`/c/${cid}/reports/trial-balance?from=${d.from}&to=${d.to}`}><Scale size={16} /> Főkönyvi kivonat {d.y}</Link>
+        {d.dep.hasAssets && <Link className="btn" href={`/c/${cid}/assets?year=${d.y}`}><Package size={16} /> Eszköztükör {d.y}</Link>}
         <Link className={`btn${isCur ? "" : " primary"}`} href={`/c/${cid}/reports/annual?year=${d.y}`}><BookOpenCheck size={16} /> Éves beszámoló {d.y}{isCur ? " (előzetes)" : ""}</Link>
       </div>
     </div>

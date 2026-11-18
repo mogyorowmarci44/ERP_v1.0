@@ -79,6 +79,61 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
 });
 
+// ---------------------------------------------------------------------------
+// v2.2 – Tárgyi eszközök és értékcsökkenés (ÉCS)
+// ---------------------------------------------------------------------------
+
+/** Tárgyi eszköz / immateriális javak analitika (eszközkarton). */
+export const fixedAssets = pgTable(
+  "fixed_assets",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    inventoryNo: varchar("inventory_no", { length: 32 }),
+    serialNo: varchar("serial_no", { length: 64 }),
+    /** Eszközszámla (pl. 141, 142, 143, 114), az ÉCS-számla (pl. 149) ebből adódik. */
+    accountCode: varchar("account_code", { length: 12 }).notNull(),
+    activationDate: date("activation_date").notNull(),
+    cost: money("cost").notNull(),
+    salvage: money("salvage").notNull().default(0),
+    /** Hasznos élettartam hónapban (lineáris, napi arányosítással). */
+    usefulLifeMonths: integer("useful_life_months").notNull().default(36),
+    /** Adótörvény szerinti éves kulcs %-ban; null = a számvitelivel egyező. */
+    taxRatePct: numeric("tax_rate_pct", { precision: 6, scale: 2 }),
+    /** linear = terv szerinti havi ÉCS; lowvalue = kisértékű, egy összegben leírva aktiváláskor. */
+    method: varchar("method", { length: 12 }).notNull().default("linear"),
+    status: varchar("status", { length: 12 }).notNull().default("active"), // active | disposed
+    disposedOn: date("disposed_on"),
+    location: varchar("location", { length: 128 }),
+    note: text("note"),
+    /** Nyitó adat: a nyilvántartásba vétel előtt már elszámolt ÉCS (számviteli / adótörvényi). */
+    openingAccumulated: money("opening_accumulated").notNull().default(0),
+    openingTaxAccumulated: money("opening_tax_accumulated").notNull().default(0),
+    /** A beszerzés könyvelt számlasora (ha számlából vettük nyilvántartásba). */
+    invoiceLineId: integer("invoice_line_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("fixed_assets_company").on(t.companyId), uniqueIndex("fixed_assets_invoice_line").on(t.invoiceLineId)],
+);
+
+/** Elszámolt ÉCS havonta eszközönként (a könyvelési tétellel). Egy eszköz egy hónapjára csak egy sor. */
+export const assetDepreciation = pgTable(
+  "asset_depreciation",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    assetId: integer("asset_id").notNull().references(() => fixedAssets.id, { onDelete: "cascade" }),
+    period: varchar("period", { length: 7 }).notNull(), // YYYY-MM
+    amount: money("amount").notNull(),
+    taxAmount: money("tax_amount").notNull(),
+    kind: varchar("kind", { length: 12 }).notNull().default("linear"), // linear | lowvalue
+    journalEntryId: integer("journal_entry_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("asset_depreciation_period").on(t.assetId, t.period)],
+);
+
 /** v2.2 – Rendszerszintű beállítások (kulcs → JSON), pl. a kétlépcsős azonosítás kötelezősége. */
 export const appSettings = pgTable("app_settings", {
   key: varchar("key", { length: 64 }).primaryKey(),
