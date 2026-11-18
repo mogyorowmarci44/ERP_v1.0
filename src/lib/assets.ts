@@ -9,8 +9,8 @@
  *  - Könyvelés: havi ÉCS T 571 / K 1x9, havonta egy vegyes tétel (VN), eszközönkénti sorokkal. Lezárt hónapba nem könyvel.
  */
 import { and, asc, eq, sql } from "drizzle-orm";
-import { db, schema, type Tx } from "@/db";
-import { accountIdByCode, assertPeriodOpen, postEntry } from "./ledger";
+import { db, schema, type Tx, type DbOrTx } from "@/db";
+import { accountIdByCode, assertPeriodOpen, inTx, postEntry } from "./ledger";
 import { round2 } from "./money";
 import { today } from "./dates";
 
@@ -26,10 +26,10 @@ export type AssetRow = typeof fixedAssets.$inferSelect & {
   posted: number; postedTax: number; accumulated: number; taxAccumulated: number; net: number; lastPeriod: string | null;
 };
 
-export async function listAssets(companyId: number): Promise<AssetRow[]> {
+export async function listAssets(companyId: number, q: DbOrTx = db): Promise<AssetRow[]> {
   const [assets, deps] = await Promise.all([
-    db.select().from(fixedAssets).where(eq(fixedAssets.companyId, companyId)).orderBy(asc(fixedAssets.accountCode), asc(fixedAssets.activationDate), asc(fixedAssets.id)),
-    db.select().from(assetDepreciation).where(eq(assetDepreciation.companyId, companyId)),
+    q.select().from(fixedAssets).where(eq(fixedAssets.companyId, companyId)).orderBy(asc(fixedAssets.accountCode), asc(fixedAssets.activationDate), asc(fixedAssets.id)),
+    q.select().from(assetDepreciation).where(eq(assetDepreciation.companyId, companyId)),
   ]);
   return assets.map((a) => {
     const mine = deps.filter((d) => d.assetId === a.id);
@@ -61,8 +61,8 @@ const planInput = (a: typeof fixedAssets.$inferSelect): AssetPlanInput => ({
 });
 
 /** Könyvelt, eszközszámlára (11x–14x) menő szállítói számlasorok, amelyek még nincsenek nyilvántartásba véve. */
-export async function assetCandidates(companyId: number) {
-  const rows = (await db.execute(sql`
+export async function assetCandidates(companyId: number, q: DbOrTx = db) {
+  const rows = (await q.execute(sql`
     select il.id, il.description, il.net_huf::float8 net, il.vat_huf::float8 vat, il.gross_huf::float8 gross,
       i.fulfillment_date::text date, i.invoice_number, i.id invoice_id, p.name partner, a.code account,
       exists (
@@ -108,10 +108,10 @@ async function postLowValue(tx: Tx, companyId: number, asset: typeof fixedAssets
  * `alreadyWrittenOff`: a leírás korábban már könyvelve volt (pl. közvetlenül az eszközszámláról) – nem könyvel újra,
  * az eszköz leírtként / kivezetettként kerül a nyilvántartásba.
  */
-export async function createAsset(companyId: number, input: NewAsset, opts: { userId?: number; alreadyWrittenOff?: boolean } = {}) {
+export async function createAsset(companyId: number, input: NewAsset, opts: { userId?: number; alreadyWrittenOff?: boolean; tx?: Tx } = {}) {
   if (!isAssetAccount(input.accountCode)) throw new Error("Az eszközszámla 11x–14x lehet (az x9 ÉCS-számla és a 121 telek nem).");
   if (!(input.cost > 0)) throw new Error("A bekerülési érték legyen pozitív.");
-  return db.transaction(async (tx) => {
+  return inTx(opts.tx, async (tx) => {
     const low = input.cost <= LOW_VALUE_LIMIT;
     const def = ASSET_ACCOUNTS.find((x) => x.code === input.accountCode)?.lifeMonths ?? 60;
     const [asset] = await tx.insert(fixedAssets).values({
@@ -131,10 +131,10 @@ export async function createAsset(companyId: number, input: NewAsset, opts: { us
 }
 
 /** Könyvelt szállítói számlasorból: név, dátum, érték, számla a sorból. */
-export async function registerFromLine(companyId: number, lineId: number, userId?: number) {
-  const c = (await assetCandidates(companyId)).find((x) => x.id === lineId);
+export async function registerFromLine(companyId: number, lineId: number, userId?: number, tx?: Tx) {
+  const c = (await assetCandidates(companyId, tx ?? db)).find((x) => x.id === lineId);
   if (!c) throw new Error("A számlasor nem található, vagy már nyilvántartásban van.");
-  return createAsset(companyId, { name: c.description.replace(/\s*–\s*tárgyi eszköz\s*$/i, ""), accountCode: c.account, activationDate: c.date, cost: c.net, invoiceLineId: c.id, note: `${c.partner} · ${c.invoice_number}` }, { userId, alreadyWrittenOff: c.written_off });
+  return createAsset(companyId, { name: c.description.replace(/\s*–\s*tárgyi eszköz\s*$/i, ""), accountCode: c.account, activationDate: c.date, cost: c.net, invoiceLineId: c.id, note: `${c.partner} · ${c.invoice_number}` }, { userId, alreadyWrittenOff: c.written_off, tx });
 }
 
 export async function updateAsset(companyId: number, id: number, patch: Partial<Pick<typeof fixedAssets.$inferInsert, "name" | "inventoryNo" | "serialNo" | "location" | "note" | "usefulLifeMonths" | "salvage" | "taxRatePct">>) {
@@ -155,12 +155,12 @@ export type DueLine = { assetId: number; name: string; inventoryNo: string | nul
 export type DuePeriod = { period: string; date: string; locked: boolean; lines: DueLine[]; total: number };
 
 /** Az adott hónapig (bezárólag) még el nem számolt havi ÉCS, hónaponként. */
-export async function depreciationDue(companyId: number, toPeriod: string): Promise<DuePeriod[]> {
+export async function depreciationDue(companyId: number, toPeriod: string, q: DbOrTx = db): Promise<DuePeriod[]> {
   const cap = toPeriod > periodOf(today()) ? periodOf(today()) : toPeriod;
   const [assets, deps, locks] = await Promise.all([
-    db.select().from(fixedAssets).where(and(eq(fixedAssets.companyId, companyId), eq(fixedAssets.method, "linear"))),
-    db.select({ assetId: assetDepreciation.assetId, period: assetDepreciation.period }).from(assetDepreciation).where(eq(assetDepreciation.companyId, companyId)),
-    db.select().from(periodLocks).where(eq(periodLocks.companyId, companyId)),
+    q.select().from(fixedAssets).where(and(eq(fixedAssets.companyId, companyId), eq(fixedAssets.method, "linear"))),
+    q.select({ assetId: assetDepreciation.assetId, period: assetDepreciation.period }).from(assetDepreciation).where(eq(assetDepreciation.companyId, companyId)),
+    q.select().from(periodLocks).where(eq(periodLocks.companyId, companyId)),
   ]);
   const done = new Set(deps.map((d) => `${d.assetId}:${d.period}`));
   const by = new Map<string, DueLine[]>();
@@ -177,13 +177,13 @@ export async function depreciationDue(companyId: number, toPeriod: string): Prom
 }
 
 /** Könyvelés: hónaponként egy VN tétel (T 571 / K 1x9 eszközönként). Lezárt hónapot kihagy. */
-export async function postDepreciation(companyId: number, toPeriod: string, userId?: number) {
-  const due = await depreciationDue(companyId, toPeriod);
+export async function postDepreciation(companyId: number, toPeriod: string, userId?: number, outerTx?: Tx) {
+  const due = await depreciationDue(companyId, toPeriod, outerTx ?? db);
   const posted: Array<{ period: string; number: string; total: number }> = [];
   const skipped: string[] = [];
   for (const p of due) {
     if (p.locked) { skipped.push(p.period); continue; }
-    await db.transaction(async (tx) => {
+    await inTx(outerTx, async (tx) => {
       await assertPeriodOpen(tx, companyId, p.date);
       const exp = await accountIdByCode(tx, companyId, "571");
       const lines = [];

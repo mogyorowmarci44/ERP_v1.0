@@ -7,16 +7,71 @@ import { isPrivate } from "@/lib/entity";
 import { uploadSyncAction } from "../gh/actions";
 import { Flash } from "@/components/Flash";
 import { wipeCompanyAction } from "../actions";
+import { DeltaImportForm } from "@/components/DeltaImportForm";
+import { listBatches, KIND_HU } from "@/lib/delta-import";
+import { firstEntryDate } from "@/lib/forecast-data";
+import { today } from "@/lib/dates";
+import { Download, FileSpreadsheet } from "lucide-react";
 
 export default async function ImportPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
   const sp = await searchParams;
   const { company, role } = await requireCompany(cid);
   const [{ n }] = await db.select({ n: dsql<number>`count(*)::int` }).from(schema.journalEntries).where(eq(schema.journalEntries.companyId, cid));
+  const [first, batches] = await Promise.all([firstEntryDate(cid), listBatches(cid)]);
+  const from = first ?? `${today().slice(0, 4)}-01-01`;
   return (
     <>
-      <h1>Adatimport</h1>
+      <h1>Adatimport és -export</h1>
       <Flash error={sp.error} ok={sp.ok} />
+
+      <form action={`/c/${cid}/import/export`} method="get" data-progress="off" className="card grid" style={{ gap: 10, marginBottom: 16 }}>
+        <strong>Adatexport</strong>
+        <span className="muted">
+          A könyvelés letöltése a választott időszakra: napló soronként, számlák tételekkel és kiegyenlítésekkel, partnerek, gépkocsik, tárgyi eszközök,
+          záró egyenlegek, lezárt hónapok. A JSON-t add oda Claude-nak – abból készül a kiegészítő csomag; az Excel ugyanez olvasható formában.
+        </span>
+        <div className="row">
+          <label>Ettől<input type="date" name="from" defaultValue={from} /></label>
+          <label>Eddig<input type="date" name="to" defaultValue={today()} /></label>
+          <button className="primary" name="fmt" value="json" style={{ alignSelf: "end" }}><Download size={16} /> Export (JSON)</button>
+          <button name="fmt" value="xlsx" style={{ alignSelf: "end" }}><FileSpreadsheet size={16} /> Export (Excel)</button>
+        </div>
+      </form>
+
+      {role === "owner" && (
+        <div className="card grid" style={{ gap: 10, marginBottom: 16 }}>
+          <strong>Kiegészítő csomag betöltése (mm-erp-delta/1)</strong>
+          <span className="muted">
+            A meglévő könyvelés mellé tölt be új tételeket (vegyes tétel, számla, kiegyenlítés, storno, tárgyi eszköz, ÉCS) – nem töröl semmit.
+            Előbb előnézetet mutat a várható bizonylatszámokkal; a már betöltött tételeket kihagyja, lezárt hónapba nem könyvel. Vagy minden bekerül, vagy semmi.
+          </span>
+          <DeltaImportForm cid={cid} />
+          {batches.length > 0 && (
+            <details>
+              <summary>Korábbi betöltések ({batches.length})</summary>
+              <div className="table-wrap" style={{ marginTop: 8 }}>
+                <table>
+                  <thead><tr><th>Időpont</th><th>Fájl</th><th>Megjegyzés</th><th className="num">Tétel</th><th>Tartalom</th></tr></thead>
+                  <tbody>
+                    {batches.map((b) => (
+                      <tr key={b.id}>
+                        <td>{b.createdAt.toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</td>
+                        <td className="small">{b.fileName}</td>
+                        <td className="small">{b.note}</td>
+                        <td className="num">{b.items}</td>
+                        <td className="small">{Object.entries(b.summary).map(([k, v]) => `${v} ${KIND_HU[k] ?? k}`).join(", ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+
+      <h2>Teljes import (üres cégbe)</h2>
       <p className="muted">
         Régi nyilvántartásból (pl. Excel) átalakított import csomag betöltése. Számlák, kiegyenlítések, vegyes tételek, partnerek
         és gépkocsik kerülnek be, egyetlen lépésben: vagy minden bekerül, vagy semmi.

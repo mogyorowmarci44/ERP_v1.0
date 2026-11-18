@@ -91,7 +91,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/partners`}><Users />Partnerek</NavLink>
           <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
           <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
-          <NavLink href={`${b}/import`}><Upload />Adatimport</NavLink>
+          <NavLink href={`${b}/import`}><Upload />Adatimport / export</NavLink>
           {user.isAdmin && <NavLink href="/admin"><ShieldCheck />Admin – hozzáférések</NavLink>}
           </>
         ) : (
@@ -136,7 +136,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <div className="group">Rendszer</div>
           <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
           <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
-          <NavLink href={`${b}/import`}><Upload />Adatimport</NavLink>
+          <NavLink href={`${b}/import`}><Upload />Adatimport / export</NavLink>
           {user.isAdmin && <NavLink href="/admin"><ShieldCheck />Admin – hozzáférések</NavLink>}
           </>
         )}

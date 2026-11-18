@@ -134,6 +134,35 @@ export const assetDepreciation = pgTable(
   (t) => [uniqueIndex("asset_depreciation_period").on(t.assetId, t.period)],
 );
 
+/** v2.2 – Kiegészítő import csomagok (mm-erp-delta/1): egy betöltés = egy köteg. */
+export const importBatches = pgTable("import_batches", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  fileName: varchar("file_name", { length: 255 }),
+  note: text("note"),
+  items: integer("items").notNull().default(0),
+  summary: jsonb("summary").$type<Record<string, number>>().notNull().default({}),
+  userId: integer("user_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** A csomag tételeinek azonosítója (ref) cégenként egyedi – így ugyanaz a tétel kétszer nem könyvelődik. */
+export const importRefs = pgTable(
+  "import_refs",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    batchId: integer("batch_id").notNull().references(() => importBatches.id, { onDelete: "cascade" }),
+    ref: varchar("ref", { length: 128 }).notNull(),
+    kind: varchar("kind", { length: 24 }).notNull(),
+    journalEntryId: integer("journal_entry_id"),
+    invoiceId: integer("invoice_id"),
+    assetId: integer("asset_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("import_refs_company_ref").on(t.companyId, t.ref), index("import_refs_entry").on(t.journalEntryId)],
+);
+
 /** v2.2 – Rendszerszintű beállítások (kulcs → JSON), pl. a kétlépcsős azonosítás kötelezősége. */
 export const appSettings = pgTable("app_settings", {
   key: varchar("key", { length: 64 }).primaryKey(),
