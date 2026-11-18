@@ -40,9 +40,9 @@ export function PayrollGrid({ cid, period, params, rows, locked }: { cid: number
         <table className="pr-table">
           <thead>
             <tr>
-              <th>Név · jogviszony</th><th className="num">Alap</th><th className="num" title="Túlóra 50% pótlékkal (óra)">Túlóra 50%</th><th className="num" title="Túlóra 100% pótlékkal (pihenőnap / ünnepnap, óra)">Túlóra 100%</th>
+              <th>Név · jogviszony</th><th className="num">Alap</th><th className="num" title="Túlóra 50% pótlékkal (óra)">Túlóra 50% (ó)</th><th className="num" title="Túlóra 100% pótlékkal (pihenőnap / ünnepnap, óra)">Túlóra 100% (ó)</th>
               <th className="num">Prémium</th><th className="num">Alkalmi nap</th><th className="num">SZÉP</th><th className="num" title="Egyes meghatározott juttatás (33,04%)">Egyéb juttatás</th>
-              <th className="num">Bruttó</th><th className="num">Nettó</th><th className="num">Cég költsége</th>
+              <th className="num">Bruttó</th><th className="num" title="TB-járulék 18,5% (társas vállalkozónál a minimum alap után, a cég viseli)">TB-járulék</th><th className="num" title="Szociális hozzájárulási adó 13% (+ juttatás és EFO közteher)">Szocho / közteher</th><th className="num">Nettó</th><th className="num">Cég költsége</th>
             </tr>
           </thead>
           <tbody>
@@ -55,25 +55,27 @@ export function PayrollGrid({ cid, period, params, rows, locked }: { cid: number
                     <div><span className={`badge ${efo ? "posted" : e.kind === "member" ? "" : "draft"}`}>{KIND_SHORT[e.kind]}</span>{x.prorate > 0 && x.prorate < 1 && <span className="muted small"> · {Math.round(x.prorate * 100)}% hónap</span>}</div>
                   </td>
                   <td className="num">{efo ? `${f(e.dailyWage)} / nap` : f(x.base)}</td>
-                  <td className="num">{cell(r.employmentId, inp.otHours50, (v) => setNum(r.employmentId, "otHours50", v), !efo && e.kind !== "member", 52)}</td>
-                  <td className="num">{cell(r.employmentId, inp.otHours100, (v) => setNum(r.employmentId, "otHours100", v), !efo && e.kind !== "member", 52)}</td>
-                  <td className="num">{cell(r.employmentId, inp.bonus, (v) => setNum(r.employmentId, "bonus", v), !efo, 80)}</td>
+                  <td className="num">{cell(r.employmentId, inp.otHours50, (v) => setNum(r.employmentId, "otHours50", v), !efo && e.kind !== "member", 44)}</td>
+                  <td className="num">{cell(r.employmentId, inp.otHours100, (v) => setNum(r.employmentId, "otHours100", v), !efo && e.kind !== "member", 44)}</td>
+                  <td className="num">{cell(r.employmentId, inp.bonus, (v) => setNum(r.employmentId, "bonus", v), !efo, 64)}</td>
                   <td className="num">{cell(r.employmentId, inp.efoDays, (v) => setNum(r.employmentId, "efoDays", v), efo, 44)}</td>
-                  <td className="num">{cell(r.employmentId, benefitOf(inp, "szep"), (v) => setBen(r.employmentId, "szep", v), true, 76)}</td>
-                  <td className="num">{cell(r.employmentId, benefitOf(inp, "ejm"), (v) => setBen(r.employmentId, "ejm", v), true, 76)}</td>
+                  <td className="num">{cell(r.employmentId, benefitOf(inp, "szep"), (v) => setBen(r.employmentId, "szep", v), true, 64)}</td>
+                  <td className="num">{cell(r.employmentId, benefitOf(inp, "ejm"), (v) => setBen(r.employmentId, "ejm", v), true, 64)}</td>
                   <td className="num">{f(x.gross)}</td>
+                  <td className="num">{f(x.tb + x.tbCompany)}</td>
+                  <td className="num">{f(x.szocho + x.efoTax + x.benefitSzja + x.benefitSzocho)}</td>
                   <td className="num">{f(x.net)}</td>
                   <td className="num"><strong>{f(x.employerCost)}</strong></td>
                 </tr>,
                 x.warnings.length > 0 && (
-                  <tr key={`${r.employmentId}-w`} className="pr-warn"><td colSpan={11}>{x.warnings.map((w, k) => <div key={k}>⚠ {w}</div>)}</td></tr>
+                  <tr key={`${r.employmentId}-w`} className="pr-warn"><td colSpan={13}>{x.warnings.map((w, k) => <div key={k}>⚠ {w}</div>)}</td></tr>
                 ),
               ];
             })}
             <tr className="pr-total">
               <td>Összesen</td><td /><td /><td /><td /><td />
               <td className="num" colSpan={2}>{f(tot.benefitTotal)}</td>
-              <td className="num">{f(tot.gross)}</td><td className="num">{f(tot.net)}</td><td className="num">{f(tot.employerCost)}</td>
+              <td className="num">{f(tot.gross)}</td><td className="num">{f(tot.tb + tot.tbCompany)}</td><td className="num">{f(tot.szocho + tot.efoTax + tot.benefitSzja + tot.benefitSzocho)}</td><td className="num">{f(tot.net)}</td><td className="num">{f(tot.employerCost)}</td>
             </tr>
           </tbody>
         </table>

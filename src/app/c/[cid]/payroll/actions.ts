@@ -109,6 +109,8 @@ export async function saveEmploymentAction(fd: FormData) {
       note: optStr(fd, "note"),
     };
     if (efo && !(v.dailyWage > 0)) throw new Error("Alkalmi / idénymunkánál add meg a napidíjat.");
+    if (!efo && kind !== "member" && !(v.monthlyWage > 0))
+      throw new Error("Munkaviszonyban (teljes / részmunkaidő) az alapbér nem lehet 0. Jövedelem nélküli ügyvezető tagnál a jogviszony: „Társas vállalkozó” – annál a minimum járulékot a társaság fizeti.");
     if (id) await db.update(schema.employments).set(v).where(and(eq(schema.employments.companyId, cid), eq(schema.employments.id, id)));
     else await db.insert(schema.employments).values({ companyId: cid, employeeId: Number(fd.get("employeeId")), ...v });
     return ok(back, "Jogviszony mentve.");
