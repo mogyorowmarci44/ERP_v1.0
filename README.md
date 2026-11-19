@@ -39,6 +39,12 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.3.2 – ÁrSugó: színes csúszka
+
+| Terület | Funkció |
+|---|---|
+| ÁrSugó | Maga a húzható csúszka is színes: piros a beszerzési árig, sárga a nullszaldóig (éles határokkal), onnan halványtól egyre élénkebb zöld – minél nagyobb a profit, annál élénkebb. A jelölők (beszerzés, nullszaldó, cél, hirdetési) a csúszkán ülnek |
+
 ## v3.3.1 – ÁrSugó a kezdőlapon, rekord-felirat
 
 | Terület | Funkció |
