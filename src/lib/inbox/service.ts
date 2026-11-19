@@ -13,8 +13,9 @@ import { today } from "../dates";
 import { listRemote, fetchRemote } from "./connector";
 import { readDocument } from "./read";
 import { proposeInvoice, proposeStatement, type ProposeCtx } from "./propose";
+import { isPaperDoc, nextFilingNo } from "./validate";
 
-const { inboxDocuments, inboxSettings, companies, partners, invoices, invoiceLines, accounts, vatCodes, vehicles, invoiceChecks } = schema;
+const { inboxDocuments, inboxSettings, companies, partners, invoices, invoiceLines, accounts, vatCodes, vehicles, invoiceChecks, periodLocks, vatClosings } = schema;
 
 export const sha256 = (b64: string) => createHash("sha256").update(Buffer.from(b64, "base64")).digest("hex");
 
@@ -73,12 +74,19 @@ export async function loadProposeCtx(companyId: number): Promise<ProposeCtx> {
     join journal_entries e on e.id = l.entry_id join accounts a on a.id = l.account_id
     where l.company_id = ${companyId} and a.code like '38%'`) as unknown as Array<{ code: string; date: string; amt: number }>;
   const moneyMoves = new Set(mm.map((r) => `${r.code}|${r.date}|${Math.round(Number(r.amt) * 100) / 100}`));
+  // v3.1.0: lezárt hónapok, utolsó bevallott ÁFA-időszak, párosításra váró kivonatsorok
+  const locks = await db.select({ y: periodLocks.year, m: periodLocks.month }).from(periodLocks).where(eq(periodLocks.companyId, companyId));
+  const [vc0] = await db.select({ to: sql<string | null>`max(${vatClosings.toDate})::text` }).from(vatClosings).where(eq(vatClosings.companyId, companyId));
+  const stDocs = await db.select({ p: inboxDocuments.proposal }).from(inboxDocuments)
+    .where(and(eq(inboxDocuments.companyId, companyId), eq(inboxDocuments.kind, "statement"), inArray(inboxDocuments.status, ["review", "booked"])));
+  const bankRows = stDocs.flatMap((d) => (d.p?.statement?.rows ?? []).filter((r) => !r.done && r.action !== "skip").map((r) => ({ date: r.date, amount: r.amount, text: r.text })));
   return {
     company: { name: company.name, taxNumber: company.taxNumber },
     partners: ps.map((p) => ({ id: p.id, name: p.name, taxNumber: p.taxNumber, isPrivatePerson: p.isPrivatePerson, country: p.country })),
     history: hist.map((h) => ({ partnerId: h.partnerId, direction: h.direction, accountCode: h.code, vatCode: h.vat, description: h.desc, hasVehicle: h.veh !== null, periodic: h.periodic })),
     vehicles: vs.map((v) => ({ id: v.id, make: v.make, model: v.model, plate: v.plate, vin: v.vin, status: v.status })),
     existing, vatCodes: new Set(vc.map((v) => v.code)), open, moneyMoves,
+    lockedMonths: new Set(locks.map((l) => `${l.y}-${String(l.m).padStart(2, "0")}`)), vatClosedUntil: vc0?.to ?? null, bankRows,
   };
 }
 
@@ -100,6 +108,7 @@ async function vatIdByCode(tx: Tx, companyId: number, code: string) {
 /** Számla-javaslat könyvelése: partner / gépkocsi létrehozása szükség szerint, számla mentése, könyvelése, készpénzes kiegyenlítése. */
 export async function bookInvoiceProposal(companyId: number, docId: number, p: NonNullable<InboxProposal["invoice"]>, userId: number | undefined, docUrl: string | null) {
   return db.transaction(async (tx) => {
+    const [{ filingNo } = { filingNo: null }] = await tx.select({ filingNo: inboxDocuments.filingNo }).from(inboxDocuments).where(eq(inboxDocuments.id, docId));
     let partnerId = p.partner.id ?? null;
     if (!partnerId) {
       const [np] = await tx.insert(partners).values({ companyId, name: p.partner.name, taxNumber: p.partner.taxNumber ?? null, isPrivatePerson: p.partner.privatePerson, country: p.partner.country || "HU" }).returning({ id: partners.id });
@@ -117,7 +126,7 @@ export async function bookInvoiceProposal(companyId: number, docId: number, p: N
     }
     const id = await saveInvoiceDraft(companyId, {
       direction: p.direction, partnerId, invoiceNumber: p.invoiceNumber, issueDate: p.issueDate, fulfillmentDate: p.fulfillmentDate, dueDate: p.dueDate ?? null,
-      paymentMethod: p.paymentMethod, currency: p.currency, exchangeRate: 1, periodic: p.periodic, note: `Beérkező bizonylat #${docId}`, lines,
+      paymentMethod: p.paymentMethod, currency: p.currency, exchangeRate: 1, periodic: p.periodic, note: `Beérkező bizonylat #${docId}${filingNo ? ` · papír: ${filingNo}` : ""}`, lines,
     }, undefined, tx);
     await postInvoice(companyId, id, userId, tx);
     if (p.payNow) {
@@ -187,6 +196,7 @@ export async function processDocument(companyId: number, docId: number, userId: 
     x = await readDocument({ data: doc.data, mime: doc.mime, filename: doc.filename }, { name: company.name, taxNumber: company.taxNumber }, { kind: doc.kind, subject: doc.emailSubject, from: doc.emailFrom }, settings);
     await db.update(inboxDocuments).set({ extracted: x, status: "extracted" }).where(eq(inboxDocuments.id, docId));
   }
+  if (!doc.filingNo && doc.kind === "invoice" && isPaperDoc(doc.mime, x)) await assignFilingNo(companyId, docId);
   const ctx = opts.ctx ?? (await loadProposeCtx(companyId));
   const prop = propose(ctx, doc.kind, x);
   const url = doc.sourceUrl ?? `/c/${companyId}/inbox/${docId}/file`;
@@ -216,6 +226,35 @@ export async function processDocument(companyId: number, docId: number, userId: 
     return p2.issues.length ? "review" : "booked";
   }
   return "review";
+}
+
+/** v3.1.0: iktatószám a papír alapú bizonylatnak (P-ÉÉÉÉ-0001, cégenként és évenként folyamatos). */
+export async function assignFilingNo(companyId: number, docId: number): Promise<string> {
+  return db.transaction(async (tx) => {
+    const [cur] = await tx.select({ f: inboxDocuments.filingNo }).from(inboxDocuments).where(and(eq(inboxDocuments.id, docId), eq(inboxDocuments.companyId, companyId)));
+    if (cur?.f) return cur.f;
+    const year = Number(today().slice(0, 4));
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`filing:${companyId}:${year}`}))`);
+    const ex = await tx.select({ f: inboxDocuments.filingNo }).from(inboxDocuments).where(and(eq(inboxDocuments.companyId, companyId), sql`${inboxDocuments.filingNo} like ${`P-${year}-%`}`));
+    const no = nextFilingNo(year, ex.map((e) => e.f));
+    await tx.update(inboxDocuments).set({ filingNo: no }).where(eq(inboxDocuments.id, docId));
+    return no;
+  });
+}
+
+/**
+ * v3.1.0: a papír bizonylatok helye a havi lefűzőben – a beszkennelés sorrendje (Drive: a fájl létrehozása,
+ * feltöltésnél a feltöltés ideje), hónaponként 1-től számozva. A papírra így nem kell ráírni semmit.
+ */
+export async function binderPositions(companyId: number, ids?: number[]): Promise<Map<number, { month: string; pos: number; label: string }>> {
+  const rows = await db.execute(sql`
+    select id, month, pos from (
+      select id, to_char(coalesce(email_date, created_at) at time zone 'Europe/Budapest', 'YYYY-MM') as month,
+        row_number() over (partition by to_char(coalesce(email_date, created_at) at time zone 'Europe/Budapest', 'YYYY-MM') order by coalesce(email_date, created_at), id)::int as pos
+      from inbox_documents where company_id = ${companyId} and filing_no is not null
+    ) t`) as unknown as Array<{ id: number; month: string; pos: number }>;
+  const want = ids ? new Set(ids) : null;
+  return new Map(rows.filter((r) => !want || want.has(Number(r.id))).map((r) => [Number(r.id), { month: r.month, pos: Number(r.pos), label: `${r.month} / ${r.pos}. tétel` }]));
 }
 
 /** A gomb: új tételek a Google-szkriptből + minden feldolgozatlan bizonylat feldolgozása. */

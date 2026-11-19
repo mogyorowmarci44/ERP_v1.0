@@ -471,6 +471,10 @@ button.big { padding: 12px 22px; font-size: 15px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .inbox-split { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.25fr); gap: 16px; align-items: start; }
 .inbox-split .preview { position: sticky; top: 12px; }
+/* v3.1.0 – papír bizonylat iktatószáma */
+.filing-card { border-left: 4px solid var(--accent, #2563eb); }
+.filing-no { font: 600 26px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.04em; margin-top: 2px; }
+.badge.filing { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background: var(--surface-2); color: var(--ink, inherit); border: 1px solid var(--line); }
 .inbox-split .preview iframe, .inbox-split .preview img { width: 100%; height: 78vh; border: 1px solid var(--line); border-radius: var(--r-md, 8px); background: #fff; object-fit: contain; }
 @media (max-width: 1100px) { .inbox-split { grid-template-columns: 1fr; } .inbox-split .preview { position: static; } }
 table.lines-edit input, table.lines-edit select { width: 100%; min-width: 0; }

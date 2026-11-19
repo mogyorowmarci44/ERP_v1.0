@@ -907,10 +907,12 @@ export const inboxDocuments = pgTable(
     proposal: jsonb("proposal").$type<InboxProposal>(),
     invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
     error: text("error"),
+    /** v3.1.0: papír alapú bizonylat iktatószáma (P-ÉÉÉÉ-0001) – ezt kell ráírni a papírra, a lefűzés sorrendje. */
+    filingNo: varchar("filing_no", { length: 20 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     processedAt: timestamp("processed_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("inbox_documents_ref").on(t.companyId, t.sourceRef), index("inbox_documents_status").on(t.companyId, t.status), index("inbox_documents_sha").on(t.companyId, t.sha256)],
+  (t) => [uniqueIndex("inbox_documents_ref").on(t.companyId, t.sourceRef), index("inbox_documents_status").on(t.companyId, t.status), index("inbox_documents_sha").on(t.companyId, t.sha256), uniqueIndex("inbox_documents_filing").on(t.companyId, t.filingNo)],
 );
 
 // ---------------------------------------------------------------------------
