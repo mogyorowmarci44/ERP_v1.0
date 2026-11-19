@@ -63,7 +63,7 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
               <div className="row" style={{ justifyContent: "space-between", alignItems: "end" }}>
                 <div>
                   <div className="filing-no">{d.filingNo}</div>
-                  {binder && <div>Helye a lefűzőben: <strong>{binder.month}</strong>, <strong>{binder.pos}.</strong> tétel (a beszkennelés sorrendjében)</div>}
+                  {binder && <div>Lefűző: <strong>{binder.month}</strong> · dátum: <strong>{binder.date}</strong>{binder.partner ? <> · {binder.partner}</> : null} <span className="muted">(a hónapon belül dátum, majd partner szerint)</span></div>}
                 </div>
                 <div className="row" style={{ gap: 6 }}>
                   <a className="btn" href={fileUrl} download>Iktatott PDF</a>
@@ -74,7 +74,7 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
           ) : canWrite && d.kind === "invoice" && (
             <form action={filingNoAction} style={{ marginBottom: 12 }}>
               <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={d.id} />
-              <button className="link">Ez papír bizonylat – iktatás (a beszkennelés ideje szerinti helyre kerül)</button>
+              <button className="link">Ez papír bizonylat – iktatás</button>
             </form>
           )}
           {d.error && <div className="card fc-warn" style={{ marginBottom: 12 }}>⚠ {d.error}</div>}

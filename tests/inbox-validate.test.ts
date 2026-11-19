@@ -81,7 +81,7 @@ describe("pecsét a digitális példányon", () => {
     const { stampDocument } = await import("@/lib/inbox/stamp");
     const { PDFDocument } = await import("pdf-lib");
     const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-    const s = { filingNo: "P-2026-0007", binder: "2026-11 / 7. tétel" };
+    const s = { filingNo: "P-2026-0007", binder: "2026-11 · 11.12. · Alkatrész Kft." };
     const out = await stampDocument(png, "image/png", "szamla.png", s);
     expect(out).not.toBeNull();
     const pdf = await PDFDocument.load(out!);

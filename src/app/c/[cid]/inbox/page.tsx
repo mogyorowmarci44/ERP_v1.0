@@ -99,7 +99,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
 
       {paperTab && (
         <p className="muted" style={{ marginTop: -4 }}>
-          A papír bizonylatok a havi lefűző sorrendjében: hónaponként úgy, ahogy beszkennelted őket – a papírt is ebben a sorrendben fűzd le, ráírni nem kell semmit. Az iktatószám a digitális példányon szerepel. Az eredeti papírt meg kell őrizni.
+          A papír bizonylatok a lefűző sorrendjében: a számla dátuma (teljesítés) szerinti hónapban, azon belül dátum, majd partner szerint. Egy később érkező számlát a dátuma szerinti helyére tegyél. Ráírni nem kell semmit. Az iktatószám a digitális példányon szerepel. Az eredeti papírt meg kell őrizni.
         </p>
       )}
 
@@ -113,7 +113,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
               const total = x?.totals?.gross ?? null;
               return (
                 <tr key={r.id}>
-                  {paperTab && <td className="nowrap">{binder?.get(r.id) ? <><strong>{binder.get(r.id)!.month}</strong> · {binder.get(r.id)!.pos}.</> : "–"}</td>}
+                  {paperTab && <td className="nowrap">{binder?.get(r.id) ? <><strong>{binder.get(r.id)!.month}</strong> · {binder.get(r.id)!.date.slice(5).replace("-", ".")}.</> : "–"}</td>}
                   <td className="nowrap">{fmtDate((r.emailDate ?? r.createdAt).toISOString().slice(0, 10))}</td>
                   <td>{r.source === "gmail" ? "Gmail" : r.source === "drive" ? "Drive" : "feltöltés"}{r.kind === "statement" ? " · kivonat" : ""}</td>
                   <td>

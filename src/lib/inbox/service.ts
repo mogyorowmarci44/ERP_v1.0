@@ -242,19 +242,38 @@ export async function assignFilingNo(companyId: number, docId: number): Promise<
   });
 }
 
+export type BinderPos = { month: string; date: string; partner: string; pos: number; label: string };
+
 /**
- * v3.1.0: a papír bizonylatok helye a havi lefűzőben – a beszkennelés sorrendje (Drive: a fájl létrehozása,
- * feltöltésnél a feltöltés ideje), hónaponként 1-től számozva. A papírra így nem kell ráírni semmit.
+ * v3.1.0: a papír bizonylatok helye a havi lefűzőben – a számla dátuma szerint.
+ * Dátum: a lekönyvelt számla teljesítése, különben a kiolvasott teljesítés / kelt, végső esetben a beszkennelés napja.
+ * A lefűző hónapja ennek a hónapja, azon belül dátum, majd partner szerint rendezve. A pecsétre a dátum és a partner kerül
+ * (nem sorszám), mert egy később érkező számla beszúrásakor a sorszámok elcsúsznának – a dátum és a partner nem változik.
  */
-export async function binderPositions(companyId: number, ids?: number[]): Promise<Map<number, { month: string; pos: number; label: string }>> {
+export async function binderPositions(companyId: number, ids?: number[]): Promise<Map<number, BinderPos>> {
   const rows = await db.execute(sql`
-    select id, month, pos from (
-      select id, to_char(coalesce(email_date, created_at) at time zone 'Europe/Budapest', 'YYYY-MM') as month,
-        row_number() over (partition by to_char(coalesce(email_date, created_at) at time zone 'Europe/Budapest', 'YYYY-MM') order by coalesce(email_date, created_at), id)::int as pos
-      from inbox_documents where company_id = ${companyId} and filing_no is not null
-    ) t`) as unknown as Array<{ id: number; month: string; pos: number }>;
+    with d as (
+      select d.id, coalesce(d.email_date, d.created_at) as scanned,
+        coalesce(
+          i.fulfillment_date::text,
+          case when d.extracted->>'fulfillmentDate' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then d.extracted->>'fulfillmentDate' end,
+          case when d.extracted->>'issueDate' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then d.extracted->>'issueDate' end,
+          to_char(coalesce(d.email_date, d.created_at) at time zone 'Europe/Budapest', 'YYYY-MM-DD')
+        ) as day,
+        coalesce(p.name, case when d.extracted->>'direction' = 'out' then d.extracted->'buyer'->>'name' else d.extracted->'seller'->>'name' end, '') as partner
+      from inbox_documents d
+      left join invoices i on i.id = d.invoice_id
+      left join partners p on p.id = i.partner_id
+      where d.company_id = ${companyId} and d.filing_no is not null
+    )
+    select id, left(day, 7) as month, day, partner,
+      (row_number() over (partition by left(day, 7) order by day, lower(partner), scanned, id))::int as pos
+    from d`) as unknown as Array<{ id: number; month: string; day: string; partner: string; pos: number }>;
   const want = ids ? new Set(ids) : null;
-  return new Map(rows.filter((r) => !want || want.has(Number(r.id))).map((r) => [Number(r.id), { month: r.month, pos: Number(r.pos), label: `${r.month} / ${r.pos}. tétel` }]));
+  return new Map(rows.filter((r) => !want || want.has(Number(r.id))).map((r) => {
+    const partner = (r.partner ?? "").trim().slice(0, 40);
+    return [Number(r.id), { month: r.month, date: r.day, partner, pos: Number(r.pos), label: `${r.month} · ${r.day.slice(5).replace("-", ".")}.${partner ? ` · ${partner}` : ""}` }];
+  }));
 }
 
 /** A gomb: új tételek a Google-szkriptből + minden feldolgozatlan bizonylat feldolgozása. */

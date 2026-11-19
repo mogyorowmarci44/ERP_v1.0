@@ -11,7 +11,8 @@ function drawStamp(page: PDFPage, font: Awaited<ReturnType<PDFDocument["embedFon
   const { width, height } = page.getSize();
   const size = Math.max(9, Math.min(14, width / 45));
   const l1 = `Iktatószám: ${s.filingNo}`;
-  const l2 = `Helye: ${s.binder}`.replace(/ő/g, "ö").replace(/ű/g, "ü").replace(/Ő/g, "Ö").replace(/Ű/g, "Ü"); // a beépített betűkészletben nincs ő / ű
+  // a beépített betűkészlet (WinAnsi) nem ismeri az ő / ű betűt és a nem latin karaktereket
+  const l2 = `Lefűző: ${s.binder}`.replace(/ő/g, "ö").replace(/ű/g, "ü").replace(/Ő/g, "Ö").replace(/Ű/g, "Ü").replace(/[^\x20-\x7E\u00A0-\u00FF]/g, "?");
   const w = Math.max(font.widthOfTextAtSize(l1, size), font.widthOfTextAtSize(l2, size * 0.8)) + size * 1.4;
   const h = size * 2.9;
   const x = width - w - size, y = height - h - size;
