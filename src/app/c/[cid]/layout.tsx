@@ -22,6 +22,7 @@ import {
   Wallet,
   HandCoins,
   TrendingUp,
+  Tag,
   Inbox,
   Landmark,
   NotebookTabs,
@@ -114,6 +115,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
 
           <div className="group">Tervezés</div>
           <NavLink href={`${b}/forecast`}><TrendingUp />Forecast</NavLink>
+          <NavLink href={`${b}/arsugo`}><Tag />ÁrSugó</NavLink>
 
           <div className="group">Kimutatások</div>
           <NavLink href={`${b}/reports/kpi`}><Gauge />KPI-Dashboard</NavLink>

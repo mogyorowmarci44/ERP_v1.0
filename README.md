@@ -39,6 +39,17 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.2.0 – ÁrSugó (árajánló)
+
+Új menüpont a Tervezés alatt (és gomb a Gépkocsi készletnél): a beszerzési árat és a tervezett költségeket kell megadni, minden más számolt.
+
+| Terület | Funkció |
+|---|---|
+| Árak | **Padló** (0 fedezet), **cél** (célfedezettel), **hirdetési** (cél + 5% alkuráhagyás, a legközelebbi …49 000-re vagy …99 000-re végződő árra kerekítve, lefelé vagy felfelé – pl. 4 083 450 → 4 099 000, 3 600 450 → 3 599 000; a padló alá sosem) |
+| Célfedezet | Az elmúlt 12 hónapban eladott autók medián „Fedezet II”-je (nettó árbevétel − teljes bekerülés), mint a KPI-Dashboardon; eladás nélkül a bekerülés 10%-a |
+| ÁFA | Alapértelmezés mindkét oldalon a különbözeti: ÁFA = (eladási ár − beszerzési ár) × 27/127, negatív különbözetnél 0. Vételnél és eladásnál is választható a normál ÁFA (vételnél a bruttó árból levonható ÁFA, eladásnál ár × 27/127). Levont ÁFÁ-jú vétel után különbözeti eladás nem lehetséges – figyelmeztet és normál ÁFÁ-val számol |
+| Felület | „Ársáv” elrendezés: nagy javasolt ár, piros / sárga / zöld sáv a padló, cél és hirdetési jelölővel, próbaár csúszka élő fedezettel és ÁFÁ-val |
+
 ## v3.1.0 – Papír alapú számlák: iktatás és automatikus ellenőrzések
 
 | Terület | Funkció |
