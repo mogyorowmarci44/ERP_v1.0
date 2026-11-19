@@ -101,6 +101,17 @@ describe("forecast – HIPA-mentesség", () => {
   });
 });
 
+describe("forecast – TAO és HIPA a közös számolóval", () => {
+  it("telephely-szabály és elhatárolt veszteség", () => {
+    const tax = { hipaSites: [{ name: "Mór", role: "seat" as const, share: 1, rule: { name: "Mór", rate: 0.02, exemptBelow: 2_500_000, exemptInclusive: false } }], losses: [{ year: "2025", amount: 10_000_000 }] };
+    const r = runForecast({ opening: { ...opening, ytdPreTax: 2_000_000, ytdHipaBase: 2_000_000, tax }, plans: [stockPlan], items: [], settings }, "base");
+    const y = r.years.find((x) => x.year === "2026")!;
+    expect(y.hipa).toBe(0); // 2 343 701 < 2,5 M → mentes
+    expect(y.preTax).toBe(2_343_701);
+    expect(y.tao).toBe(Math.round(Math.round(2_343_701 * 0.5) * 0.09)); // a veszteség az alap felét viszi
+  });
+});
+
 describe("forecast – nyitott tételek", () => {
   it("a nyitott szállítói számla esedékességkor csökkenti a bankot, a lejárt ma", () => {
     const r = runForecast({ opening: { ...opening, openItems: [

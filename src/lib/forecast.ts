@@ -12,6 +12,7 @@
  */
 import type { ForecastScenarioParams, ForecastSettings } from "@/db/schema";
 import { fmtNum } from "@/lib/money";
+import { hipaTax, taoCalc, type HipaSiteCalc, type LossEntry } from "@/lib/corp-tax";
 
 export type Scenario = "base" | "pessimistic" | "optimistic";
 export const SCENARIO_LABEL: Record<Scenario, string> = { pessimistic: "Rosszabb", base: "Alap", optimistic: "Jobb" };
@@ -96,6 +97,9 @@ export type FcOpening = {
   ytdHipaBase: number;
   /** Nyitott vevő- (+) és szállítói (−) számlák a főkönyvből: esedékességkor rendeződnek. */
   openItems?: Array<{ date: string; amount: number; channel: Channel; label: string }>;
+  /** v3.3.3 – TAO és HIPA a közös számolóval: telephelyek a település szabályaival, elhatárolt veszteség a folyó év előtt,
+   *  a folyó év kézi HIPA-alap csökkentései (alvállalkozó, K+F). Ha nincs megadva, a forgatókönyv-beállítás (mérték, határ) él. */
+  tax?: { hipaSites: HipaSiteCalc[]; losses: LossEntry[]; hipaDeduct?: number };
 };
 
 // ---------------------------------------------------------------------------
@@ -386,19 +390,34 @@ export function runForecast(
   const years: FcYear[] = [];
   const curFy = fyKey(opening.asOf);
   const fyList = [...new Set([curFy, ...[...fyPreTax.keys()]])].sort();
+  let lossPool: LossEntry[] = (opening.tax?.losses ?? []).map((l) => ({ ...l }));
   for (const y of fyList) {
     const actual = y === curFy ? opening.ytdPreTax : 0;
     const fcPre = r0(fyPreTax.get(y) ?? 0);
     const hipaBase = (y === curFy ? opening.ytdHipaBase : 0) + (fyHipa.get(y) ?? 0);
     // HIPA-alap = nettó árbevétel − ELÁBÉ − anyagköltség: az eredménytől független, veszteség mellett is lehet pozitív.
-    // Önkormányzati mentesség (pl. Mór, 27/2018. rendelet): ha a vállalkozási szintű adóalap nem éri el a határt, nincs adó.
-    const hipaExempt = hipaBase < (settings.hipaExemptBelow ?? 0);
-    const hipa = hipaExempt ? 0 : r0(Math.max(0, hipaBase) * settings.hipaRate);
+    // Telephelyek megadásakor településenként a saját mértékkel és mentességgel (Évzárás › TAO és HIPA); különben
+    // a forgatókönyv-beállítás: önkormányzati mentesség (pl. Mór, 27/2018. rendelet), ha az adóalap nem éri el a határt.
+    const tx = opening.tax;
+    const base = hipaBase - (y === curFy ? tx?.hipaDeduct ?? 0 : 0);
+    let hipa: number, hipaExempt: boolean;
+    if (tx && tx.hipaSites.length) {
+      const h = hipaTax(base, tx.hipaSites);
+      hipa = h.total; hipaExempt = h.lines.length > 0 && h.lines.every((l) => l.exempt);
+    } else {
+      hipaExempt = base < (settings.hipaExemptBelow ?? 0);
+      hipa = hipaExempt ? 0 : r0(Math.max(0, base) * settings.hipaRate);
+    }
     const preTax = r0(actual + fcPre - hipa);
-    const tao = r0(Math.max(0, preTax) * settings.taoRate);
+    let tao: number;
+    if (tx) {
+      const t = taoCalc({ preTax, losses: lossPool, rate: settings.taoRate });
+      tao = t.tax;
+      lossPool = [...t.lossesAfter, ...(t.newLoss ? [{ year: y, amount: t.newLoss }] : [])];
+    } else tao = r0(Math.max(0, preTax) * settings.taoRate);
     const fyEndMonth = addMonths(`${y}-${String(opening.fiscalYearStartMonth).padStart(2, "0")}`, 11);
     const payDate = lastDay(addMonths(fyEndMonth, 5));
-    years.push({ year: y, actualPreTax: r0(actual), forecastPreTax: fcPre, preTax, hipaBase: r0(hipaBase), hipaExempt, hipa, tao, afterTax: preTax - tao, payDate, partial: lastDay(fyEndMonth) > horizonEnd });
+    years.push({ year: y, actualPreTax: r0(actual), forecastPreTax: fcPre, preTax, hipaBase: r0(base), hipaExempt, hipa, tao, afterTax: preTax - tao, payDate, partial: lastDay(fyEndMonth) > horizonEnd });
     if (payDate <= horizonEnd && lastDay(fyEndMonth) <= horizonEnd && tao + hipa > 0)
       events.push({ date: payDate, channel: "bank", amount: -(tao + hipa), kind: "tax", note: `TAO + HIPA ${y}` });
   }

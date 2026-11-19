@@ -261,6 +261,12 @@ export type CompanySettings = {
   /** v2.2 – A tényleges működés (operáció) kezdete, ISO dátum. A KPI-k és a cégérték időszaka ennél korábban nem kezdődik
    *  (pl. a cég alakulása és az első vásárlás után, de az értékesítés megkezdése előtti hetek nem hígítják az átlagokat). */
   operationStart?: string | null;
+  /** v3.3.3 – HIPA: székhely és telephelyek (irányítószám, település, adóalap-megosztási arány 0–1). */
+  hipaSites?: { zip: string; city: string; role: "seat" | "site"; share: number }[] | null;
+  /** v3.3.3 – Adóévenkénti kézi tételek (üzleti év kezdőéve → összegek). */
+  taxAdjustments?: Record<string, { taoIncrease?: number; taoDecrease?: number; hipaSubcontract?: number; hipaRnd?: number }> | null;
+  /** v3.3.3 – Az ERP előtti évek elhatárolt vesztesége (keletkezés éve, összeg). */
+  openingLosses?: { year: string; amount: number }[] | null;
 };
 
 /** v2.0 – Adószámos magánszemély (pl. szálláshely-szolgáltatás) adózási profilja. */

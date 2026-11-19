@@ -39,12 +39,14 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
-## v3.3.3 – Forecast: HIPA-mentességi határ
+## v3.3.3 – TAO és HIPA: teljes számítás, települési HIPA-szabályok a Kincstártól
 
 | Terület | Funkció |
 |---|---|
-| Forecast › Forgatókönyvek | Új beállítás: **HIPA-mentesség, ha az adóalap kisebb mint** (alap: 2 500 000 Ft – Mór, 27/2018. rendelet; 0 = nincs mentesség). Ha az üzleti év (tény + terv) vállalkozási szintű HIPA-alapja nem éri el, nincs HIPA |
-| Kimutatás | A becslés sorában látszik a HIPA-alap és az, ha a mentességi határ alatt van. A HIPA-alap nettó árbevétel − ELÁBÉ − anyagköltség, ezért veszteség mellett is lehet pozitív |
+| Évzárás › TAO és HIPA (új oldal) | Üzleti évenként, **tény** vagy **tény + terv** (Forecast alap forgatókönyv) nézetben. **HIPA**: nettó árbevétel − ELÁBÉ (811, 814) − közvetített szolgáltatások (815) − anyagköltség (51) − alvállalkozói teljesítések − K+F (kézi) = vállalkozási szintű adóalap; 500 M Ft felett az ELÁBÉ sávos korlátja; megosztás székhely / telephelyek között; településenként a saját mérték és mentesség. **TAO**: adózás előtti eredmény (folyó évben a becsült HIPA-val csökkentve) + növelő − csökkentő tételek − elhatárolt veszteség (legfeljebb 50%, 5 évig) × 9%. Évek áttekintése, továbbvihető veszteség, 867 / 891 főkönyvi forgalom, bevallási határidő |
+| Székhely és telephelyek | Irányítószám → település (Magyar Posta lista, 2023, MIT csomag); ha nincs megadva, a cég címéből a székhely 100%-kal |
+| HIPA-szabályok | **Frissítés a Kincstártól** gomb: a hakka.allamkincstar.gov.hu országos havi adatállománya (minden önkormányzat mértéke és adóalap-mentessége, Htv. 39/C. § (2)); csak gombnyomásra. Tartalék: a HAKKA oldalról letöltött fájl kézi feltöltése (zip / xlsx / xls / csv / xml). Az utolsó frissítés naplója a fejlécekkel látszik, formátumváltozásnál ebből javítható. Letöltés előtt beépített szabály: Mór 2%, mentes 2,5 M Ft adóalap alatt (27/2018. rendelet) |
+| Forecast és Cégérték | Ugyanezzel a számolóval: HIPA a HIPA-alapból a telephelyek szabályaival (nem az eredményből), TAO az elhatárolt veszteséggel. A Forecast forgatókönyv HIPA-mértéke és mentességi határa csak tartalék, ha nincs telephely |
 
 ## v3.3.2 – ÁrSugó: színes csúszka
 
