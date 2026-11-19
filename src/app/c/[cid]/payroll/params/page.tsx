@@ -46,7 +46,7 @@ export default async function PayrollParamsPage({ params, searchParams }: { para
           </tbody>
         </table>
         {canWrite ? <div className="row" style={{ marginTop: 12 }}><button className="primary">Mentés</button></div> : <p className="muted small">A paramétereket csak tulajdonos módosíthatja.</p>}
-        <p className="muted small">A kedvezmények (családi, 25 év alatti, anyák) és a jelenléti naptár a következő fázisban jönnek.</p>
+        <p className="muted small">A kedvezmények (családi, 25 év alatti, anyák) a következő fázisban jönnek. A jelenléti naptár a havi bértáblában, soronként a naptár ikonnal nyílik; a munkaszüneti napokat és a munkanap-áthelyezéseket a rendszer ismeri (2025–2026).</p>
       </form>
     </>
   );
