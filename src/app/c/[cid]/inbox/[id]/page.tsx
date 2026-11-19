@@ -10,7 +10,7 @@ import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
-import { bookInvoiceAction, reprocessAction, ignoreDocAction, statementRowAction, repairStatementAction } from "../actions";
+import { bookInvoiceAction, reprocessAction, ignoreDocAction, statementRowAction, repairStatementAction, filingNoAction } from "../actions";
 
 const STATUS_HU: Record<string, string> = { new: "új", extracted: "kiolvasva", review: "jóváhagyásra vár", booked: "lekönyvelve", duplicate: "már bent volt", ignored: "kihagyva", error: "hiba" };
 
@@ -55,6 +55,17 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
         </div>
 
         <div>
+          {d.filingNo ? (
+            <div className="card filing-card" style={{ marginBottom: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Papír bizonylat · iktatószám – írd rá a papírra, és ebben a sorrendben fűzd le</div>
+              <div className="filing-no">{d.filingNo}</div>
+            </div>
+          ) : canWrite && d.kind === "invoice" && (
+            <form action={filingNoAction} style={{ marginBottom: 12 }}>
+              <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={d.id} />
+              <button className="link">Ez papír bizonylat – iktatószám kiosztása</button>
+            </form>
+          )}
           {d.error && <div className="card fc-warn" style={{ marginBottom: 12 }}>⚠ {d.error}</div>}
           {prop && prop.issues.length > 0 && (
             <div className="card fc-warn" style={{ marginBottom: 12 }}>

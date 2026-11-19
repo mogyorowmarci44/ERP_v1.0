@@ -3,6 +3,7 @@
  * Forrás: a partner korábbi könyvelt számlái (főkönyvi számla, ÁFA-kód, autóhoz kötés), a gépkocsi-törzs és a nyitott tételek.
  */
 import type { ExtractedDoc, InboxProposal } from "@/db/schema";
+import { bankMatch, validateExtracted } from "./validate";
 
 export type CtxPartner = { id: number; name: string; taxNumber: string | null; isPrivatePerson: boolean; country: string };
 export type CtxHistoryLine = { partnerId: number; direction: "in" | "out"; accountCode: string; vatCode: string; description: string; hasVehicle: boolean; periodic: boolean };
@@ -19,6 +20,11 @@ export type ProposeCtx = {
   open: CtxOpenInvoice[];
   /** már könyvelt pénzmozgások: `${accountCode}|${dátum}|${összeg}` */
   moneyMoves: Set<string>;
+  /** v3.1.0: lezárt hónapok („YYYY-MM”) és az utolsó bevallott ÁFA-időszak vége – a dátum-ellenőrzéshez. */
+  lockedMonths?: Set<string>;
+  vatClosedUntil?: string | null;
+  /** v3.1.0: még párosításra váró kivonatsorok – a bruttó összeg banki megerősítéséhez. */
+  bankRows?: Array<{ date: string; amount: number; text: string }>;
 };
 
 const digits = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
@@ -156,6 +162,9 @@ export function proposeInvoice(ctx: ProposeCtx, x: ExtractedDoc, today: string):
     issues.push(`A tételek összege (${r2(sumNet + sumVat)}) eltér a végösszegtől (${gross}).`);
   if (!partner && !priv) issues.push("Új partner – ellenőrizd az adatait.");
   if ((x.confidence ?? 1) < 0.7) issues.push("Bizonytalan kiolvasás (rossz minőségű kép?) – ellenőrizd.");
+  // v3.1.0: adószám-CDV, ÁFA-matek, dátumok, lezárt időszak
+  for (const i of validateExtracted({ ...x, direction }, { today, lockedMonths: ctx.lockedMonths, vatClosedUntil: ctx.vatClosedUntil })) if (!issues.includes(i)) issues.push(i);
+  const bank = bankMatch({ ...x, direction }, ctx.bankRows ?? []);
 
   const pm = x.paymentMethod ?? (isContract ? "cash" : "transfer");
   const currency = (x.currency || "HUF").toUpperCase();
@@ -165,7 +174,8 @@ export function proposeInvoice(ctx: ProposeCtx, x: ExtractedDoc, today: string):
   return {
     kind: "invoice",
     issues,
-    basis: partner ? (hist.length ? `${partner.name}: ${new Set(hist.map((h) => h.accountCode)).size === 1 ? `korábbi könyvelés (${hist[0].accountCode})` : "korábbi könyvelések alapján"}` : `${partner.name}: ismert partner, korábbi számla nélkül`) : "új partner",
+    basis: (partner ? (hist.length ? `${partner.name}: ${new Set(hist.map((h) => h.accountCode)).size === 1 ? `korábbi könyvelés (${hist[0].accountCode})` : "korábbi könyvelések alapján"}` : `${partner.name}: ismert partner, korábbi számla nélkül`) : "új partner")
+      + (bank ? ` · a bruttó egyezik egy banki tétellel (${bank.date}, ${bank.text.slice(0, 40)})` : ""),
     invoice: {
       direction,
       partner: { id: partner?.id ?? null, name: partner?.name ?? cp?.name ?? "Ismeretlen", taxNumber: partner?.taxNumber ?? cp?.taxNumber ?? null, privatePerson: partner?.isPrivatePerson ?? priv, country: partner?.country ?? (cp?.euVat && !/^HU/i.test(cp.euVat) ? cp.euVat.slice(0, 2).toUpperCase() : "HU") },

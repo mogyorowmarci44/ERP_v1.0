@@ -36,6 +36,10 @@ export default async function InboxSettingsPage({ params, searchParams }: { para
           Opcionális AI-kiegészítés (az ismeretlen formátumú bizonylatokhoz):{" "}
           {extractionAvailable() ? <span className="pos">bekapcsolva ({EXTRACT_MODEL})</span> : <>kikapcsolva – ha egyszer szeretnéd, a Renderen add hozzá az <code>ANTHROPIC_API_KEY</code> változót. Nélküle az ismeretlen formátumok jóváhagyásra kerülnek.</>}
         </p>
+        <p className="muted" style={{ margin: "6px 0 0" }}>
+          <strong>Papír számlák:</strong> a Google Drive app <em>Szkennelés</em> funkciójával (vagy Microsoft Lensszel) fotózd le, és mentsd a Bejövő számlák mappába – vagy töltsd fel a Beérkező bizonylatok oldalon.
+          A rendszer iktatószámot ad (P-ÉÉÉÉ-0001), ezt írd rá a papírra. Lekönyvelés előtt ellenőrzi az adószám ellenőrző számjegyét, az ÁFA-t (nettó × kulcs), a dátumokat és a lezárt időszakokat; ami nem stimmel, jóváhagyásra kerül.
+        </p>
       </div>
 
       {newSecret && (

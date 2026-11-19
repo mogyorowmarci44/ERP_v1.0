@@ -11,7 +11,7 @@ import { parseNumber } from "@/lib/money";
 import { isDate } from "@/lib/dates";
 import { encryptSecret } from "@/lib/inbox/secret";
 import { pingRemote } from "@/lib/inbox/connector";
-import { addDocument, getInboxSettings, saveInboxSettings, runSync, processDocument, bookInvoiceProposal, bookStatementRows, loadProposeCtx, propose } from "@/lib/inbox/service";
+import { addDocument, getInboxSettings, saveInboxSettings, runSync, processDocument, bookInvoiceProposal, bookStatementRows, loadProposeCtx, propose, assignFilingNo } from "@/lib/inbox/service";
 
 const { inboxDocuments } = schema;
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
@@ -129,6 +129,19 @@ export async function ignoreDocAction(fd: FormData) {
     await db.update(inboxDocuments).set({ status: "ignored", processedAt: new Date() }).where(eq(inboxDocuments.id, id));
     refresh(cid);
     return `${base(cid)}?ok=${encodeURIComponent("Kihagyva.")}`;
+  });
+}
+
+/** v3.1.0: iktatószám kézi kiosztása (pl. szövegréteges szkennelt PDF-nél, amit a rendszer nem ismert fel papírként). */
+export async function filingNoAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  const id = Number(fd.get("id"));
+  await runOrRedirect(`${base(cid)}/${id}`, async () => {
+    await ownDoc(cid, id);
+    const no = await assignFilingNo(cid, id);
+    refresh(cid);
+    return `${base(cid)}/${id}?ok=${encodeURIComponent(`Iktatószám: ${no} – írd rá a papírra.`)}`;
   });
 }
 

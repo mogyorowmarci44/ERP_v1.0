@@ -39,6 +39,16 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.1.0 – Papír alapú számlák: iktatás és automatikus ellenőrzések
+
+| Terület | Funkció |
+|---|---|
+| Folyamat | Papír számla → Google Drive app *Szkennelés* (vagy Microsoft Lens) → Bejövő számlák mappa / kézi feltöltés → „Beolvasás és könyvelés”. A szöveget a Google Drive ingyenes OCR-je adja, a kiolvasás szabályalapú (AI nélkül) |
+| Iktatószám | Minden szkennelt / fotózott bizonylat kap egy cégenként és évenként folyamatos iktatószámot (`P-2026-0001`) – ezt kell ráírni a papírra. Megjelenik a bizonylaton, a listában és a lekönyvelt számla megjegyzésében. Szövegréteges szkennelt PDF-nél kézzel is kiosztható |
+| Papír archívum | Új fül a Beérkező bizonylatoknál: a papír bizonylatok iktatószám szerint, a havi lefűzővel való egyeztetéshez |
+| Ellenőrzések | Adószám ellenőrző számjegye (CDV), ÁFA-kód és megyekód · ÁFA = nettó × kulcs tételenként (kerekítési tűréssel) · jövőbeli / egy évnél régebbi dátum, teljesítés jóval a kelt után · lezárt hónap · már bevallott ÁFA-időszakba eső késve érkezett számla. Ami nem stimmel, nem könyvelődik magától, a jóváhagyó képernyőn látszik az ok |
+| Bank | Ha a bruttó összeg pontosan egy, még párosításra váró kivonatsorral egyezik, a javaslat jelzi („a bruttó egyezik egy banki tétellel”) |
+
 ## v3.0.1 – Jelenléti naptár, CEO - Ügyvezető szerepkör, készlettervezés törlés
 
 | Terület | Funkció |
