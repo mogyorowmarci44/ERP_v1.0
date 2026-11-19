@@ -39,6 +39,13 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.3.1 – ÁrSugó a kezdőlapon, rekord-felirat
+
+| Terület | Funkció |
+|---|---|
+| Kezdőlap | ÁrSugó gomb a gyorsgombok között és link a „Tervezés és rendszer” csempén |
+| Eladás-számláló | Új felirat: „Eddigi legrosszabb: N nap, most M nappal alatta vagy” (ha épp a mostani a leghosszabb: „ez most az új rekord”); a dátumok az egérrel rámutatva látszanak |
+
 ## v3.3.0 – Eladás-számláló a kezdőlapon, ÁrSugó hajtás-választó
 
 | Terület | Funkció |

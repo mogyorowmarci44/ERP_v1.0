@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, count, eq, inArray, max, sql } from "drizzle-orm";
 import {
-  Inbox, FileOutput, FileInput, FilePlus2, BookPlus, ChartNoAxesCombined, Percent, Clock, CarFront, Files, PiggyBank, Library, Database, Cog, ChevronRight,
+  Inbox, FileOutput, FileInput, FilePlus2, BookPlus, ChartNoAxesCombined, Percent, Clock, CarFront, Files, PiggyBank, Library, Database, Cog, ChevronRight, Tag,
 } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
@@ -99,7 +99,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
     { title: "Kimutatások", icon: <ChartNoAxesCombined />, links: [["KPI-Dashboard", `${b}/reports/kpi`], ["P&L, cash-flow, mérleg", `${b}/reports/statements`], ["ÁFA", `${b}/reports/vat`], ["EPR összesítő", `${b}/vehicles/epr`], ["Nyitott tételek", `${b}/reports/open-items`]] },
     { title: "Főkönyv", icon: <Library />, links: [["Napló", `${b}/journal`], ["Számlakarton", `${b}/reports/ledger`], ["Tárgyi eszközök", `${b}/assets`], ["Évzárás", `${b}/closing`]] },
     { title: "Törzsadatok", icon: <Database />, badge: `${inStock.length} autó`, links: [["Gépkocsi készlet", `${b}/vehicles`], ["Partnerek", `${b}/partners`], ["Számlatükör", `${b}/accounts`], ["Árfolyamok (MNB)", `${b}/fx`]] },
-    { title: "Tervezés és rendszer", icon: <Cog />, links: [["Forecast", `${b}/forecast`], ["Megjelenés", `${b}/appearance`], ["Beállítások", `${b}/settings`], ["Adatimport / export", `${b}/import`]] },
+    { title: "Tervezés és rendszer", icon: <Cog />, links: [["Forecast", `${b}/forecast`], ["ÁrSugó", `${b}/arsugo`], ["Megjelenés", `${b}/appearance`], ["Beállítások", `${b}/settings`], ["Adatimport / export", `${b}/import`]] },
   ];
 
   return (
@@ -125,6 +125,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
           <Link className="btn" href={`${b}/invoices/new?dir=in`}><FileInput />Új szállítói számla</Link>
           <Link className="btn" href={`${b}/journal/new`}><BookPlus />Vegyes / bank tétel</Link>
           <Link className="btn" href={`${b}/vehicles`}><CarFront />Gépkocsi készlet</Link>
+          <Link className="btn" href={`${b}/arsugo`}><Tag />ÁrSugó</Link>
         </div>
       </div>
 
@@ -143,9 +144,11 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
           title={gap.median != null ? `Medián szünet két eladás között: ${Math.round(gap.median)} nap (${gap.gapCount} szünet alapján)` : "Még nincs elég eladás a mediánhoz"}>
           <div className="label">Előző eladás óta</div>
           <div className="value">{gap.daysSince == null ? "–" : <>{gap.daysSince} nap{gap.median != null && <small>medián {Math.round(gap.median)} nap</small>}</>}</div>
-          {gap.worst && (
-            <div className="lp-gap-sub">
-              Rekord szünet: {gap.worst.days} nap ({shortDate(gap.worst.from)} – {gap.worst.ongoing ? "most is tart" : shortDate(gap.worst.to)})
+          {gap.worst && gap.daysSince != null && (
+            <div className="lp-gap-sub" title={`${shortDate(gap.worst.from)} – ${gap.worst.ongoing ? "ma" : shortDate(gap.worst.to)}`}>
+              {gap.worst.ongoing
+                ? `Eddigi legrosszabb: ${gap.worst.days} nap, ez most az új rekord`
+                : `Eddigi legrosszabb: ${gap.worst.days} nap, most ${gap.worst.days - gap.daysSince} nappal alatta vagy`}
             </div>
           )}
         </Link>
