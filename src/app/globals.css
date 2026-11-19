@@ -868,12 +868,20 @@ tbody tr.att-row:hover td { background: var(--surface-2); }
 .as-scale { display: grid; gap: 8px; padding: 0 40px; }
 .as-labels { position: relative; height: 40px; }
 .as-labels > div { position: absolute; top: 0; transform: translateX(-50%); display: grid; text-align: center; font-size: 12px; white-space: nowrap; }
-.as-band { position: relative; height: 16px; border-radius: 999px; background: color-mix(in srgb, var(--pos) 18%, var(--surface)); }
+.as-band { position: relative; height: 16px; border-radius: 999px; background: color-mix(in srgb, var(--pos) 45%, var(--surface)); }
 .as-band > div { position: absolute; top: 0; bottom: 0; }
-.as-band .z-neg { left: 0; border-radius: 999px 0 0 999px; background: color-mix(in srgb, var(--neg) 22%, var(--surface)); }
-.as-band .z-warn { background: color-mix(in srgb, var(--warn) 22%, var(--surface)); }
+.as-band .z-neg { left: 0; border-radius: 999px 0 0 999px; background: color-mix(in srgb, var(--neg) 45%, var(--surface)); }
+.as-band .z-warn { background: color-mix(in srgb, var(--warn) 45%, var(--surface)); }
 .as-band i { position: absolute; top: -6px; bottom: -6px; width: 2px; margin-left: -1px; }
-.as-band .m-neg { background: var(--neg); } .as-band .m-pos { background: var(--pos); } .as-band .m-acc { background: var(--accent); }
+.as-band .m-neg { background: var(--neg); } .as-band .m-warn { background: var(--warn); } .as-band .m-pos { background: var(--pos); } .as-band .m-acc { background: var(--accent); }
+.as-labels { height: 40px; }
+.as-labels.below { margin-top: 4px; }
+.as-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; }
+.as-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.as-legend i { width: 12px; height: 12px; border-radius: 3px; }
+.as-legend .l-neg { background: color-mix(in srgb, var(--neg) 45%, var(--surface)); }
+.as-legend .l-warn { background: color-mix(in srgb, var(--warn) 45%, var(--surface)); }
+.as-legend .l-pos { background: color-mix(in srgb, var(--pos) 45%, var(--surface)); }
 .as-scale input[type="range"] { width: 100%; accent-color: var(--accent); height: 28px; margin: 4px 0 0; padding: 0; border: 0; background: transparent; }
 .as-ends { display: flex; justify-content: space-between; font-size: 12px; }
 .as-trial { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; background: var(--surface-2); border-radius: var(--r-md); padding: 16px; }

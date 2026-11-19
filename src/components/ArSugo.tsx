@@ -37,13 +37,13 @@ export function ArSugo({ medianMargin, soldCount }: { medianMargin: number | nul
   const ready = buy > 0;
 
   // ársáv: a padló (vagy a beszerzés) alól a hirdetési ár fölé
-  const lo = Math.floor((Math.min(r.floor.price, buy || r.floor.price) * 0.9) / 10000) * 10000;
+  const lo = Math.floor((Math.min(r.buyCover, r.floor.price) * 0.9) / 10000) * 10000;
   const hi = Math.max(lo + 10000, Math.ceil((r.ask.price * 1.1) / 10000) * 10000);
   const pos = (v: number) => `${Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))}%`;
   const tp = trial ?? r.ask.price;
   const t = pricePoint({ price: tp, buy, buyBase: r.buyBase, costs: costTotal, sellMode: r.sellMode });
-  const zone = tp < r.floor.price ? "neg" : tp < r.goal.price ? "warn" : "pos";
-  const zoneTxt = zone === "neg" ? "Veszteséges" : zone === "warn" ? "Cél alatt" : "Cél fölött";
+  const zone = tp < r.buyCover ? "neg" : tp < r.floor.price ? "warn" : "pos";
+  const zoneTxt = zone === "neg" ? "A beszerzési árat sem fedezi" : zone === "warn" ? "Veszteséges – a költségek és az ÁFA nincs fedezve" : tp < r.goal.price ? "Nyereséges, de a cél alatt" : "Nyereséges";
 
   const reset = () => setTrial(null);
   const setCost = (id: number, patch: Partial<Cost>) => { setCosts((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c))); reset(); };
@@ -107,16 +107,25 @@ export function ArSugo({ medianMargin, soldCount }: { medianMargin: number | nul
 
             <div className="as-scale">
               <div className="as-labels">
-                <div style={{ left: pos(r.floor.price) }}><b className="neg">Padló</b><span>{ft(r.floor.price)}</span></div>
                 <div style={{ left: pos(r.goal.price) }}><b className="pos">Cél</b><span>{ft(r.goal.price)}</span></div>
                 <div style={{ left: pos(r.ask.price) }}><b className="as-accent">Hirdetési</b><span>{ft(r.ask.price)}</span></div>
               </div>
               <div className="as-band">
-                <div className="z-neg" style={{ width: pos(r.floor.price) }} />
-                <div className="z-warn" style={{ left: pos(r.floor.price), right: `calc(100% - ${pos(r.goal.price)})` }} />
-                <i className="m-neg" style={{ left: pos(r.floor.price) }} />
+                <div className="z-neg" style={{ width: pos(r.buyCover) }} />
+                <div className="z-warn" style={{ left: pos(r.buyCover), right: `calc(100% - ${pos(r.floor.price)})` }} />
+                <i className="m-neg" style={{ left: pos(r.buyCover) }} />
+                <i className="m-warn" style={{ left: pos(r.floor.price) }} />
                 <i className="m-pos" style={{ left: pos(r.goal.price) }} />
                 <i className="m-acc" style={{ left: pos(r.ask.price) }} />
+              </div>
+              <div className="as-labels below">
+                <div style={{ left: pos(r.buyCover) }}><b className="neg">Beszerzés</b><span>{ft(r.buyCover)}</span></div>
+                <div style={{ left: pos(r.floor.price) }}><b className="warn">Nullszaldó</b><span>{ft(r.floor.price)}</span></div>
+              </div>
+              <div className="as-legend muted">
+                <span><i className="l-neg" />beszerzési ár alatt</span>
+                <span><i className="l-warn" />költségek + ÁFA még nincs fedezve</span>
+                <span><i className="l-pos" />profit</span>
               </div>
               <input type="range" aria-label="Próbaár" min={lo} max={hi} step={1000} value={tp} onChange={(e) => setTrial(Number(e.target.value))} />
               <div className="as-ends muted"><span>{ft(lo)}</span><span>{ft(hi)}</span></div>
@@ -136,7 +145,7 @@ export function ArSugo({ medianMargin, soldCount }: { medianMargin: number | nul
           {r.targetFromHistory
             ? `– az elmúlt 12 hónapban eladott ${soldCount} autó medián fedezete (nettó árbevétel − teljes bekerülés).`
             : "– még nincs eladott autó, ezért a bekerülés 10%-a."}
-          {" "}Padló: 0 fedezet · Cél: célfedezettel · Hirdetési: cél + {Math.round(HAGGLE * 100)}% alkuráhagyás, a legközelebbi …49 000 / …99 000 árra kerekítve ·{" "}
+          {" "}Nullszaldó: 0 fedezet · Cél: célfedezettel · Hirdetési: cél + {Math.round(HAGGLE * 100)}% alkuráhagyás, a legközelebbi …49 000 / …99 000 árra kerekítve ·{" "}
           {r.sellMode === "margin" ? "ÁFA = (eladási ár − beszerzési ár) × 27/127" : "ÁFA = eladási ár × 27/127"}
         </p>
       </div>

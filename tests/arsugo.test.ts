@@ -18,6 +18,9 @@ describe("ÁrSugó – kerekítés", () => {
 
 describe("ÁrSugó – különbözeti vétel és eladás (alapeset)", () => {
   const r = arsugo({ buy: 3_000_000, buyMode: "margin", sellMode: "margin", costs: 400_000, target: 300_000 });
+  it("a piros zóna határa a beszerzési ár", () => {
+    expect(r.buyCover).toBe(3_000_000);
+  });
   it("padló = beszerzés + költség × 1,27, ott a fedezet 0", () => {
     expect(r.floor.price).toBe(3_508_000);
     expect(r.floor.vat).toBeCloseTo(108_000, 6);
@@ -47,6 +50,7 @@ describe("ÁrSugó – normál ÁFA", () => {
     expect(r.floor.price).toBe(3_048_000);
     expect(r.goal.price).toBe(3_429_000);
     expect(r.goal.margin).toBeCloseTo(300_000, 6);
+    expect(r.buyCover).toBe(2_540_000);
   });
   it("különbözeti vétel, normál eladás: a teljes beszerzési ár bekerülés", () => {
     const r = arsugo({ buy: 3_000_000, buyMode: "margin", sellMode: "normal", costs: 400_000, target: 300_000 });

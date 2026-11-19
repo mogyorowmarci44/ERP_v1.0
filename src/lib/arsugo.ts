@@ -47,6 +47,9 @@ export type ArsugoResult = {
   totalCost: number;
   target: number;
   targetFromHistory: boolean;
+  /** Az az ár, ami épp csak a beszerzést fedezi (különbözeti eladásnál = beszerzési ár, normálnál a nettó beszerzés × 1,27). Alatta piros. */
+  buyCover: number;
+  /** Nullszaldó: a költségek és az ÁFA is fedezve; alatta sárga, fölötte zöld. */
   floor: PricePoint;
   goal: PricePoint;
   /** Cél + alkuráhagyás, kerekítés előtt. */
@@ -72,6 +75,7 @@ export function arsugo(input: ArsugoInput): ArsugoResult {
   const at = (price: number) => pricePoint({ price, buy, buyBase, costs, sellMode });
   const priceFor = (f: number) => (sellMode === "margin" ? buy + (costs + f) * K : (buyBase + costs + f) * K);
 
+  const buyCover = Math.ceil(priceFor(-costs) - 1e-6);
   // egész forintra felfelé, hogy a padló ár se csússzon veszteségbe
   const floor = at(Math.ceil(priceFor(0) - 1e-6));
   const goal = at(Math.ceil(priceFor(target) - 1e-6));
@@ -80,7 +84,7 @@ export function arsugo(input: ArsugoInput): ArsugoResult {
   // lefelé kerekítve se kerüljön a padló alá
   while (askPrice < floor.price) askPrice += 50_000;
   const ask = at(askPrice);
-  return { invalidCombo, sellMode, buyBase, buyVat: buy - buyBase, totalCost, target, targetFromHistory, floor, goal, goalWithHaggle, ask };
+  return { invalidCombo, sellMode, buyBase, buyVat: buy - buyBase, totalCost, target, targetFromHistory, buyCover, floor, goal, goalWithHaggle, ask };
 }
 
 /** Egy tetszőleges (bruttó) eladási árhoz tartozó ÁFA és fedezet – a próbaár csúszkához is. */
