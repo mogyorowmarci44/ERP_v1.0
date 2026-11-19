@@ -136,7 +136,7 @@ export function ArSugo({ medianMargin, soldCount }: { medianMargin: number | nul
           {r.targetFromHistory
             ? `– az elmúlt 12 hónapban eladott ${soldCount} autó medián fedezete (nettó árbevétel − teljes bekerülés).`
             : "– még nincs eladott autó, ezért a bekerülés 10%-a."}
-          {" "}Padló: 0 fedezet · Cél: célfedezettel · Hirdetési: cél + {Math.round(HAGGLE * 100)}% alkuráhagyás, felfelé kerekítve 99 000-re végződőre ·{" "}
+          {" "}Padló: 0 fedezet · Cél: célfedezettel · Hirdetési: cél + {Math.round(HAGGLE * 100)}% alkuráhagyás, a legközelebbi …49 000 / …99 000 árra kerekítve ·{" "}
           {r.sellMode === "margin" ? "ÁFA = (eladási ár − beszerzési ár) × 27/127" : "ÁFA = eladási ár × 27/127"}
         </p>
       </div>

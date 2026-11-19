@@ -1,6 +1,6 @@
 /**
  * ÁrSugó – árajánló gépkocsikhoz. A felhasználó a beszerzési árat és a tervezett költségeket adja meg,
- * minden más számolt: padló ár (0 fedezet), cél ár (célfedezettel), hirdetési ár (cél + alkuráhagyás, 99-re kerekítve).
+ * minden más számolt: padló ár (0 fedezet), cél ár (célfedezettel), hirdetési ár (cél + alkuráhagyás, a legközelebbi …49 000 / …99 000 árra kerekítve).
  *
  * ÁFA-módok (alapértelmezés mindkét oldalon a különbözeti):
  * - vétel különbözeti: a beszerzési ár egésze a bekerülés része, nincs levonható ÁFA;
@@ -54,11 +54,9 @@ export type ArsugoResult = {
   ask: PricePoint;
 };
 
-/** Felfelé kerekítés a legközelebbi, ezresekben 99-re végződő árra (pl. 4 083 450 → 4 099 000). */
-export function roundUpTo99k(x: number): number {
-  let k = Math.ceil(x / 1000 - 1e-9);
-  while (((k % 100) + 100) % 100 !== 99) k++;
-  return k * 1000;
+/** Kerekítés a legközelebbi, ezresekben 49-re vagy 99-re végződő árra, lefelé vagy felfelé (pl. 4 083 450 → 4 099 000, 3 600 450 → 3 599 000). Döntetlennél felfelé. */
+export function roundTo49or99k(x: number): number {
+  return Math.round((x + 1000) / 50_000) * 50_000 - 1000;
 }
 
 export function arsugo(input: ArsugoInput): ArsugoResult {
@@ -78,7 +76,10 @@ export function arsugo(input: ArsugoInput): ArsugoResult {
   const floor = at(Math.ceil(priceFor(0) - 1e-6));
   const goal = at(Math.ceil(priceFor(target) - 1e-6));
   const goalWithHaggle = goal.price * (1 + HAGGLE);
-  const ask = at(roundUpTo99k(goalWithHaggle));
+  let askPrice = roundTo49or99k(goalWithHaggle);
+  // lefelé kerekítve se kerüljön a padló alá
+  while (askPrice < floor.price) askPrice += 50_000;
+  const ask = at(askPrice);
   return { invalidCombo, sellMode, buyBase, buyVat: buy - buyBase, totalCost, target, targetFromHistory, floor, goal, goalWithHaggle, ask };
 }
 

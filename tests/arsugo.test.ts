@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { arsugo, pricePoint, roundUpTo99k } from "@/lib/arsugo";
+import { arsugo, pricePoint, roundTo49or99k } from "@/lib/arsugo";
 
 describe("ÁrSugó – kerekítés", () => {
-  it("felfelé a következő, ezresekben 99-re végződő árra", () => {
-    expect(roundUpTo99k(4_083_450)).toBe(4_099_000);
-    expect(roundUpTo99k(4_099_000)).toBe(4_099_000);
-    expect(roundUpTo99k(4_099_001)).toBe(4_199_000);
-    expect(roundUpTo99k(950)).toBe(99_000);
+  it("a legközelebbi, ezresekben 49-re vagy 99-re végződő árra, le vagy fel", () => {
+    expect(roundTo49or99k(4_083_450)).toBe(4_099_000);
+    expect(roundTo49or99k(3_600_450)).toBe(3_599_000);
+    expect(roundTo49or99k(4_060_000)).toBe(4_049_000);
+    expect(roundTo49or99k(4_049_000)).toBe(4_049_000);
+    expect(roundTo49or99k(4_074_000)).toBe(4_099_000); // döntetlen → fel
+  });
+  it("a hirdetési ár nem kerülhet a padló alá", () => {
+    const r = arsugo({ buy: 1_000, buyMode: "margin", sellMode: "margin", costs: 0, target: 0 });
+    expect(r.ask.price).toBeGreaterThanOrEqual(r.floor.price);
+    expect(r.ask.price).toBe(49_000);
   });
 });
 
@@ -22,7 +28,7 @@ describe("ÁrSugó – különbözeti vétel és eladás (alapeset)", () => {
     expect(r.goal.vat).toBeCloseTo(189_000, 6);
     expect(r.goal.margin).toBeCloseTo(300_000, 6);
   });
-  it("hirdetési = cél + 5%, 99-re kerekítve", () => {
+  it("hirdetési = cél + 5%, a legközelebbi …49 / …99 ezresre kerekítve", () => {
     expect(r.ask.price).toBe(4_099_000);
     expect(r.ask.margin).toBeGreaterThan(r.goal.margin);
   });
