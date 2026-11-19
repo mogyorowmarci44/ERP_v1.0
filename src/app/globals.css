@@ -898,3 +898,10 @@ tbody tr.att-row:hover td { background: var(--surface-2); }
 .as-trial .as-zone button { height: 34px; }
 .as-foot { font-size: 12.5px; margin: 0; max-width: none; }
 @media (max-width: 640px) { .as-big { font-size: 38px; } .as-scale { padding: 0 24px; } .as-cost input.num { width: 120px; } }
+
+/* ---------- Kezdőlap: napok az előző eladás óta (v3.3.0) ---------- */
+.grid.lp-kpi5 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.lp-gap { color: var(--ink); }
+.lp-gap:hover { text-decoration: none; }
+.lp-gap .value small { color: var(--ink); opacity: 0.7; }
+.lp-gap-sub { font-size: 11.5px; color: var(--ink); opacity: 0.75; }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, count, eq, inArray, max } from "drizzle-orm";
+import { and, count, eq, inArray, max, sql } from "drizzle-orm";
 import {
   Inbox, FileOutput, FileInput, FilePlus2, BookPlus, ChartNoAxesCombined, Percent, Clock, CarFront, Files, PiggyBank, Library, Database, Cog, ChevronRight,
 } from "lucide-react";
@@ -14,6 +14,8 @@ import { cashSplit } from "@/lib/cash-split";
 import { companyValue, valuationParamsFor } from "@/lib/company-value";
 import { unclosedVatPeriods } from "@/lib/vat-closing";
 import { dueAccruals } from "@/lib/accruals";
+import { operationStartOf } from "@/lib/kpi";
+import { salesGap, type GapTone } from "@/lib/sales-gap";
 
 const INBOX_TODO = ["review", "error", "new", "extracted"];
 const STALE_DAYS = 90;
@@ -29,6 +31,13 @@ const toHuf = (r: { currency: string; openFx: number; grossHuf: string | number;
 /** Ezer forintra kerekítve, „eFt” egységgel. */
 const eFtFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0, useGrouping: "always" }); // 4 jegyű számot is tagol (8 412)
 const eFt = (n: number) => `${eFtFmt.format(Math.round(n / 1000) || 0)} eFt`;
+/** A szünet-csempe háttere: zöld (0 nap a legerősebb) · sárga · egyre erősebb piros. */
+const gapBg = (t: GapTone) =>
+  t.kind === "pos" ? `color-mix(in srgb, var(--pos) ${Math.round(12 + 38 * t.strength)}%, var(--surface))`
+  : t.kind === "warn" ? "color-mix(in srgb, #e3b008 34%, var(--surface))"
+  : t.kind === "neg" ? `color-mix(in srgb, var(--neg) ${Math.round(16 + 44 * t.strength)}%, var(--surface))`
+  : undefined;
+const shortDate = (d: string) => d.replaceAll("-", ". ") + ".";
 const eurFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0, useGrouping: "always" });
 
 export default async function Dashboard({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -48,6 +57,13 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
     cashSplit(cid, t),
   ]);
   const cv = await companyValue(cid, await valuationParamsFor(cid));
+  // eladási napok (kiszámlázott gépkocsik teljesítési dátuma) – a számláló a működés kezdetétől indul
+  const [saleRows, opStart] = await Promise.all([
+    db.execute(sql`select distinct i.fulfillment_date::text d from invoice_lines il join invoices i on i.id = il.invoice_id
+      where i.company_id = ${cid} and i.direction = 'out' and i.status = 'posted' and il.vehicle_id is not null`) as unknown as Promise<Array<{ d: string }>>,
+    operationStartOf(cid),
+  ]);
+  const gap = salesGap(saleRows.map((r) => r.d), opStart, t);
   const bal = (pred: (code: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
   const revenue = -bal((c) => c.startsWith("9"));
   const costs = bal((c) => c.startsWith("5") || c.startsWith("8"));
@@ -122,7 +138,17 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
           </Link>
         ))}
       </div>
-      <div className="grid cols-4 lp-kpi">
+      <div className="grid lp-kpi lp-kpi5">
+        <Link href={`${b}/reports/kpi`} className="card stat lp-gap" style={{ background: gapBg(gap.tone) }}
+          title={gap.median != null ? `Medián szünet két eladás között: ${Math.round(gap.median)} nap (${gap.gapCount} szünet alapján)` : "Még nincs elég eladás a mediánhoz"}>
+          <div className="label">Előző eladás óta</div>
+          <div className="value">{gap.daysSince == null ? "–" : <>{gap.daysSince} nap{gap.median != null && <small>medián {Math.round(gap.median)} nap</small>}</>}</div>
+          {gap.worst && (
+            <div className="lp-gap-sub">
+              Rekord szünet: {gap.worst.days} nap ({shortDate(gap.worst.from)} – {gap.worst.ongoing ? "most is tart" : shortDate(gap.worst.to)})
+            </div>
+          )}
+        </Link>
         <Link href={`${b}/value`} className="card stat lp-value" title="Korrigált nettó eszközérték – kattints a három számításért">
           <div className="label">Cégérték</div>
           <div className={cv.nav.value < 0 ? "value neg" : "value"}>{eFt(cv.nav.value)}</div>
