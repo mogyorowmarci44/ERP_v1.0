@@ -39,6 +39,14 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.0.1 – Jelenléti naptár, CEO - Ügyvezető szerepkör, készlettervezés törlés
+
+| Terület | Funkció |
+|---|---|
+| Bérszámfejtés – jelenléti naptár | Soronként naptár a havi bértáblában: munkában / szabadság / betegszabadság (70%) / táppénz / fizetés nélküli / nem beosztott. Távollét-levonás, pihenő- és munkaszüneti napi munka 100% pótléka, EFO-napok a naptárból, 15 napos betegszabadság-figyelmeztetés. Munkaszüneti napok és 2025–2026 munkanap-áthelyezések (dec. 24. munkaszüneti nap 2026-tól) |
+| Szerepkörök | A „csak olvasás” szerepkör neve „CEO - Ügyvezető” (jogosultság változatlan) |
+| Készlettervezés | Az autónkénti „törlés” az eladási árat és a dátumot is kiüríti (a még nem mentett beírást is) |
+
 ## v2.2.4 – KPI-Dashboard, Évzárás, Cégérték · v2.2.1 – Kétlépcsős azonosítás, Admin hozzáférések, forecast törlés
 
 | Terület | Funkció |
