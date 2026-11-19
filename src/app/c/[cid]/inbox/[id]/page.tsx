@@ -10,6 +10,7 @@ import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
+import { binderPositions } from "@/lib/inbox/service";
 import { bookInvoiceAction, reprocessAction, ignoreDocAction, statementRowAction, repairStatementAction, filingNoAction } from "../actions";
 
 const STATUS_HU: Record<string, string> = { new: "új", extracted: "kiolvasva", review: "jóváhagyásra vár", booked: "lekönyvelve", duplicate: "már bent volt", ignored: "kihagyva", error: "hiba" };
@@ -28,7 +29,8 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
   const inv = prop?.invoice ?? null;
   const opts = await formOptions(cid, inv?.lines.map((l) => l.vehicleId ?? 0).filter(Boolean) ?? []);
   const fileUrl = `/c/${cid}/inbox/${d.id}/file`;
-  const isImg = d.mime.startsWith("image/");
+  const isImg = d.mime.startsWith("image/") && !d.filingNo; // a papír bizonylat pecsételt PDF-ként jelenik meg
+  const binder = d.filingNo ? (await binderPositions(cid, [d.id])).get(d.id) ?? null : null;
   const blank = { description: "", quantity: 1, unitPrice: 0, accountCode: inv?.direction === "out" ? (isPrivate(company) ? ld.outAcc : "911") : "529", vatCode: inv?.direction === "out" ? ld.outVat : ld.inVat, vehicleId: null, newVehicle: false };
   // két üres sor, hogy hiányzó tételt is fel lehessen venni
   const rows = inv ? [...inv.lines, ...(canWrite && d.status !== "booked" ? [blank, blank] : [])] : [];
@@ -57,13 +59,22 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
         <div>
           {d.filingNo ? (
             <div className="card filing-card" style={{ marginBottom: 12 }}>
-              <div className="muted" style={{ fontSize: 12 }}>Papír bizonylat · iktatószám – írd rá a papírra, és ebben a sorrendben fűzd le</div>
-              <div className="filing-no">{d.filingNo}</div>
+              <div className="muted" style={{ fontSize: 12 }}>Papír bizonylat · iktatószám (a digitális példányra rányomtatva – a papírra nem kell ráírni)</div>
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "end" }}>
+                <div>
+                  <div className="filing-no">{d.filingNo}</div>
+                  {binder && <div>Helye a lefűzőben: <strong>{binder.month}</strong>, <strong>{binder.pos}.</strong> tétel (a beszkennelés sorrendjében)</div>}
+                </div>
+                <div className="row" style={{ gap: 6 }}>
+                  <a className="btn" href={fileUrl} download>Iktatott PDF</a>
+                  <a className="btn link" href={`${fileUrl}?original=1`} target="_blank" rel="noreferrer">eredeti</a>
+                </div>
+              </div>
             </div>
           ) : canWrite && d.kind === "invoice" && (
             <form action={filingNoAction} style={{ marginBottom: 12 }}>
               <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={d.id} />
-              <button className="link">Ez papír bizonylat – iktatószám kiosztása</button>
+              <button className="link">Ez papír bizonylat – iktatás (a beszkennelés ideje szerinti helyre kerül)</button>
             </form>
           )}
           {d.error && <div className="card fc-warn" style={{ marginBottom: 12 }}>⚠ {d.error}</div>}

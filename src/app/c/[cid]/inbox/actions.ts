@@ -141,7 +141,7 @@ export async function filingNoAction(fd: FormData) {
     await ownDoc(cid, id);
     const no = await assignFilingNo(cid, id);
     refresh(cid);
-    return `${base(cid)}/${id}?ok=${encodeURIComponent(`Iktatószám: ${no} – írd rá a papírra.`)}`;
+    return `${base(cid)}/${id}?ok=${encodeURIComponent(`Iktatva: ${no}.`)}`;
   });
 }
 

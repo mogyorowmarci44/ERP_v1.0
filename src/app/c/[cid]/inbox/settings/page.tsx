@@ -38,7 +38,7 @@ export default async function InboxSettingsPage({ params, searchParams }: { para
         </p>
         <p className="muted" style={{ margin: "6px 0 0" }}>
           <strong>Papír számlák:</strong> a Google Drive app <em>Szkennelés</em> funkciójával (vagy Microsoft Lensszel) fotózd le, és mentsd a Bejövő számlák mappába – vagy töltsd fel a Beérkező bizonylatok oldalon.
-          A rendszer iktatószámot ad (P-ÉÉÉÉ-0001), ezt írd rá a papírra. Lekönyvelés előtt ellenőrzi az adószám ellenőrző számjegyét, az ÁFA-t (nettó × kulcs), a dátumokat és a lezárt időszakokat; ami nem stimmel, jóváhagyásra kerül.
+          A rendszer iktatószámot ad (P-ÉÉÉÉ-0001), és rányomtatja a digitális példányra a lefűzőbeli hellyel együtt – a papírra nem kell ráírni semmit, csak fűzd le havonta a beszkennelés sorrendjében. Lekönyvelés előtt ellenőrzi az adószám ellenőrző számjegyét, az ÁFA-t (nettó × kulcs), a dátumokat és a lezárt időszakokat; ami nem stimmel, jóváhagyásra kerül.
         </p>
       </div>
 

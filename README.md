@@ -44,8 +44,8 @@ Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Air
 | Terület | Funkció |
 |---|---|
 | Folyamat | Papír számla → Google Drive app *Szkennelés* (vagy Microsoft Lens) → Bejövő számlák mappa / kézi feltöltés → „Beolvasás és könyvelés”. A szöveget a Google Drive ingyenes OCR-je adja, a kiolvasás szabályalapú (AI nélkül) |
-| Iktatószám | Minden szkennelt / fotózott bizonylat kap egy cégenként és évenként folyamatos iktatószámot (`P-2026-0001`) – ezt kell ráírni a papírra. Megjelenik a bizonylaton, a listában és a lekönyvelt számla megjegyzésében. Szövegréteges szkennelt PDF-nél kézzel is kiosztható |
-| Papír archívum | Új fül a Beérkező bizonylatoknál: a papír bizonylatok iktatószám szerint, a havi lefűzővel való egyeztetéshez |
+| Iktatás – a papírra nem kell írni | Minden szkennelt / fotózott bizonylat automatikusan kap egy cégenként és évenként folyamatos iktatószámot (`P-2026-0001`). A papírt havonta a beszkennelés sorrendjében kell lefűzni; a bizonylat helye (pl. „2026-11 / 7. tétel”) a beszkennelés idejéből adódik (Drive: a fájl létrehozása, feltöltésnél a feltöltés ideje). Az iktatószám és a hely rá van nyomtatva a digitális példányra (pecsételt PDF; `?original=1` az eredeti). Megjelenik a lekönyvelt számla megjegyzésében is. Szövegréteges szkennelt PDF-nél kézzel is iktatható |
+| Papír archívum | Új fül a Beérkező bizonylatoknál: a papír bizonylatok a lefűző sorrendjében (hónap · sorszám), a papír visszakereséséhez |
 | Ellenőrzések | Adószám ellenőrző számjegye (CDV), ÁFA-kód és megyekód · ÁFA = nettó × kulcs tételenként (kerekítési tűréssel) · jövőbeli / egy évnél régebbi dátum, teljesítés jóval a kelt után · lezárt hónap · már bevallott ÁFA-időszakba eső késve érkezett számla. Ami nem stimmel, nem könyvelődik magától, a jóváhagyó képernyőn látszik az ok |
 | Bank | Ha a bruttó összeg pontosan egy, még párosításra váró kivonatsorral egyezik, a javaslat jelzi („a bruttó egyezik egy banki tétellel”) |
 

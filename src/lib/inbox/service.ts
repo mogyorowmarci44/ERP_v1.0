@@ -242,6 +242,21 @@ export async function assignFilingNo(companyId: number, docId: number): Promise<
   });
 }
 
+/**
+ * v3.1.0: a papír bizonylatok helye a havi lefűzőben – a beszkennelés sorrendje (Drive: a fájl létrehozása,
+ * feltöltésnél a feltöltés ideje), hónaponként 1-től számozva. A papírra így nem kell ráírni semmit.
+ */
+export async function binderPositions(companyId: number, ids?: number[]): Promise<Map<number, { month: string; pos: number; label: string }>> {
+  const rows = await db.execute(sql`
+    select id, month, pos from (
+      select id, to_char(coalesce(email_date, created_at) at time zone 'Europe/Budapest', 'YYYY-MM') as month,
+        row_number() over (partition by to_char(coalesce(email_date, created_at) at time zone 'Europe/Budapest', 'YYYY-MM') order by coalesce(email_date, created_at), id)::int as pos
+      from inbox_documents where company_id = ${companyId} and filing_no is not null
+    ) t`) as unknown as Array<{ id: number; month: string; pos: number }>;
+  const want = ids ? new Set(ids) : null;
+  return new Map(rows.filter((r) => !want || want.has(Number(r.id))).map((r) => [Number(r.id), { month: r.month, pos: Number(r.pos), label: `${r.month} / ${r.pos}. tétel` }]));
+}
+
 /** A gomb: új tételek a Google-szkriptből + minden feldolgozatlan bizonylat feldolgozása. */
 export async function runSync(companyId: number, userId: number | undefined): Promise<SyncSummary> {
   const sum: SyncSummary = { fetched: 0, processed: 0, booked: 0, review: 0, duplicate: 0, ignored: 0, errors: [] };

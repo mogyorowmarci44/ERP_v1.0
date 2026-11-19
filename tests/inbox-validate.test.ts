@@ -75,3 +75,19 @@ describe("iktatószám, papír, bank", () => {
     expect(bankMatch(doc(), [...rows, { date: "2026-11-13", amount: -12700, text: "másik" }])).toBeNull();
   });
 });
+
+describe("pecsét a digitális példányon", () => {
+  it("PNG-ből és PDF-ből pecsételt PDF lesz, WEBP-nél null", async () => {
+    const { stampDocument } = await import("@/lib/inbox/stamp");
+    const { PDFDocument } = await import("pdf-lib");
+    const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const s = { filingNo: "P-2026-0007", binder: "2026-11 / 7. tétel" };
+    const out = await stampDocument(png, "image/png", "szamla.png", s);
+    expect(out).not.toBeNull();
+    const pdf = await PDFDocument.load(out!);
+    expect(pdf.getPageCount()).toBe(1);
+    const again = await stampDocument(Buffer.from(out!).toString("base64"), "application/pdf", "x.pdf", s);
+    expect(again).not.toBeNull();
+    expect(await stampDocument(png, "image/webp", "x.webp", s)).toBeNull();
+  });
+});

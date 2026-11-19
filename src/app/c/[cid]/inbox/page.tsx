@@ -4,7 +4,7 @@ import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
-import { getInboxSettings, type SyncSummary } from "@/lib/inbox/service";
+import { binderPositions, getInboxSettings, type SyncSummary } from "@/lib/inbox/service";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
 import { syncAction, uploadAction, ignoreDocAction } from "./actions";
@@ -36,6 +36,12 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
     .orderBy(paperTab ? desc(schema.inboxDocuments.filingNo) : desc(schema.inboxDocuments.createdAt), asc(schema.inboxDocuments.id))
     .limit(paperTab ? 1000 : 300);
   const counts = await db.select({ status: schema.inboxDocuments.status, filingNo: schema.inboxDocuments.filingNo }).from(schema.inboxDocuments).where(eq(schema.inboxDocuments.companyId, cid));
+  // papír archívum: a lefűző sorrendje (hónap csökkenő, azon belül a beszkennelés sorrendje)
+  const binder = paperTab ? await binderPositions(cid) : null;
+  if (binder) rows.sort((a, b) => {
+    const A = binder.get(a.id), B = binder.get(b.id);
+    return (B?.month ?? "").localeCompare(A?.month ?? "") || (A?.pos ?? 0) - (B?.pos ?? 0);
+  });
   const cnt = (k: string, st: readonly string[]) => counts.filter((c) => st.includes(c.status) && (k !== "paper" || c.filingNo)).length;
   let sync: SyncSummary | null = null;
   try { sync = sp.sync ? (JSON.parse(sp.sync) as SyncSummary) : null; } catch { sync = null; }
@@ -93,13 +99,13 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
 
       {paperTab && (
         <p className="muted" style={{ marginTop: -4 }}>
-          A szkennelt / fotózott bizonylatok iktatószám szerint – ugyanebben a sorrendben legyenek a havi lefűzőben. Az eredeti papírt meg kell őrizni.
+          A papír bizonylatok a havi lefűző sorrendjében: hónaponként úgy, ahogy beszkennelted őket – a papírt is ebben a sorrendben fűzd le, ráírni nem kell semmit. Az iktatószám a digitális példányon szerepel. Az eredeti papírt meg kell őrizni.
         </p>
       )}
 
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Érkezett</th><th>Forrás</th><th>Bizonylat</th><th>Partner</th><th className="num">Összeg</th><th>Állapot</th><th>Megjegyzés</th><th /></tr></thead>
+          <thead><tr>{paperTab && <th>Lefűző</th>}<th>Érkezett</th><th>Forrás</th><th>Bizonylat</th><th>Partner</th><th className="num">Összeg</th><th>Állapot</th><th>Megjegyzés</th><th /></tr></thead>
           <tbody>
             {rows.map((r) => {
               const x = r.extracted;
@@ -107,6 +113,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
               const total = x?.totals?.gross ?? null;
               return (
                 <tr key={r.id}>
+                  {paperTab && <td className="nowrap">{binder?.get(r.id) ? <><strong>{binder.get(r.id)!.month}</strong> · {binder.get(r.id)!.pos}.</> : "–"}</td>}
                   <td className="nowrap">{fmtDate((r.emailDate ?? r.createdAt).toISOString().slice(0, 10))}</td>
                   <td>{r.source === "gmail" ? "Gmail" : r.source === "drive" ? "Drive" : "feltöltés"}{r.kind === "statement" ? " · kivonat" : ""}</td>
                   <td>
@@ -129,7 +136,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                 </tr>
               );
             })}
-            {rows.length === 0 && <tr><td colSpan={8} className="muted">Nincs ilyen tétel.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={paperTab ? 9 : 8} className="muted">Nincs ilyen tétel.</td></tr>}
           </tbody>
         </table>
       </div>
