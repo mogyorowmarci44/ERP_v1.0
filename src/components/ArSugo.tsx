@@ -78,12 +78,12 @@ export function ArSugo({ medianMargin, soldCount }: { medianMargin: number | nul
           <div className="as-costs">
             {costs.map((c) => (
               <div key={c.id} className="as-cost">
-                <input aria-label="Költség megnevezése" value={c.name} onChange={(e) => setCost(c.id, { name: e.target.value })} />
-                <input aria-label={`${c.name} összege`} className="num" inputMode="numeric" value={c.amount ? fmtHuf(c.amount) : ""} placeholder="0" onChange={(e) => setCost(c.id, { amount: parseFt(e.target.value) })} />
-                <button type="button" className="as-icon" aria-label={`${c.name} törlése`} onClick={() => { setCosts((cs) => cs.filter((x) => x.id !== c.id)); reset(); }}><X size={16} /></button>
+                <input aria-label="Költség megnevezése" value={c.name} placeholder="Új tétel" onChange={(e) => setCost(c.id, { name: e.target.value })} autoFocus={!c.name} />
+                <input aria-label={`${c.name || "Új tétel"} összege`} className="num" inputMode="numeric" value={c.amount ? fmtHuf(c.amount) : ""} placeholder="0" onChange={(e) => setCost(c.id, { amount: parseFt(e.target.value) })} />
+                <button type="button" className="as-icon" aria-label={`${c.name || "Új tétel"} törlése`} onClick={() => { setCosts((cs) => cs.filter((x) => x.id !== c.id)); reset(); }}><X size={16} /></button>
               </div>
             ))}
-            <div><button type="button" className="as-add" onClick={() => { setCosts((cs) => [...cs, { id: nextId, name: "Új tétel", amount: 0 }]); setNextId((n) => n + 1); }}>+ Tétel</button></div>
+            <div><button type="button" className="as-add" onClick={() => { setCosts((cs) => [...cs, { id: nextId, name: "", amount: 0 }]); setNextId((n) => n + 1); }}>+ Tétel</button></div>
           </div>
         )}
         {buyMode === "normal" && ready && (
