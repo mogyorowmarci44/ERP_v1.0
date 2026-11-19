@@ -797,7 +797,39 @@ table.cv-calc tr.total td { font-weight: 700; border-top: 2px solid var(--ink, c
 .kpi-yoy .muted { font-weight: 400; }
 
 /* v2.2 – bértábla */
-.pr-table td, .pr-table th { padding: 7px 8px; vertical-align: middle; }
+.pr-table td, .pr-table th { padding: 6px 6px; vertical-align: middle; font-size: 13px; }
 .pr-in { text-align: right; padding: 4px 6px; height: 30px; font-variant-numeric: tabular-nums; }
 .pr-warn td { background: color-mix(in srgb, var(--warn, #b7791f) 9%, var(--surface)); color: var(--warn, #8a5a0b); font-size: 12px; padding: 4px 10px; }
 .pr-total td { font-weight: 600; background: var(--surface-2); }
+
+/* Jelenléti naptár (bérszámfejtés) */
+.att-toggle { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 2px 4px; vertical-align: -3px; color: var(--muted); cursor: pointer; }
+.att-toggle.used { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+.att-toggle[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--accent-soft); }
+tr.att-row td { background: var(--surface-2); }
+tbody tr.att-row:hover td { background: var(--surface-2); }
+.att { display: grid; gap: 8px; }
+.att-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.att-brush { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600; }
+.att-brush span { font-weight: 400; }
+.att-brush.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.att-strip { display: grid; gap: 3px; overflow-x: auto; }
+.att-day { display: grid; justify-items: center; gap: 1px; padding: 3px 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; font-size: 11px; line-height: 1.2; min-height: 48px; }
+.att-day .n { font-weight: 600; font-size: 12px; }
+.att-day .w { color: var(--muted); font-size: 10px; }
+.att-day .c { font-weight: 700; min-height: 13px; }
+.att-day.t-rest, .att-day.t-holiday { background: color-mix(in srgb, var(--muted) 12%, var(--surface)); }
+.att-day.t-holiday .n { color: var(--neg); }
+.att-day.out { opacity: .35; cursor: default; }
+.att-day.set { border-width: 2px; }
+.att-day:disabled { cursor: default; }
+.att-M .c, .att-sum .att-M, .att-brush.att-M { color: var(--pos); }
+.att-SZ .c, .att-sum .att-SZ, .att-brush.att-SZ { color: var(--accent); }
+.att-B .c, .att-sum .att-B, .att-brush.att-B { color: #b26a00; }
+.att-T .c, .att-F .c, .att-sum .att-T, .att-brush.att-T, .att-brush.att-F { color: var(--neg); }
+.att-N .c, .att-brush.att-N { color: var(--muted); }
+.att-day.att-SZ { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.att-day.att-B { background: color-mix(in srgb, #b26a00 12%, var(--surface)); }
+.att-day.att-T, .att-day.att-F { background: color-mix(in srgb, var(--neg) 10%, var(--surface)); }
+.att-day.t-rest.att-M, .att-day.t-holiday.att-M { background: color-mix(in srgb, var(--pos) 14%, var(--surface)); }
+.att-sum { display: flex; flex-wrap: wrap; gap: 4px 12px; }

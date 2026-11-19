@@ -61,7 +61,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                 <strong>{c.name}</strong>
                 <span className="entity-tag">{ENTITY_LABEL[c.entityType]}</span>
                 <span className="muted">{c.taxNumber ?? "adószám nélkül"}</span>
-                <span className="muted">ÁFA: {{ monthly: "havi", quarterly: "negyedéves", yearly: "éves" }[c.vatPeriod]} bevalló, szerep: {{ owner: "tulajdonos", accountant: "könyvelő", viewer: "csak olvasás" }[role]}</span>
+                <span className="muted">ÁFA: {{ monthly: "havi", quarterly: "negyedéves", yearly: "éves" }[c.vatPeriod]} bevalló, szerep: {{ owner: "tulajdonos", accountant: "könyvelő", viewer: "CEO - Ügyvezető" }[role]}</span>
               </div>
               <div style={{ height: 4, background: t.accent }} />
             </Link>

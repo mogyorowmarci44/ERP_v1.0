@@ -5,7 +5,8 @@ import { ForecastTabs } from "@/components/Forecast";
 import { Flash } from "@/components/Flash";
 import { fmtHuf, fmtNum } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
-import { savePlanAction, savePlansBulkAction, clearSalePlanAction, deletePlanAction, addPlanCostAction, deletePlanCostAction, fillSuggestionsAction, linkPlanAction, deleteAllPlannedAction } from "../actions";
+import { ClearSalePlan } from "@/components/ClearSalePlan";
+import { savePlanAction, savePlansBulkAction, deletePlanAction, addPlanCostAction, deletePlanCostAction, fillSuggestionsAction, linkPlanAction, deleteAllPlannedAction } from "../actions";
 import { ConfirmButton } from "@/components/ConfirmButton";
 
 type Cost = { id: number; description: string; date: string | null; net: number; vatRate: number; deductible: boolean; capitalize: boolean; payment: string };
@@ -123,17 +124,12 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                         <input form={BULK} type="hidden" name={`v${s.vehicle.id}:rowLabel`} value={vehicleLabel(s.vehicle)} />
                         <input form={BULK} type="hidden" name={`v${s.vehicle.id}:vehicleId`} value={s.vehicle.id} />
                         {p && <input form={BULK} type="hidden" name={`v${s.vehicle.id}:planId`} value={p.id} />}
-                        <input form={BULK} name={`v${s.vehicle.id}:salePrice`} className="num" style={{ width: 120 }} defaultValue={price ?? ""} placeholder={sug ? fmtHuf(sug.price) : ""} aria-label="Bruttó eladási ár" />
-                        <input form={BULK} type="date" name={`v${s.vehicle.id}:saleDate`} defaultValue={p?.saleDate ?? ""} aria-label="Eladás dátuma" />
+                        <input key={`sp-${price ?? ""}`} form={BULK} name={`v${s.vehicle.id}:salePrice`} className="num" style={{ width: 120 }} defaultValue={price ?? ""} placeholder={sug ? fmtHuf(sug.price) : ""} aria-label="Bruttó eladási ár" />
+                        <input key={`sd-${p?.saleDate ?? ""}`} form={BULK} type="date" name={`v${s.vehicle.id}:saleDate`} defaultValue={p?.saleDate ?? ""} aria-label="Eladás dátuma" />
                         <select form={BULK} name={`v${s.vehicle.id}:salePayment`} defaultValue={p?.salePayment ?? "bank"} aria-label="Fizetés módja"><option value="bank">utalás</option><option value="cash">készpénz</option></select>
                         <input form={BULK} type="hidden" name={`v${s.vehicle.id}:note`} value={p?.note ?? ""} />
                         <button form={BULK} title="Az összes sor mentése">Mentés</button>
-                        {p && (p.salePrice || p.saleDate) && (
-                          <form action={clearSalePlanAction}>
-                            <input type="hidden" name="cid" value={cid} /><input type="hidden" name="planId" value={p.id} />
-                            <button className="link" title="Eladási terv törlése ennél az autónál">törlés</button>
-                          </form>
-                        )}
+                        <ClearSalePlan cid={cid} planId={p?.id} row={`v${s.vehicle.id}`} form={BULK} saved={!!(p && (p.salePrice || p.saleDate))} />
                       </div>
                     ) : price ? `${fmtHuf(price)} Ft · ${fmtDate(p?.saleDate)}` : "–"}
                     {p?.note && <div className="muted" style={{ fontSize: 12 }}>{p.note}</div>}

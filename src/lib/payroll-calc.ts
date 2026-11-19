@@ -2,8 +2,11 @@
  * Bérszámfejtés – tiszta számítómotor (adatbázis nélkül, kliensen is fut).
  * Jogviszonyok: teljes munkaidő, részmunkaidő (6 / 4 óra / egyéb), egyszerűsített foglalkoztatás (alkalmi, idénymunka),
  * társas vállalkozó. Túlóra (50% / 100% pótlék), prémium, béren kívüli juttatások (SZÉP: keretig 28%, felette 33,04%).
+ * Jelenléti naptár: napi kód (munkában, szabadság, betegszabadság, táppénz, fizetés nélküli) – a távollétek levonása,
+ * a 70%-os betegszabadság-díj, a pihenő- / munkaszüneti napi munka pótléka és az EFO-napok száma ebből jön.
  * Kedvezmények (családi, 25 év alatti, anyák) a 2. fázisban.
  */
+import { hasSwapData, monthDays, type CalDay } from "./workcal";
 
 export type PayrollParams = {
   minWage: number;            // minimálbér (havi)
@@ -84,11 +87,82 @@ export type Employment = {
 };
 export type BenefitKind = "szep" | "ejm" | "taxfree";
 export const BENEFIT_LABEL: Record<BenefitKind, string> = { szep: "SZÉP-kártya", ejm: "Egyéb (egyes meghatározott)", taxfree: "Adómentes" };
-export type PayrollInput = { otHours50?: number; otHours100?: number; bonus?: number; efoDays?: number; benefits?: Array<{ kind: BenefitKind; amount: number; note?: string }> };
-export type YearToDate = { szepUsed: number; efoDays: number; overtimeHours: number };
+/** Jelenléti naptár napi kódjai. Üres nap = a munkarend szerinti alapérték (munkanapon „munkában”, EFO-nál „nem dolgozott”). */
+export type DayCode = "M" | "SZ" | "B" | "T" | "F" | "N";
+export const DAY_CODES: Array<{ code: DayCode; label: string; hint: string }> = [
+  { code: "M", label: "Munkában", hint: "Ledolgozott nap. Pihenő- / munkaszüneti napon: 100% pótlékkal fizetett munka; EFO-nál: alkalmi munkanap." },
+  { code: "SZ", label: "Szabadság", hint: "Fizetett szabadság – havibérnél nincs levonás (távolléti díj)." },
+  { code: "B", label: "Betegszabadság", hint: "Évi 15 munkanapig: a napi bér 70%-a (távolléti díj 70%)." },
+  { code: "T", label: "Táppénz", hint: "Keresőképtelenség a betegszabadság után – a munkáltató nem fizet bért, a táppénzt a TB folyósítja." },
+  { code: "F", label: "Fizetés nélküli", hint: "Fizetés nélküli szabadság / igazolatlan távollét – bér nem jár." },
+  { code: "N", label: "Nem dolgozott", hint: "Munkanapon nem volt beosztva (pl. EFO, rész-hónap) – levonás nélkül." },
+];
+export const DAY_CODE_LABEL = Object.fromEntries(DAY_CODES.map((c) => [c.code, c.label])) as Record<DayCode, string>;
+export const SICK_LEAVE_DAYS = 15;
+
+export type PayrollInput = {
+  otHours50?: number; otHours100?: number; bonus?: number; efoDays?: number; benefits?: Array<{ kind: BenefitKind; amount: number; note?: string }>;
+  /** jelenléti naptár: nap sorszáma ("1"–"31") → kód; csak az alapértéktől eltérő napok */
+  days?: Record<string, DayCode>;
+};
+export type YearToDate = { szepUsed: number; efoDays: number; overtimeHours: number; sickDays?: number; leaveDays?: number };
+
+export type Attendance = {
+  used: boolean;              // van-e kitöltött nap
+  workdays: number;           // munkanapok a jogviszony idejére
+  worked: number;             // ledolgozott munkanap
+  leave: number; sick: number; sickPay: number; unpaid: number; idle: number;
+  restWorked: number;         // pihenőnapon / hétvégi munkaszüneti napon dolgozott (alapbér + 100%)
+  holidayWorked: number;      // munkanapra eső munkaszüneti napon dolgozott (csak a 100% pótlék – a havibér fedezi az alapot)
+  efoDays: number;            // EFO: „munkában” napok
+};
+
+const inEmployment = (e: Pick<Employment, "startDate" | "endDate">, d: CalDay) => d.date >= e.startDate && (!e.endDate || d.date <= e.endDate);
+
+/** A napi kód a naptárban: a mentett vagy a munkarend szerinti alapértelmezett. */
+export function effectiveCode(e: Pick<Employment, "kind" | "startDate" | "endDate">, d: CalDay, days: PayrollInput["days"]): DayCode | null {
+  if (!inEmployment(e, d)) return null;
+  const v = days?.[String(d.day)];
+  if (v) return v;
+  if (isEfo(e.kind)) return null;
+  return d.type === "work" ? "M" : null;
+}
+
+/** A jelenléti naptár összesítése egy hónapra. */
+export function attendanceOf(e: Pick<Employment, "kind" | "startDate" | "endDate">, period: string, days: PayrollInput["days"]): Attendance {
+  const a: Attendance = { used: !!days && Object.keys(days).length > 0, workdays: 0, worked: 0, leave: 0, sick: 0, sickPay: 0, unpaid: 0, idle: 0, restWorked: 0, holidayWorked: 0, efoDays: 0 };
+  for (const d of monthDays(period)) {
+    if (!inEmployment(e, d)) continue;
+    const c = effectiveCode(e, d, days);
+    if (d.type === "work") a.workdays++;
+    if (c === "M") {
+      a.efoDays++;
+      if (d.type === "work") a.worked++;
+      else if (d.type === "holiday" && d.dow < 5) a.holidayWorked++;
+      else a.restWorked++;
+      continue;
+    }
+    if (d.type !== "work" || !c) continue; // távollét csak munkanapon számít
+    if (c === "SZ") a.leave++;
+    else if (c === "B") a.sick++;
+    else if (c === "T" || c === "F") a.unpaid++;
+    else if (c === "N") a.idle++;
+  }
+  return a;
+}
+
+/** A naptárból adódó, rendkívüli munkaidőnek számító órák (az éves túlóra-keretbe). */
+export function calendarOvertimeHours(e: Employment, period: string, days: PayrollInput["days"]) {
+  if (isEfo(e.kind) || e.kind === "member" || !days) return 0;
+  const a = attendanceOf(e, period, days);
+  return (a.restWorked + a.holidayWorked) * weeklyHoursOf(e.kind, e.weeklyHours) / 5;
+}
 
 export type PayrollResult = {
   base: number; overtimePay: number; bonus: number; gross: number;
+  absenceDeduction: number;   // távollét miatti levonás az alapbérből (betegszabadság, táppénz, fizetés nélküli)
+  sickPay: number;            // betegszabadság-díj (70%)
+  attendance: Attendance | null;
   szja: number; tb: number; net: number;
   tbCompany: number;          // társas vállalkozó: a minimum alap miatti, a cég által viselt járulék
   szocho: number;             // bér utáni szocho (+ társas vállalkozó minimum)
@@ -118,11 +192,13 @@ export function prorateOf(e: Pick<Employment, "startDate" | "endDate">, period: 
 export function calcPayroll(e: Employment, input: PayrollInput, p: PayrollParams, period: string, ytd: YearToDate = { szepUsed: 0, efoDays: 0, overtimeHours: 0 }): PayrollResult {
   const w: string[] = [];
   const ratio = isEfo(e.kind) ? 1 : prorateOf(e, period);
-  const res: PayrollResult = { base: 0, overtimePay: 0, bonus: 0, gross: 0, szja: 0, tb: 0, net: 0, tbCompany: 0, szocho: 0, efoTax: 0, benefitTotal: 0, benefitSzja: 0, benefitSzocho: 0, employerCost: 0, hourlyRate: 0, prorate: ratio, warnings: w };
+  const att = input.days && Object.keys(input.days).length ? attendanceOf(e, period, input.days) : null;
+  if (att && !hasSwapData(Number(period.slice(0, 4)))) w.push(`A ${period.slice(0, 4)}. évi munkanap-áthelyezések még nincsenek a naptárban – csak a munkaszüneti napokkal számol.`);
+  const res: PayrollResult = { base: 0, overtimePay: 0, bonus: 0, absenceDeduction: 0, sickPay: 0, attendance: att, gross: 0, szja: 0, tb: 0, net: 0, tbCompany: 0, szocho: 0, efoTax: 0, benefitTotal: 0, benefitSzja: 0, benefitSzocho: 0, employerCost: 0, hourlyRate: 0, prorate: ratio, warnings: w };
   const pct = (x: number) => x / 100;
 
   if (isEfo(e.kind)) {
-    const days = Math.max(0, Math.round(Number(input.efoDays ?? 0)));
+    const days = att ? att.efoDays : Math.max(0, Math.round(Number(input.efoDays ?? 0)));
     const daily = Number(e.dailyWage || 0);
     res.base = r0(daily * days);
     res.gross = res.base;
@@ -139,12 +215,24 @@ export function calcPayroll(e: Employment, input: PayrollInput, p: PayrollParams
     res.base = r0(monthly * ratio);
     res.hourlyRate = weekly ? monthly / (p.hourDivisor * weekly / 40) : 0;
     const ot50 = Number(input.otHours50 ?? 0), ot100 = Number(input.otHours100 ?? 0);
-    res.overtimePay = r0(res.hourlyRate * (ot50 * 1.5 + ot100 * 2));
+    let calOt = 0, calHours = 0;
+    if (att && e.kind !== "member") {
+      const dayHours = weekly / 5, dayPay = res.hourlyRate * dayHours;
+      res.absenceDeduction = Math.min(res.base, r0(dayPay * (att.sick + att.unpaid)));
+      res.sickPay = r0(dayPay * att.sick * 0.7);
+      calHours = (att.restWorked + att.holidayWorked) * dayHours;
+      calOt = res.hourlyRate * dayHours * (att.restWorked * 2 + att.holidayWorked);
+      const sickYtd = (ytd.sickDays ?? 0) + att.sick;
+      if (sickYtd > SICK_LEAVE_DAYS) w.push(`Betegszabadság az évben ${sickYtd} munkanap – a ${SICK_LEAVE_DAYS} napos keret felett táppénz (T) jár, nem betegszabadság.`);
+      if (att.unpaid > 0 && Object.values(input.days ?? {}).includes("T")) w.push("Táppénzes napok: a táppénzt a TB folyósítja; a munkáltató a táppénz 1/3-át (táppénz-hozzájárulás) fizeti a NEAK határozata alapján.");
+    }
+    res.overtimePay = r0(res.hourlyRate * (ot50 * 1.5 + ot100 * 2) + calOt);
     res.bonus = r0(Number(input.bonus ?? 0));
-    res.gross = res.base + res.overtimePay + res.bonus;
+    res.gross = res.base - res.absenceDeduction + res.sickPay + res.overtimePay + res.bonus;
     res.szja = r0(res.gross * pct(p.szjaPct));
     if (ot50 + ot100 > 0 && e.kind === "member") w.push("Társas vállalkozónál nincs túlóra – a pótlék tagi jövedelemként számolódik.");
-    if (ytd.overtimeHours + ot50 + ot100 > p.overtimeYearLimit && e.kind !== "member") w.push(`Az éves túlóra ${ytd.overtimeHours + ot50 + ot100} óra – túllépi a ${p.overtimeYearLimit} órás keretet.`);
+    const otNow = ot50 + ot100 + calHours;
+    if (ytd.overtimeHours + otNow > p.overtimeYearLimit && e.kind !== "member") w.push(`Az éves túlóra ${ytd.overtimeHours + otNow} óra – túllépi a ${p.overtimeYearLimit} órás keretet.`);
 
     if (e.kind === "member") {
       const minBase = (e.guaranteedMin ? p.guaranteedMin : p.minWage) * ratio;

@@ -19,11 +19,12 @@ function EmploymentForm({ cid, employeeId, e, canWrite }: { cid: number; employe
       <input type="hidden" name="cid" value={cid} /><input type="hidden" name="employeeId" value={employeeId} />
       {e && <input type="hidden" name="id" value={e.id} />}
       <label>Jogviszony
-        <select name="kind" defaultValue={e?.kind ?? "full"} disabled={!canWrite}>
-          {(Object.keys(KIND_LABEL) as EmploymentKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+        <select name="kind" defaultValue={e?.kind ?? ""} required disabled={!canWrite}>
+          {!e && <option value="" disabled>– válassz –</option>}
+          {(Object.keys(KIND_LABEL) as EmploymentKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}{k === "member" ? " (pl. jövedelem nélküli ügyvezető tag)" : ""}</option>)}
         </select>
       </label>
-      <label>Kezdete<input type="date" name="startDate" defaultValue={e?.startDate ?? today()} required disabled={!canWrite} /></label>
+      <label>Kezdete<input type="date" name="startDate" defaultValue={e?.startDate ?? ""} required disabled={!canWrite} /></label>
       <label>Megszűnése<input type="date" name="endDate" defaultValue={e?.endDate ?? ""} disabled={!canWrite} /></label>
       <label>Havi alapbér / tagi jövedelem (Ft)<input name="monthlyWage" inputMode="decimal" defaultValue={e ? String(Number(e.monthlyWage)) : ""} placeholder="EFO-nál üres" disabled={!canWrite} /></label>
       <label>Napidíj (Ft, csak EFO)<input name="dailyWage" inputMode="decimal" defaultValue={e && Number(e.dailyWage) ? String(Number(e.dailyWage)) : ""} disabled={!canWrite} /></label>

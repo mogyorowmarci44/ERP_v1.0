@@ -15,7 +15,7 @@ import { db, schema } from "@/db";
 import { accountIdByCode, postEntry, reverseEntry } from "./ledger";
 import { today } from "./dates";
 import {
-  calcPayroll, defaultParams, isEfo, prorateOf, sumResults,
+  attendanceOf, calcPayroll, calendarOvertimeHours, defaultParams, isEfo, prorateOf, sumResults, DAY_CODE_LABEL,
   type Employment, type EmploymentKind, type PayrollInput, type PayrollParams, type PayrollResult, type YearToDate,
 } from "./payroll-calc";
 
@@ -75,11 +75,15 @@ export async function loadMonth(companyId: number, period: string) {
       const emp = toEmployment(e);
       const mine = run ? items.find((i) => i.runId === run.id && i.employmentId === e.id) : undefined;
       const input = (mine?.input ?? {}) as PayrollInput;
-      const prev = items.filter((i) => earlier.has(i.runId) && i.employmentId === e.id).map((i) => i.input as PayrollInput);
+      const prev = items.filter((i) => earlier.has(i.runId) && i.employmentId === e.id)
+        .map((i) => ({ x: i.input as PayrollInput, p: runs.find((r) => r.id === i.runId)!.period }));
+      const att = (q: { x: PayrollInput; p: string }) => (q.x.days && Object.keys(q.x.days).length ? attendanceOf(emp, q.p, q.x.days) : null);
       const ytd: YearToDate = {
-        szepUsed: prev.reduce((a, x) => a + (x.benefits ?? []).filter((b) => b.kind === "szep").reduce((q, b) => q + Number(b.amount || 0), 0), 0),
-        efoDays: prev.reduce((a, x) => a + Number(x.efoDays ?? 0), 0),
-        overtimeHours: prev.reduce((a, x) => a + Number(x.otHours50 ?? 0) + Number(x.otHours100 ?? 0), 0),
+        szepUsed: prev.reduce((a, { x }) => a + (x.benefits ?? []).filter((b) => b.kind === "szep").reduce((q, b) => q + Number(b.amount || 0), 0), 0),
+        efoDays: prev.reduce((a, q) => a + (att(q)?.efoDays ?? Number(q.x.efoDays ?? 0)), 0),
+        overtimeHours: prev.reduce((a, q) => a + Number(q.x.otHours50 ?? 0) + Number(q.x.otHours100 ?? 0) + calendarOvertimeHours(emp, q.p, q.x.days), 0),
+        sickDays: prev.reduce((a, q) => a + (att(q)?.sick ?? 0), 0),
+        leaveDays: prev.reduce((a, q) => a + (att(q)?.leave ?? 0), 0),
       };
       // ugyanannak a személynek a többi jogviszonya is számít a SZÉP-keretbe
       rows.push({ employmentId: e.id, employeeId: p.id, name: p.name, position: p.position, employment: emp, input, ytd, result: calcPayroll(emp, input, params, period, ytd) });
@@ -121,10 +125,12 @@ export async function saveMonth(companyId: number, period: string, inputs: Recor
   }
 }
 
+const CODES = new Set(Object.keys(DAY_CODE_LABEL));
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0; };
 function sanitize(x: PayrollInput | undefined): PayrollInput {
   return {
     otHours50: num(x?.otHours50), otHours100: num(x?.otHours100), bonus: num(x?.bonus), efoDays: Math.round(num(x?.efoDays)),
+    days: Object.fromEntries(Object.entries(x?.days ?? {}).filter(([d, c]) => /^([1-9]|[12]\d|3[01])$/.test(d) && CODES.has(String(c)))) as PayrollInput["days"],
     benefits: (x?.benefits ?? []).filter((b) => num(b.amount) > 0 && ["szep", "ejm", "taxfree"].includes(b.kind)).map((b) => ({ kind: b.kind, amount: num(b.amount), note: b.note?.slice(0, 100) })),
   };
 }
@@ -147,7 +153,8 @@ export async function postMonth(companyId: number, period: string, userId?: numb
     };
     for (const r of m.rows) {
       const x = r.result, n = r.name;
-      pair(a541, a471, x.gross, `${n}: ${isEfo(r.employment.kind) ? `alkalmi munkabér (${r.input.efoDays ?? 0} nap)` : x.overtimePay ? `bruttó bér (túlórapótlékkal ${x.overtimePay} Ft)` : "bruttó bér"}`);
+      const extra = [x.overtimePay ? `túlórapótlékkal ${x.overtimePay} Ft` : "", x.sickPay ? `betegszabadság ${x.attendance?.sick} nap` : "", x.attendance?.unpaid ? `fizetetlen távollét ${x.attendance.unpaid} nap` : ""].filter(Boolean).join(", ");
+      pair(a541, a471, x.gross, `${n}: ${isEfo(r.employment.kind) ? `alkalmi munkabér (${x.attendance?.efoDays ?? r.input.efoDays ?? 0} nap)` : extra ? `bruttó bér (${extra})` : "bruttó bér"}`);
       pair(a471, a462, x.szja, `${n}: SZJA-előleg`);
       pair(a471, a463, x.tb, `${n}: TB-járulék`);
       pair(a561, a463, x.szocho, `${n}: szociális hozzájárulási adó`);

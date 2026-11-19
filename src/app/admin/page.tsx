@@ -14,7 +14,7 @@ import { APP_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
-const ROLE_HU: Record<string, string> = { owner: "tulajdonos", accountant: "könyvelő", viewer: "csak olvasás" };
+const ROLE_HU: Record<string, string> = { owner: "tulajdonos", accountant: "könyvelő", viewer: "CEO - Ügyvezető" };
 const dt = (d: Date | null) => (d ? d.toLocaleString("hu-HU", { timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–");
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
@@ -67,7 +67,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <p className="muted" style={{ marginTop: -4 }}>
         Sorok: felhasználók, oszlopok: cégek / egységek. A cellában választva azonnal ment.
         {" "}<strong>Tulajdonos</strong>: minden, felhasználókat is adhat hozzá a céghez · <strong>Könyvelő</strong>: rögzíthet és módosíthat ·{" "}
-        <strong>Csak olvasás</strong>: mindent lát, semmit nem módosíthat.
+        <strong>CEO - Ügyvezető</strong>: mindent lát, semmit nem módosíthat (csak olvasás).
       </p>
       <div className="table-wrap">
         <table className="access-matrix">

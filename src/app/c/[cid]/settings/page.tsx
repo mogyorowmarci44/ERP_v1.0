@@ -80,7 +80,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
       <h2>Felhasználók</h2>
       <table>
         <thead><tr><th>Név</th><th>E-mail</th><th>Szerep</th></tr></thead>
-        <tbody>{members.map((m) => <tr key={m.email}><td>{m.name}</td><td>{m.email}</td><td>{m.role}</td></tr>)}</tbody>
+        <tbody>{members.map((m) => <tr key={m.email}><td>{m.name}</td><td>{m.email}</td><td>{{ owner: "tulajdonos", accountant: "könyvelő", viewer: "CEO - Ügyvezető" }[m.role]}</td></tr>)}</tbody>
       </table>
       {role === "owner" && (
         <form action={addMemberAction} className="card form-grid" style={{ marginTop: 12 }}>
@@ -90,7 +90,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           <label>Kezdő jelszó (új felhasználónál)<input name="password" type="password" /></label>
           <label>Szerep
             <select name="role" defaultValue="accountant">
-              <option value="owner">tulajdonos</option><option value="accountant">könyvelő</option><option value="viewer">csak olvasás</option>
+              <option value="owner">tulajdonos</option><option value="accountant">könyvelő</option><option value="viewer">CEO - Ügyvezető</option>
             </select>
           </label>
           <div style={{ alignSelf: "end" }}><button>Hozzáadás</button></div>
