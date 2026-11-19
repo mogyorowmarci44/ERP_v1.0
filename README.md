@@ -44,7 +44,8 @@ Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Air
 | Terület | Funkció |
 |---|---|
 | Ársáv | A csúszka sávja az ár összetételét mutatja: piros a beszerzési ár alatt, sárga amíg a költségek és az ÁFA nincs fedezve (nullszaldóig), zöld fölötte (profit); jelölők: beszerzés, nullszaldó, cél, hirdetési ár, jelmagyarázattal |
-| Költségtételek | Az új tétel neve üres (szürke „Új tétel” helykitöltő), a kurzor rögtön a megnevezésben |
+| Költségtételek | A lista alapból üres; az új tétel neve üres (szürke „Új tétel” helykitöltő), a kurzor rögtön a megnevezésben |
+| EPR | EPR kategória legördülőben (M1 alapból, vagy „Nincs EPR – belföldi beszerzés”) és tömeg (kg); a díj = tömeg × a mai díjtétel (belső égésű, a cég díjátalány-beállítása szerint). Fix, ÁFA-t nem csökkentő költség: a bekerülést növeli, a különbözeti ÁFA alapját nem |
 
 ## v3.2.0 – ÁrSugó (árajánló)
 

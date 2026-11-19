@@ -848,6 +848,11 @@ tbody tr.att-row:hover td { background: var(--surface-2); }
 .as-money input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; text-align: right; font-size: 16px; font-weight: 600; color: var(--ink); padding: 0; }
 .as-money strong { flex: 1; text-align: right; font-size: 16px; color: var(--ink); }
 .as-money:focus-within { border-color: var(--accent); }
+.as-break { flex-basis: 100%; height: 0; }
+.as-field select { height: 44px; }
+.as-field small { font-size: 11.5px; color: var(--muted); font-weight: 400; min-height: 1em; }
+.as-ro { background: var(--surface-2); }
+.as-money input:disabled { color: var(--muted); }
 .as-link { height: 34px; padding: 0 12px; border: 0; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font-weight: 500; cursor: pointer; }
 .as-seg { display: flex; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
 .as-seg button { flex: 1; height: 44px; border: 0; border-radius: 0; background: transparent; color: var(--ink); font-weight: 500; cursor: pointer; }

@@ -20,20 +20,24 @@ function Seg({ value, onChange, label }: { value: VatMode; onChange: (v: VatMode
   );
 }
 
-export function ArSugo({ medianMargin, soldCount }: { medianMargin: number | null; soldCount: number }) {
+export type EprCat = "none" | "M1" | "N1" | "3W";
+export type EprOptions = { rates: Record<Exclude<EprCat, "none">, number>; labels: Record<Exclude<EprCat, "none">, string>; rateLabel: string };
+
+export function ArSugo({ medianMargin, soldCount, epr }: { medianMargin: number | null; soldCount: number; epr: EprOptions }) {
   const [buy, setBuy] = useState(0);
   const [buyMode, setBuyMode] = useState<VatMode>("margin");
   const [sellMode, setSellMode] = useState<VatMode>("margin");
-  const [costs, setCosts] = useState<Cost[]>([
-    { id: 1, name: "Fényezés", amount: 0 },
-    { id: 2, name: "Szerviz", amount: 0 },
-  ]);
-  const [nextId, setNextId] = useState(3);
+  const [costs, setCosts] = useState<Cost[]>([]);
+  const [nextId, setNextId] = useState(1);
+  const [eprCat, setEprCat] = useState<EprCat>("M1");
+  const [massKg, setMassKg] = useState(0);
   const [showCosts, setShowCosts] = useState(true);
   const [trial, setTrial] = useState<number | null>(null);
 
   const costTotal = costs.reduce((a, c) => a + c.amount, 0);
-  const r = useMemo(() => arsugo({ buy, buyMode, sellMode, costs: costTotal, target: medianMargin }), [buy, buyMode, sellMode, costTotal, medianMargin]);
+  const eprRate = eprCat === "none" ? 0 : epr.rates[eprCat];
+  const eprFee = Math.round(massKg * eprRate);
+  const r = useMemo(() => arsugo({ buy, buyMode, sellMode, costs: costTotal, fixed: eprFee, target: medianMargin }), [buy, buyMode, sellMode, costTotal, eprFee, medianMargin]);
   const ready = buy > 0;
 
   // ársáv: a padló (vagy a beszerzés) alól a hirdetési ár fölé
@@ -41,7 +45,7 @@ export function ArSugo({ medianMargin, soldCount }: { medianMargin: number | nul
   const hi = Math.max(lo + 10000, Math.ceil((r.ask.price * 1.1) / 10000) * 10000);
   const pos = (v: number) => `${Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))}%`;
   const tp = trial ?? r.ask.price;
-  const t = pricePoint({ price: tp, buy, buyBase: r.buyBase, costs: costTotal, sellMode: r.sellMode });
+  const t = pricePoint({ price: tp, buy, buyBase: r.buyBase, costs: r.allCosts, sellMode: r.sellMode });
   const zone = tp < r.buyCover ? "neg" : tp < r.floor.price ? "warn" : "pos";
   const zoneTxt = zone === "neg" ? "A beszerzési árat sem fedezi" : zone === "warn" ? "Veszteséges – a költségek és az ÁFA nincs fedezve" : tp < r.goal.price ? "Nyereséges, de a cél alatt" : "Nyereséges";
 
@@ -74,8 +78,32 @@ export function ArSugo({ medianMargin, soldCount }: { medianMargin: number | nul
           <Seg label="Eladás ÁFA" value={r.sellMode} onChange={(v) => { setSellMode(v); reset(); }} />
         </div>
 
+        <div className="as-break" />
+        <label className="as-field">
+          <span>EPR kategória</span>
+          <select value={eprCat} onChange={(e) => { setEprCat(e.target.value as EprCat); reset(); }}>
+            {(Object.keys(epr.labels) as Array<Exclude<EprCat, "none">>).map((k) => <option key={k} value={k}>{epr.labels[k]}</option>)}
+            <option value="none">Nincs EPR (belföldi beszerzés)</option>
+          </select>
+        </label>
+        <label className="as-field">
+          <span>Tömeg (kg)</span>
+          <span className="as-money">
+            <input inputMode="numeric" value={massKg ? fmtHuf(massKg) : ""} placeholder="forgalmi szerint" disabled={eprCat === "none"} onChange={(e) => { setMassKg(parseFt(e.target.value)); reset(); }} />
+            <span>kg</span>
+          </span>
+        </label>
+        <div className="as-field">
+          <span>EPR díj (fix, ÁFA-t nem csökkenti)</span>
+          <span className="as-money as-ro">
+            <strong>{fmtHuf(eprFee)}</strong><span>Ft</span>
+          </span>
+          <small>{eprCat === "none" ? "Belföldi beszerzés: nincs EPR-díj." : `${String(eprRate).replace(".", ",")} Ft/kg · ${epr.rateLabel}`}</small>
+        </div>
+
         {showCosts && (
           <div className="as-costs">
+            {costs.length === 0 && <div className="muted">Még nincs tétel. A „+ Tétel” gombbal adhatsz hozzá (fényezés, szerviz, gumi…).</div>}
             {costs.map((c) => (
               <div key={c.id} className="as-cost">
                 <input aria-label="Költség megnevezése" value={c.name} placeholder="Új tétel" onChange={(e) => setCost(c.id, { name: e.target.value })} autoFocus={!c.name} />
@@ -141,7 +169,7 @@ export function ArSugo({ medianMargin, soldCount }: { medianMargin: number | nul
           </>
         )}
         <p className="muted as-foot">
-          Célfedezet: <b>{ft(r.target)}</b>{" "}
+          Bekerülés: beszerzés {ft(r.buyBase)} + költségek {ft(costTotal)}{r.fixed ? ` + EPR ${ft(r.fixed)}` : ""} = <b>{ft(r.totalCost)}</b> · Célfedezet: <b>{ft(r.target)}</b>{" "}
           {r.targetFromHistory
             ? `– az elmúlt 12 hónapban eladott ${soldCount} autó medián fedezete (nettó árbevétel − teljes bekerülés).`
             : "– még nincs eladott autó, ezért a bekerülés 10%-a."}

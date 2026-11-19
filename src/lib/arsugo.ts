@@ -9,7 +9,8 @@
  * - eladás normál ÁFA: ÁFA = bruttó eladási ár × 27/127.
  * Levont ÁFÁ-jú (normál) vétel után különbözeti eladás nem lehetséges → normál ÁFÁ-val számol, és jelzi.
  *
- * A költségek nettóban értendők (az ÁFÁ-juk levonható). A fedezet = nettó árbevétel − teljes bekerülés
+ * A költségek nettóban értendők (az ÁFÁ-juk levonható). Az EPR-díj fix, ÁFA nélküli költség: a bekerülést növeli,
+ * az ÁFÁ-t nem csökkenti (különbözeti eladásnál az ÁFA alapja csak eladási ár − beszerzési ár). A fedezet = nettó árbevétel − teljes bekerülés
  * (ugyanaz, mint a KPI-Dashboard „Fedezet II”-je).
  */
 
@@ -30,6 +31,8 @@ export type ArsugoInput = {
   sellMode: VatMode;
   /** Tervezett költségek összesen, nettó. */
   costs: number;
+  /** Fix, ÁFA-t nem csökkentő költségek (EPR-díj). */
+  fixed?: number;
   /** Célfedezet Ft-ban (az eladott autók mediánja); null → a bekerülés 10%-a. */
   target: number | null;
 };
@@ -45,6 +48,9 @@ export type ArsugoResult = {
   /** Levonható beszerzési ÁFA (különbözeti vételnél 0). */
   buyVat: number;
   totalCost: number;
+  /** Tervezett költségek + EPR. */
+  allCosts: number;
+  fixed: number;
   target: number;
   targetFromHistory: boolean;
   /** Az az ár, ami épp csak a beszerzést fedezi (különbözeti eladásnál = beszerzési ár, normálnál a nettó beszerzés × 1,27). Alatta piros. */
@@ -64,7 +70,8 @@ export function roundTo49or99k(x: number): number {
 
 export function arsugo(input: ArsugoInput): ArsugoResult {
   const buy = Math.max(0, input.buy || 0);
-  const costs = Math.max(0, input.costs || 0);
+  const fixed = Math.max(0, input.fixed || 0);
+  const costs = Math.max(0, input.costs || 0) + fixed;
   const invalidCombo = input.buyMode === "normal" && input.sellMode === "margin";
   const sellMode: VatMode = invalidCombo ? "normal" : input.sellMode;
   const buyBase = input.buyMode === "normal" ? buy / K : buy;
@@ -84,7 +91,7 @@ export function arsugo(input: ArsugoInput): ArsugoResult {
   // lefelé kerekítve se kerüljön a padló alá
   while (askPrice < floor.price) askPrice += 50_000;
   const ask = at(askPrice);
-  return { invalidCombo, sellMode, buyBase, buyVat: buy - buyBase, totalCost, target, targetFromHistory, buyCover, floor, goal, goalWithHaggle, ask };
+  return { invalidCombo, sellMode, buyBase, buyVat: buy - buyBase, totalCost, allCosts: costs, fixed, target, targetFromHistory, buyCover, floor, goal, goalWithHaggle, ask };
 }
 
 /** Egy tetszőleges (bruttó) eladási árhoz tartozó ÁFA és fedezet – a próbaár csúszkához is. */

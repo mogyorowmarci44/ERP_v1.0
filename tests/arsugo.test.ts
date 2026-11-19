@@ -72,3 +72,14 @@ describe("ÁrSugó – célfedezet", () => {
     expect(r.goal.margin).toBeCloseTo(340_000, 6);
   });
 });
+
+describe("ÁrSugó – EPR", () => {
+  it("az EPR-díj a bekerülést növeli, a különbözeti ÁFA alapját nem", () => {
+    const a = arsugo({ buy: 3_000_000, buyMode: "margin", sellMode: "margin", costs: 400_000, target: 300_000 });
+    const b = arsugo({ buy: 3_000_000, buyMode: "margin", sellMode: "margin", costs: 400_000, fixed: 52_200, target: 300_000 });
+    expect(b.totalCost - a.totalCost).toBe(52_200);
+    expect(b.floor.margin).toBeCloseTo(0, 6);
+    expect(b.goal.margin).toBeCloseTo(300_000, 6);
+    expect(b.buyCover).toBe(3_000_000);
+  });
+});
