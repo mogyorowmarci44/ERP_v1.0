@@ -21,7 +21,13 @@ function Seg({ value, onChange, label }: { value: VatMode; onChange: (v: VatMode
 }
 
 export type EprCat = "none" | "M1" | "N1" | "3W";
-export type EprOptions = { rates: Record<Exclude<EprCat, "none">, number>; labels: Record<Exclude<EprCat, "none">, string>; rateLabel: string };
+export type EprDriveKey = "ice" | "hev" | "phev" | "bev";
+export type EprOptions = {
+  rates: Record<Exclude<EprCat, "none">, Record<EprDriveKey, number>>;
+  labels: Record<Exclude<EprCat, "none">, string>;
+  driveLabels: Record<EprDriveKey, string>;
+  rateLabel: string;
+};
 
 export function ArSugo({ medianMargin, soldCount, epr }: { medianMargin: number | null; soldCount: number; epr: EprOptions }) {
   const [buy, setBuy] = useState(0);
@@ -30,12 +36,13 @@ export function ArSugo({ medianMargin, soldCount, epr }: { medianMargin: number 
   const [costs, setCosts] = useState<Cost[]>([]);
   const [nextId, setNextId] = useState(1);
   const [eprCat, setEprCat] = useState<EprCat>("M1");
+  const [eprDrive, setEprDrive] = useState<EprDriveKey>("ice");
   const [massKg, setMassKg] = useState(0);
   const [showCosts, setShowCosts] = useState(true);
   const [trial, setTrial] = useState<number | null>(null);
 
   const costTotal = costs.reduce((a, c) => a + c.amount, 0);
-  const eprRate = eprCat === "none" ? 0 : epr.rates[eprCat];
+  const eprRate = eprCat === "none" ? 0 : epr.rates[eprCat][eprDrive];
   const eprFee = Math.round(massKg * eprRate);
   const r = useMemo(() => arsugo({ buy, buyMode, sellMode, costs: costTotal, fixed: eprFee, target: medianMargin }), [buy, buyMode, sellMode, costTotal, eprFee, medianMargin]);
   const ready = buy > 0;
@@ -84,6 +91,12 @@ export function ArSugo({ medianMargin, soldCount, epr }: { medianMargin: number 
           <select value={eprCat} onChange={(e) => { setEprCat(e.target.value as EprCat); reset(); }}>
             {(Object.keys(epr.labels) as Array<Exclude<EprCat, "none">>).map((k) => <option key={k} value={k}>{epr.labels[k]}</option>)}
             <option value="none">Nincs EPR (belföldi beszerzés)</option>
+          </select>
+        </label>
+        <label className="as-field">
+          <span>Hajtás</span>
+          <select value={eprDrive} disabled={eprCat === "none"} onChange={(e) => { setEprDrive(e.target.value as EprDriveKey); reset(); }}>
+            {(Object.keys(epr.driveLabels) as EprDriveKey[]).map((k) => <option key={k} value={k}>{epr.driveLabels[k]}</option>)}
           </select>
         </label>
         <label className="as-field">

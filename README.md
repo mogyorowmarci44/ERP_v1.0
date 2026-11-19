@@ -39,13 +39,20 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.3.0 – Eladás-számláló a kezdőlapon, ÁrSugó hajtás-választó
+
+| Terület | Funkció |
+|---|---|
+| Kezdőlap | Új csempe: **N nap az előző eladás óta**. A számláló a működés kezdetétől indul (Beállítások: működés kezdete, pl. PezCar 2025-07-01); egy napon több eladás egy eladási napnak számít. Szín a medián szünethez képest: alatta zöld (0 nap a legzöldebb), medián ±25% sárga, +25% felett egyre pirosabb (2,5× mediánnál a legerősebb). Kis betűvel a rekord szünet dátumokkal („most is tart”, ha épp a mostani a leghosszabb) |
+| ÁrSugó | EPR hajtás-választó (belső égésű / HEV / PHEV / BEV) – díjátalánynál a díjtétel ettől függ |
+
 ## v3.2.1 – ÁrSugó finomítások
 
 | Terület | Funkció |
 |---|---|
 | Ársáv | A csúszka sávja az ár összetételét mutatja: piros a beszerzési ár alatt, sárga amíg a költségek és az ÁFA nincs fedezve (nullszaldóig), zöld fölötte (profit); jelölők: beszerzés, nullszaldó, cél, hirdetési ár, jelmagyarázattal |
 | Költségtételek | A lista alapból üres; az új tétel neve üres (szürke „Új tétel” helykitöltő), a kurzor rögtön a megnevezésben |
-| EPR | EPR kategória legördülőben (M1 alapból, vagy „Nincs EPR – belföldi beszerzés”) és tömeg (kg); a díj = tömeg × a mai díjtétel (belső égésű, a cég díjátalány-beállítása szerint). Fix, ÁFA-t nem csökkentő költség: a bekerülést növeli, a különbözeti ÁFA alapját nem |
+| EPR | EPR kategória legördülőben (M1 alapból, vagy „Nincs EPR – belföldi beszerzés”) és tömeg (kg); a díj = tömeg × a mai díjtétel (a cég díjátalány-beállítása szerint). Fix, ÁFA-t nem csökkentő költség: a bekerülést növeli, a különbözeti ÁFA alapját nem |
 
 ## v3.2.0 – ÁrSugó (árajánló)
 
