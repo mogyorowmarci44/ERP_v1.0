@@ -39,6 +39,13 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.3.3 – Forecast: HIPA-mentességi határ
+
+| Terület | Funkció |
+|---|---|
+| Forecast › Forgatókönyvek | Új beállítás: **HIPA-mentesség, ha az adóalap kisebb mint** (alap: 2 500 000 Ft – Mór, 27/2018. rendelet; 0 = nincs mentesség). Ha az üzleti év (tény + terv) vállalkozási szintű HIPA-alapja nem éri el, nincs HIPA |
+| Kimutatás | A becslés sorában látszik a HIPA-alap és az, ha a mentességi határ alatt van. A HIPA-alap nettó árbevétel − ELÁBÉ − anyagköltség, ezért veszteség mellett is lehet pozitív |
+
 ## v3.3.2 – ÁrSugó: színes csúszka
 
 | Terület | Funkció |

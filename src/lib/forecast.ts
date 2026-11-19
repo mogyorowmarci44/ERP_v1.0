@@ -23,6 +23,7 @@ export const DEFAULT_FORECAST_SETTINGS: ForecastSettings = {
   optimistic: { priceAdj: 0.03, dateShiftDays: -14, vehicleCostAdj: -0.1, fixedCostAdj: 0 },
   horizonMonths: 12,
   hipaRate: 0.02,
+  hipaExemptBelow: 2_500_000,
   taoRate: 0.09,
   calibratedFrom: null,
 };
@@ -41,6 +42,7 @@ export function normalizeSettings(s: Partial<ForecastSettings> | null | undefine
     optimistic: p(s?.optimistic, d.optimistic),
     horizonMonths: Math.min(36, Math.max(3, Math.round(num(s?.horizonMonths, d.horizonMonths)))),
     hipaRate: num(s?.hipaRate, d.hipaRate),
+    hipaExemptBelow: Math.max(0, num(s?.hipaExemptBelow, d.hipaExemptBelow ?? 0)),
     taoRate: num(s?.taoRate, d.taoRate),
     calibratedFrom: s?.calibratedFrom ?? null,
   };
@@ -217,7 +219,7 @@ export type FcSaleRow = {
   inHorizon: boolean;
   shifted: boolean;
 };
-export type FcYear = { year: string; actualPreTax: number; forecastPreTax: number; preTax: number; hipa: number; tao: number; afterTax: number; payDate: string; partial: boolean };
+export type FcYear = { year: string; actualPreTax: number; forecastPreTax: number; preTax: number; hipaBase: number; hipaExempt: boolean; hipa: number; tao: number; afterTax: number; payDate: string; partial: boolean };
 export type FcResult = {
   scenario: Scenario;
   months: FcMonth[];
@@ -388,12 +390,15 @@ export function runForecast(
     const actual = y === curFy ? opening.ytdPreTax : 0;
     const fcPre = r0(fyPreTax.get(y) ?? 0);
     const hipaBase = (y === curFy ? opening.ytdHipaBase : 0) + (fyHipa.get(y) ?? 0);
-    const hipa = r0(Math.max(0, hipaBase) * settings.hipaRate);
+    // HIPA-alap = nettó árbevétel − ELÁBÉ − anyagköltség: az eredménytől független, veszteség mellett is lehet pozitív.
+    // Önkormányzati mentesség (pl. Mór, 27/2018. rendelet): ha a vállalkozási szintű adóalap nem éri el a határt, nincs adó.
+    const hipaExempt = hipaBase < (settings.hipaExemptBelow ?? 0);
+    const hipa = hipaExempt ? 0 : r0(Math.max(0, hipaBase) * settings.hipaRate);
     const preTax = r0(actual + fcPre - hipa);
     const tao = r0(Math.max(0, preTax) * settings.taoRate);
     const fyEndMonth = addMonths(`${y}-${String(opening.fiscalYearStartMonth).padStart(2, "0")}`, 11);
     const payDate = lastDay(addMonths(fyEndMonth, 5));
-    years.push({ year: y, actualPreTax: r0(actual), forecastPreTax: fcPre, preTax, hipa, tao, afterTax: preTax - tao, payDate, partial: lastDay(fyEndMonth) > horizonEnd });
+    years.push({ year: y, actualPreTax: r0(actual), forecastPreTax: fcPre, preTax, hipaBase: r0(hipaBase), hipaExempt, hipa, tao, afterTax: preTax - tao, payDate, partial: lastDay(fyEndMonth) > horizonEnd });
     if (payDate <= horizonEnd && lastDay(fyEndMonth) <= horizonEnd && tao + hipa > 0)
       events.push({ date: payDate, channel: "bank", amount: -(tao + hipa), kind: "tax", note: `TAO + HIPA ${y}` });
   }

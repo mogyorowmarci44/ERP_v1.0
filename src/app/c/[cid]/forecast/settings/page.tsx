@@ -68,6 +68,7 @@ export default async function ForecastSettingsPage({ params, searchParams }: { p
         <div className="card form-grid" style={{ marginTop: 14 }}>
           <Row label="Tervezési horizont" name="horizon" value={s.horizonMonths} unit="hónap" hint="3–36, a folyó hónappal" />
           <Row label="Helyi iparűzési adó" name="hipa" value={pct(s.hipaRate)} unit="%" hint="a székhely szerinti önkormányzat mértéke" />
+          <Row label="HIPA-mentesség, ha az adóalap kisebb mint" name="hipaExempt" value={s.hipaExemptBelow ?? 0} unit="Ft" hint="Mór: 2 500 000 Ft (27/2018. rendelet) · 0 = nincs mentesség" />
           <Row label="Társasági adó" name="tao" value={pct(s.taoRate)} unit="%" />
           {canWrite && <div style={{ alignSelf: "end" }}><button className="primary">Mentés</button></div>}
         </div>

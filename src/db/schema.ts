@@ -708,6 +708,8 @@ export type ForecastSettings = {
   horizonMonths: number;
   /** Helyi iparűzési adó mértéke (pl. 0.02). */
   hipaRate: number;
+  /** Önkormányzati HIPA-mentesség (Htv. 39/C. § (2)): ha a vállalkozási szintű adóalap ennél kisebb, nincs HIPA. 0 = nincs mentesség. */
+  hipaExemptBelow?: number;
   /** Társasági adó mértéke. */
   taoRate: number;
   /** Honnan jöttek a forgatókönyv-paraméterek. */
