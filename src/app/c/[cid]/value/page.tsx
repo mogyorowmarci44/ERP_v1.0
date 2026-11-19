@@ -137,7 +137,7 @@ export default async function CompanyValuePage({ params, searchParams }: { param
           <input type="hidden" name="cid" value={cid} />
           <label>Eredményszorzó (×)<input name="multiple" className="num" defaultValue={String(p.multiple)} disabled={!canWrite} /><small className="muted">2. módszer · jellemzően 2–4</small></label>
           <label>Diszkontráta (%/év)<input name="discountRate" className="num" defaultValue={String(Math.round(p.discountRate * 1000) / 10)} disabled={!canWrite} /><small className="muted">3. módszer · a tőke elvárt hozama</small></label>
-          <label>TAO + HIPA<input className="num" value={`${Math.round(v.rates.tao * 1000) / 10}% + ${Math.round(v.rates.hipa * 1000) / 10}%`} disabled readOnly /><small className="muted">a Forecast › Forgatókönyvek fülről</small></label>
+          <label>TAO + HIPA<input className="num" value={`TAO ${Math.round(v.rates.tao * 1000) / 10}% + HIPA telephelyek szerint`} disabled readOnly /><small className="muted"><a href={`/c/${cid}/closing/taxes`}>Évzárás › TAO és HIPA</a></small></label>
           {canWrite && <div style={{ alignSelf: "end" }}><button className="primary">Mentés</button></div>}
         </form>
         <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>

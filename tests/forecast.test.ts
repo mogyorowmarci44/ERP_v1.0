@@ -68,14 +68,47 @@ describe("forecast – különbözeti ÁFA és eredmény", () => {
   });
 
   it("éves TAO + HIPA becslés a tény + terv eredményből, befizetés május 31-én", () => {
-    const r = runForecast({ opening: { ...opening, ytdPreTax: 1_000_000, ytdHipaBase: 1_500_000 }, plans: [stockPlan], items: [], settings }, "base");
+    const r = runForecast({ opening: { ...opening, ytdPreTax: 1_000_000, ytdHipaBase: 3_000_000 }, plans: [stockPlan], items: [], settings }, "base");
     const y = r.years.find((x) => x.year === "2026")!;
-    const hipa = Math.round((1_500_000 + 343_701) * 0.02);
+    const hipa = Math.round((3_000_000 + 343_701) * 0.02);
     expect(y.hipa).toBe(hipa);
     expect(y.preTax).toBe(1_000_000 + 343_701 - hipa);
     expect(y.tao).toBe(Math.round(y.preTax * 0.09));
     expect(y.payDate).toBe("2027-05-31");
     expect(r.months.find((m) => m.month === "2027-05")!.taxPaid).toBe(y.tao + y.hipa);
+  });
+});
+
+describe("forecast – HIPA-mentesség", () => {
+  it("a mentességi határ (alap: 2,5 M Ft) alatti adóalapnál nincs HIPA", () => {
+    const r = runForecast({ opening: { ...opening, ytdPreTax: -2_000_000, ytdHipaBase: 1_500_000 }, plans: [stockPlan], items: [], settings }, "base");
+    const y = r.years.find((x) => x.year === "2026")!;
+    expect(y.hipaBase).toBe(1_843_701);
+    expect(y.hipaExempt).toBe(true);
+    expect(y.hipa).toBe(0);
+  });
+  it("veszteség mellett is van HIPA, ha az adóalap a határ felett van (az alap nem az eredmény)", () => {
+    const r = runForecast({ opening: { ...opening, ytdPreTax: -2_000_000, ytdHipaBase: 4_000_000 }, plans: [stockPlan], items: [], settings }, "base");
+    const y = r.years.find((x) => x.year === "2026")!;
+    expect(y.preTax).toBeLessThan(0);
+    expect(y.hipa).toBe(Math.round((4_000_000 + 343_701) * 0.02));
+    expect(y.tao).toBe(0);
+  });
+  it("0 = nincs mentesség", () => {
+    const s0 = normalizeSettings({ ...settings, hipaExemptBelow: 0 });
+    const r = runForecast({ opening: { ...opening, ytdHipaBase: 100_000 }, plans: [stockPlan], items: [], settings: s0 }, "base");
+    expect(r.years.find((x) => x.year === "2026")!.hipa).toBe(Math.round((100_000 + 343_701) * 0.02));
+  });
+});
+
+describe("forecast – TAO és HIPA a közös számolóval", () => {
+  it("telephely-szabály és elhatárolt veszteség", () => {
+    const tax = { hipaSites: [{ name: "Mór", role: "seat" as const, share: 1, rule: { name: "Mór", rate: 0.02, exemptBelow: 2_500_000, exemptInclusive: false } }], losses: [{ year: "2025", amount: 10_000_000 }] };
+    const r = runForecast({ opening: { ...opening, ytdPreTax: 2_000_000, ytdHipaBase: 2_000_000, tax }, plans: [stockPlan], items: [], settings }, "base");
+    const y = r.years.find((x) => x.year === "2026")!;
+    expect(y.hipa).toBe(0); // 2 343 701 < 2,5 M → mentes
+    expect(y.preTax).toBe(2_343_701);
+    expect(y.tao).toBe(Math.round(Math.round(2_343_701 * 0.5) * 0.09)); // a veszteség az alap felét viszi
   });
 });
 

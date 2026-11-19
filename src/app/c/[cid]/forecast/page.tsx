@@ -155,7 +155,9 @@ export default async function ForecastPage({ params, searchParams }: { params: P
 
       {curYear && (
         <p className="muted">
-          {curYear.year}. üzleti év becslés: tény {fmtHuf(curYear.actualPreTax)} Ft + terv {fmtHuf(curYear.forecastPreTax)} Ft − HIPA {fmtHuf(curYear.hipa)} Ft = adózás előtti eredmény <strong>{fmtHuf(curYear.preTax)} Ft</strong>,
+          {curYear.year}. üzleti év becslés: tény {fmtHuf(curYear.actualPreTax)} Ft + terv {fmtHuf(curYear.forecastPreTax)} Ft − HIPA {fmtHuf(curYear.hipa)} Ft{" "}
+          <span className="muted">(HIPA-alap: {fmtHuf(curYear.hipaBase)} Ft{curYear.hipaExempt ? " – a mentességi határ alatt, nincs HIPA" : ""})</span>{" "}
+          = adózás előtti eredmény <strong>{fmtHuf(curYear.preTax)} Ft</strong>,
           társasági adó {fmtHuf(curYear.tao)} Ft (befizetés {fmtDate(curYear.payDate)}).
           {r.years.slice(1).map((y) => ` ${y.year}: ${fmtHuf(y.preTax)} Ft${y.partial ? " (részleges év)" : ""}.`)}
         </p>
@@ -239,7 +241,7 @@ export default async function ForecastPage({ params, searchParams }: { params: P
       )}
       <p className="muted" style={{ marginTop: 12 }}>
         A különbözeti ÁFA autónként számolódik: (bruttó eladási ár − beszerzési ár) × 27/127, negatív különbözetnél 0. Az ÁFA a bevallási időszak után ({o.vatPeriod === "monthly" ? "havi" : o.vatPeriod === "quarterly" ? "negyedéves" : "éves"}) esedékes; a negatív egyenleg továbbvihető.
-        A *-gal jelölt időszak részleges (a tervezési horizont előbb ér véget). A TAO és a HIPA az üzleti év tény + terv eredményéből becsült (előlegek és adóalap-korrekciók nélkül), befizetés a következő év május 31-ig.
+        A *-gal jelölt időszak részleges (a tervezési horizont előbb ér véget). A TAO az üzleti év tény + terv eredményéből, a HIPA a nettó árbevétel − ELÁBÉ − anyagköltség alapból becsült (ez veszteség mellett is lehet pozitív; a mentességi határ alatt nincs HIPA) (előlegek és adóalap-korrekciók nélkül), befizetés a következő év május 31-ig.
       </p>
     </div>
   );

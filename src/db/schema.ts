@@ -261,6 +261,12 @@ export type CompanySettings = {
   /** v2.2 – A tényleges működés (operáció) kezdete, ISO dátum. A KPI-k és a cégérték időszaka ennél korábban nem kezdődik
    *  (pl. a cég alakulása és az első vásárlás után, de az értékesítés megkezdése előtti hetek nem hígítják az átlagokat). */
   operationStart?: string | null;
+  /** v3.3.3 – HIPA: székhely és telephelyek (irányítószám, település, adóalap-megosztási arány 0–1). */
+  hipaSites?: { zip: string; city: string; role: "seat" | "site"; share: number }[] | null;
+  /** v3.3.3 – Adóévenkénti kézi tételek (üzleti év kezdőéve → összegek). */
+  taxAdjustments?: Record<string, { taoIncrease?: number; taoDecrease?: number; hipaSubcontract?: number; hipaRnd?: number }> | null;
+  /** v3.3.3 – Az ERP előtti évek elhatárolt vesztesége (keletkezés éve, összeg). */
+  openingLosses?: { year: string; amount: number }[] | null;
 };
 
 /** v2.0 – Adószámos magánszemély (pl. szálláshely-szolgáltatás) adózási profilja. */
@@ -708,6 +714,8 @@ export type ForecastSettings = {
   horizonMonths: number;
   /** Helyi iparűzési adó mértéke (pl. 0.02). */
   hipaRate: number;
+  /** Önkormányzati HIPA-mentesség (Htv. 39/C. § (2)): ha a vállalkozási szintű adóalap ennél kisebb, nincs HIPA. 0 = nincs mentesség. */
+  hipaExemptBelow?: number;
   /** Társasági adó mértéke. */
   taoRate: number;
   /** Honnan jöttek a forgatókönyv-paraméterek. */

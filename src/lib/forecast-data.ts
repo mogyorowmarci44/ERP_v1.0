@@ -6,6 +6,7 @@ import { marginPurchaseBase, vehicleBookValues } from "./ledger";
 import { fiscalYearStart, openItems } from "./reports";
 import { today, addDaysIso } from "./dates";
 import { round2 } from "./money";
+import { lossPoolForCurrentYear, fyOf } from "./corp-tax-data";
 import { vehicleTitle } from "./vehicle-id";
 import {
   normalizeSettings, calibrate, quantile, MIN_CALIBRATION_SALES, periodList, periodKey,
@@ -52,7 +53,8 @@ export async function loadOpening(companyId: number, asOf = today()): Promise<Fc
     if (/^9[123]/.test(r.code)) revenue -= r.bal;
     if (/^(811|814|815|51)/.test(r.code)) cogsMat += r.bal;
   }
-  const [ins, outs] = await Promise.all([openItems(companyId, "in"), openItems(companyId, "out")]);
+  const [ins, outs, pool] = await Promise.all([openItems(companyId, "in"), openItems(companyId, "out"), lossPoolForCurrentYear(company)]);
+  const curAdj = company.settings.taxAdjustments?.[fyOf(asOf, company.fiscalYearStartMonth)];
   const oi = [...outs.map((r) => ({ r, sign: 1 })), ...ins.map((r) => ({ r, sign: -1 }))].map(({ r, sign }) => ({
     date: r.dueDate ?? r.issueDate,
     amount: sign * Math.round((Number(r.grossHuf) * r.openFx) / (Number(r.grossFx) || 1)),
@@ -69,6 +71,7 @@ export async function loadOpening(companyId: number, asOf = today()): Promise<Fc
     vatPeriod: company.vatPeriod as FcOpening["vatPeriod"],
     ytdPreTax: round2(ytdPreTax),
     ytdHipaBase: round2(revenue - cogsMat),
+    tax: { hipaSites: pool.siteCalc, losses: pool.losses, hipaDeduct: (curAdj?.hipaSubcontract ?? 0) + (curAdj?.hipaRnd ?? 0) },
   };
 }
 

@@ -4,6 +4,7 @@
  *  2. Eredményszorzós: (elmúlt 12 hónap adózás előtti eredménye + értékcsökkenés) × szorzó + pénzeszközök − hitelek / tagi kölcsön.
  *  3. Előretekintő: könyv szerinti saját tőke + a Forecast következő 12 havi adózott eredményének jelenértéke (három forgatókönyv).
  */
+import { hipaTax, taoCalc } from "./corp-tax";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import { trialBalance, type TrialBalanceRow } from "./reports";
@@ -49,6 +50,12 @@ export async function companyValue(companyId: number, opts: { multiple?: number;
     loadForecastInput(companyId),
   ]);
   const tao = input.settings.taoRate, hipa = input.settings.hipaRate;
+  // v3.3.3 – TAO és HIPA a közös számolóval: a HIPA alapja nem az eredmény (nettó árbevétel − ELÁBÉ − anyagköltség),
+  // településenként a saját mértékkel és mentességgel; a TAO-t az elhatárolt veszteség csökkenti.
+  const tx = input.opening.tax;
+  const hipaNow = tx && tx.hipaSites.length
+    ? hipaTax(input.opening.ytdHipaBase - (tx.hipaDeduct ?? 0), tx.hipaSites).total
+    : (input.opening.ytdHipaBase < (input.settings.hipaExemptBelow ?? 0) ? 0 : Math.round(Math.max(0, input.opening.ytdHipaBase) * hipa));
 
   // --- Mérleg (a könyvek szerint, mai nap) ------------------------------------------
   const assets = sumBy(all, (c) => /^[123]/.test(c));
@@ -73,8 +80,9 @@ export async function companyValue(companyId: number, opts: { multiple?: number;
   });
   const uplift = round2(stock.reduce((a, s) => a + s.uplift, 0));
   const ytdPreTax = -flowBy(ytd, (c) => c.startsWith("9")) - flowBy(ytd, (c) => c.startsWith("5") || c.startsWith("8"));
-  const taxBase = Math.max(0, ytdPreTax + uplift);
-  const tax = Math.round(taxBase * (tao + hipa));
+  const taoNow = taoCalc({ preTax: ytdPreTax + uplift - hipaNow, losses: tx?.losses ?? [], rate: tao });
+  const taxBase = taoNow.base;
+  const tax = Math.round(taoNow.tax + hipaNow);
   const navValue = round2(bookEquity + uplift - tax);
 
   // --- 2. Eredményszorzós -------------------------------------------------------------
@@ -94,10 +102,13 @@ export async function companyValue(companyId: number, opts: { multiple?: number;
   const empty = input.plans.length === 0 && input.items.length === 0;
   let fwdMonths = 0;
   const scenarios = Object.fromEntries(SCENARIOS.map((sc) => {
-    const months12 = runForecast(input, sc, "month").months.slice(0, 12);
+    const run = runForecast(input, sc, "month");
+    const months12 = run.months.slice(0, 12);
     fwdMonths = months12.length;
     const preTax = months12.reduce((a, m) => a + m.preTax, 0);
-    const afterTax = preTax - Math.max(0, preTax) * (tao + hipa);
+    // éves HIPA a folyó üzleti év becsléséből; TAO az elhatárolt veszteséggel
+    const hipaYear = run.years[0]?.hipa ?? 0;
+    const afterTax = preTax - hipaYear - taoCalc({ preTax: preTax - hipaYear, losses: tx?.losses ?? [], rate: tao }).tax;
     // havi diszkontálás: az egyes hónapok adózott eredménye a hónap végén
     const ratio = preTax !== 0 ? afterTax / preTax : 1;
     const pv = months12.reduce((a, m, i) => a + (m.preTax * ratio) / Math.pow(1 + monthly, i + 1), 0);
@@ -116,7 +127,7 @@ export async function companyValue(companyId: number, opts: { multiple?: number;
         { label: "Kötelezettségek összesen", amount: -round2(liabilities), hint: "42–49. számlacsoport (tagi kölcsön, szállítók, ÁFA, adók …)" },
         { label: "Könyv szerinti saját tőke", amount: round2(bookEquity), hint: "a tárgyévi, még le nem zárt eredménnyel" },
         { label: "Készlet átértékelése várható nettó eladási értékre", amount: uplift, hint: "Forecast eladási ár − különbözeti ÁFA − hátralévő tervezett költség; terv nélkül könyv szerinti érték" },
-        { label: `Becsült TAO + HIPA (${pct(tao)} + ${pct(hipa)})`, amount: -tax, hint: `adóalap: tárgyévi eredmény (${Math.round(ytdPreTax).toLocaleString("hu-HU")} Ft) + átértékelés` },
+        { label: `Becsült TAO (${pct(tao)}) + HIPA`, amount: -tax, hint: `HIPA ${hipaNow.toLocaleString("hu-HU")} Ft (telephelyek szerint, a HIPA-alapból) · TAO-alap: tárgyévi eredmény (${Math.round(ytdPreTax).toLocaleString("hu-HU")} Ft) + átértékelés − HIPA${taoNow.lossUsed ? ` − elhatárolt veszteség ${taoNow.lossUsed.toLocaleString("hu-HU")} Ft` : ""}` },
       ],
     },
     multiple: {

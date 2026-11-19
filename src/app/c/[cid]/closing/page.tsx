@@ -61,6 +61,7 @@ export default async function ClosingPage({ params }: { params: Promise<{ cid: s
       <div className="row" style={{ marginTop: 10, gap: 8 }}>
         <Link className="btn" href={`/c/${cid}/reports/trial-balance?from=${d.from}&to=${d.to}`}><Scale size={16} /> Főkönyvi kivonat {d.y}</Link>
         {d.dep.hasAssets && <Link className="btn" href={`/c/${cid}/assets?year=${d.y}`}><Package size={16} /> Eszköztükör {d.y}</Link>}
+        <Link className="btn" href={`/c/${cid}/closing/taxes?fy=${d.y}`}>TAO és HIPA {d.y}</Link>
         <Link className={`btn${isCur ? "" : " primary"}`} href={`/c/${cid}/reports/annual?year=${d.y}`}><BookOpenCheck size={16} /> Éves beszámoló {d.y}{isCur ? " (előzetes)" : ""}</Link>
       </div>
     </div>
@@ -74,6 +75,7 @@ export default async function ClosingPage({ params }: { params: Promise<{ cid: s
           <span className="muted">{company.name} · főkönyvi kivonat és éves beszámoló évenként</span>
         </div>
         <div className="row">
+          <Link className="btn primary" href={`/c/${cid}/closing/taxes`}>TAO és HIPA</Link>
           <Link className="btn" href={`/c/${cid}/reports/vat/closing`}>ÁFA-zárás</Link>
           <Link className="btn" href={`/c/${cid}/closing/accruals`}>Időbeli elhatárolások</Link>
           <Link className="btn" href={`/c/${cid}/settings`}>Időszakok lezárása (Beállítások)</Link>

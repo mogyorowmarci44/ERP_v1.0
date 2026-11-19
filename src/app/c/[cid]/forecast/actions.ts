@@ -344,6 +344,7 @@ export async function saveScenarioSettingsAction(fd: FormData) {
       optimistic: { priceAdj: pct(fd, "o_price"), dateShiftDays: Math.round(parseNumber(fd.get("o_days"))), vehicleCostAdj: pct(fd, "o_vcost"), fixedCostAdj: pct(fd, "o_fixed") },
       horizonMonths: Math.round(parseNumber(fd.get("horizon"))),
       hipaRate: pct(fd, "hipa"),
+      hipaExemptBelow: Math.max(0, Math.round(parseNumber(fd.get("hipaExempt")))),
       taoRate: pct(fd, "tao"),
       calibratedFrom: "kézi beállítás",
     });
