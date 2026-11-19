@@ -39,6 +39,13 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.2.1 – ÁrSugó finomítások
+
+| Terület | Funkció |
+|---|---|
+| Ársáv | A csúszka sávja az ár összetételét mutatja: piros a beszerzési ár alatt, sárga amíg a költségek és az ÁFA nincs fedezve (nullszaldóig), zöld fölötte (profit); jelölők: beszerzés, nullszaldó, cél, hirdetési ár, jelmagyarázattal |
+| Költségtételek | Az új tétel neve üres (szürke „Új tétel” helykitöltő), a kurzor rögtön a megnevezésben |
+
 ## v3.2.0 – ÁrSugó (árajánló)
 
 Új menüpont a Tervezés alatt (és gomb a Gépkocsi készletnél): a beszerzési árat és a tervezett költségeket kell megadni, minden más számolt.
