@@ -50,7 +50,15 @@ export function ArSugo({ medianMargin, soldCount, epr }: { medianMargin: number 
   // ársáv: a padló (vagy a beszerzés) alól a hirdetési ár fölé
   const lo = Math.floor((Math.min(r.buyCover, r.floor.price) * 0.9) / 10000) * 10000;
   const hi = Math.max(lo + 10000, Math.ceil((r.ask.price * 1.1) / 10000) * 10000);
-  const pos = (v: number) => `${Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))}%`;
+  // a csúszka gombja 24 px széles: a jelölők és a színsáv a gomb középpontjának útjához igazodnak
+  const frac = (v: number) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+  const pos = (v: number) => `calc(12px + (100% - 24px) * ${frac(v).toFixed(4)})`;
+  // piros a beszerzésig, sárga a nullszaldóig (éles határokkal), utána halványtól élénk zöldig – minél nagyobb a profit, annál élénkebb
+  const track = [
+    `var(--as-neg) 0`, `var(--as-neg) ${pos(r.buyCover)}`,
+    `var(--as-warn) ${pos(r.buyCover)}`, `var(--as-warn) ${pos(r.floor.price)}`,
+    `var(--as-pos-soft) ${pos(r.floor.price)}`, `var(--pos) 100%`,
+  ].join(", ");
   const tp = trial ?? r.ask.price;
   const t = pricePoint({ price: tp, buy, buyBase: r.buyBase, costs: r.allCosts, sellMode: r.sellMode });
   const zone = tp < r.buyCover ? "neg" : tp < r.floor.price ? "warn" : "pos";
@@ -151,9 +159,9 @@ export function ArSugo({ medianMargin, soldCount, epr }: { medianMargin: number 
                 <div style={{ left: pos(r.goal.price) }}><b className="pos">Cél</b><span>{ft(r.goal.price)}</span></div>
                 <div style={{ left: pos(r.ask.price) }}><b className="as-accent">Hirdetési</b><span>{ft(r.ask.price)}</span></div>
               </div>
-              <div className="as-band">
-                <div className="z-neg" style={{ width: pos(r.buyCover) }} />
-                <div className="z-warn" style={{ left: pos(r.buyCover), right: `calc(100% - ${pos(r.floor.price)})` }} />
+              <div className="as-track">
+                <input type="range" aria-label="Próbaár" min={lo} max={hi} step={1000} value={tp} onChange={(e) => setTrial(Number(e.target.value))}
+                  style={{ background: `linear-gradient(to right, ${track})` }} />
                 <i className="m-neg" style={{ left: pos(r.buyCover) }} />
                 <i className="m-warn" style={{ left: pos(r.floor.price) }} />
                 <i className="m-pos" style={{ left: pos(r.goal.price) }} />
@@ -166,9 +174,8 @@ export function ArSugo({ medianMargin, soldCount, epr }: { medianMargin: number 
               <div className="as-legend muted">
                 <span><i className="l-neg" />beszerzési ár alatt</span>
                 <span><i className="l-warn" />költségek + ÁFA még nincs fedezve</span>
-                <span><i className="l-pos" />profit</span>
+                <span><i className="l-pos" />profit (minél élénkebb, annál több)</span>
               </div>
-              <input type="range" aria-label="Próbaár" min={lo} max={hi} step={1000} value={tp} onChange={(e) => setTrial(Number(e.target.value))} />
               <div className="as-ends muted"><span>{ft(lo)}</span><span>{ft(hi)}</span></div>
             </div>
 
