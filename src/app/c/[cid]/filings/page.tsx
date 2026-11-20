@@ -8,7 +8,7 @@ import { fmtDate, today } from "@/lib/dates";
 import { fmtHuf } from "@/lib/money";
 import { KIND_LABEL, type VatResult } from "@/lib/anyk";
 import { filingsOverview, type FilingVersion, type PeriodRow } from "@/lib/filings";
-import { template2608 } from "@/lib/payroll-2608-data";
+import { payrollExportRows, template2608 } from "@/lib/payroll-2608-data";
 import { deleteFilingAction, fillPartnerTaxAction, markLatestAction, markSubmittedAction, uploadFilingsAction } from "./actions";
 import { isDate } from "@/lib/dates";
 import { vatPlan, type PlanRow } from "@/lib/vat-return-data";
@@ -57,7 +57,7 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
       <div className="topbar">
         <div>
           <h1>NAV-bevallások (ÁNYK)</h1>
-          <span className="muted">{company.name} · ÁFA (2565 / 2665) és járulék (2608) havonta · ÁNYK mentések betöltése, beküldött változatok, határidők</span>
+          <span className="muted">{company.name} · ÁFA- és járulékbevallás havonta · ÁNYK mentések betöltése, beküldött változatok, határidők</span>
         </div>
         <div className="row">
           <Link className="btn" href={`/c/${cid}/payroll`}>Bérszámfejtés</Link>
@@ -91,8 +91,8 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
       <div className="row" style={{ marginBottom: 12 }}>
         <div className="segmented" role="tablist" aria-label="Bevallás">
           <Link className={tab === "vat" ? "on" : undefined} href="?tab=vat">ÁFA-bevallás</Link>
-          <Link className={tab === "payroll" ? "on" : undefined} href="?tab=payroll">Járulék (2608)</Link>
-          <Link href="?tab=revise">ÁNYK Export</Link>
+          <Link className={tab === "payroll" ? "on" : undefined} href="?tab=payroll">Járulékbevallás</Link>
+          <Link href={tab === "payroll" ? "?tab=revise&kind=payroll" : "?tab=revise&kind=vat"}>ÁNYK Export</Link>
           <Link href="?tab=mcheck">M-lap ellenőrzés</Link>
         </div>
         {canWrite && rows.some((r) => r.versions.length) && (
@@ -151,7 +151,7 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
                               bruttó {ft(pm.totals.gross)} · SZJA {ft(pm.totals.szja)} · TB {ft(pm.totals.tb + pm.totals.tbCompany)}{pm.totals.tbCompany ? ` (ebből a cég viseli ${ft(pm.totals.tbCompany)})` : ""} · szocho {ft(pm.totals.szocho)}
                             </div>
                             <div><b>Befizetendő: {ft(toNav)}</b> · {pm.runStatus === "posted" ? "könyvelve" : pm.runStatus === "external" ? "kézzel könyvelve" : <Link href={`/c/${cid}/payroll?period=${r.period}`}>nincs könyvelve</Link>}</div>
-                            {hasTemplate && (toNav > 0) && <div style={{ marginTop: 4 }}><a className="btn" href={`/c/${cid}/filings/payroll/${r.period}/xml`}><FileDown size={13} /> 2608 XML</a></div>}
+                            {hasTemplate && (toNav > 0) && <div style={{ marginTop: 4 }}><a className="btn" href={`/c/${cid}/filings/payroll/${r.period}/xml`}><FileDown size={13} /> XML</a></div>}
                           </> : <span className="muted">–</span>)}
                     </td>
                     <td>
@@ -232,7 +232,87 @@ const ROW_LABEL: Record<string, string> = {
   "82": "82 – előző időszakról áthozott", "83": "83 – különbözet", "84": "84 – befizetendő", "85": "85 – visszaigényelt", "86": "86 – átvihető",
 };
 
+/** ÁNYK Export: szűrő (ÁFA-bevallás / Járulékbevallás), egy helyről letölthető XML-ek és ZIP. */
+function ExportKindFilter({ kind }: { kind: "vat" | "payroll" }) {
+  return (
+    <div className="row no-print" style={{ marginBottom: 12 }}>
+      <span className="muted">Mit exportálsz?</span>
+      <div className="segmented" role="tablist" aria-label="Export">
+      <Link className={kind === "vat" ? "on" : undefined} href="?tab=revise&kind=vat">ÁFA-bevallás</Link>
+      <Link className={kind === "payroll" ? "on" : undefined} href="?tab=revise&kind=payroll">Járulékbevallás</Link>
+      </div>
+    </div>
+  );
+}
+
+async function PayrollExportPage({ cid, companyName }: { cid: number; companyName: string }) {
+  const [rows, tpl] = await Promise.all([payrollExportRows(cid), template2608(cid)]);
+  const todo = rows.filter((r) => r.todo);
+  const total = todo.reduce((a, r) => a + r.toNav, 0);
+  const t = today();
+  return (
+    <>
+      <div className="topbar">
+        <div>
+          <h1>ÁNYK Export</h1>
+          <span className="muted">{companyName} · 2608 havi járulékbevallás a Bérszámfejtésből, a betöltött ÁNYK-minta alapján</span>
+        </div>
+        <div className="row"><Link className="btn" href="?tab=payroll">← Járulékbevallás</Link></div>
+      </div>
+      <ExportKindFilter kind="payroll" />
+      <div className="grid cols-4 lp-kpi">
+        <div className="card stat"><div className="label">Beküldendő</div><div className="value">{todo.length}<small>hónap</small></div></div>
+        <div className="card stat"><div className="label">Befizetendő összesen</div><div className="value">{fmtHuf(total)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Minta (ÁNYK)</div><div className="value" style={{ fontSize: 16 }}>{tpl ? `${tpl.periodFrom.slice(0, 7)} · ${tpl.form}` : "nincs"}</div></div>
+        <div className="card stat"><div className="label">Hónapok jogviszonnyal</div><div className="value">{rows.length}<small>hónap</small></div></div>
+      </div>
+      {!tpl && (
+        <div className="card" style={{ borderColor: "var(--warn)", marginBottom: 14 }}>
+          <CircleAlert size={16} style={{ verticalAlign: -2 }} /> Nincs betöltött 2608 minta. Töltsd ki egy hónapra az ÁNYK-ban, mentsd el, és töltsd be a <code>.frm.enyk</code>-t a NAV-bevallások oldalon – abból készül a többi hónap.
+        </div>
+      )}
+      <p className="muted no-print" style={{ margin: "0 0 8px" }}>
+        Beküldés: ÁNYK › Adatok › XML állomány ellenőrzése és átadása elektronikus beküldésre (Ctrl+D), majd a szokásos közvetlen beküldés.
+      </p>
+      <div className="row card no-print" style={{ marginBottom: 12 }}>
+        {tpl && todo.length > 0
+          ? <a className="btn primary" href={`/c/${cid}/filings/export/zip?kind=payroll`}><FileDown size={14} /> Összes beküldendő (ZIP)</a>
+          : <span className="muted">{tpl ? "Nincs beküldendő hónap." : "A ZIP a minta betöltése után érhető el."}</span>}
+      </div>
+      <div className="card table-wrap">
+        <table>
+          <thead><tr><th>Időszak</th><th>Határidő</th><th>Állapot</th><th>Személyek</th><th className="num">TB-járulék</th><th className="num">Szocho</th><th className="num">SZJA</th><th className="num">Befizetendő</th><th>Teendő</th></tr></thead>
+          <tbody>
+            {[...rows].reverse().map((r) => {
+              const st = STATUS[r.status];
+              return (
+                <tr key={r.period}>
+                  <td><b>{label(r.period)}</b><div className="muted" style={{ fontSize: 12 }}>{r.form}</div></td>
+                  <td className={r.due < t && r.todo ? "neg" : undefined}>{fmtDate(r.due)}</td>
+                  <td><span className={`badge ${st.cls}`}>{st.text}</span></td>
+                  <td>{r.pm?.people.map((p) => p.name).join(", ") ?? "–"}</td>
+                  <td className="num">{r.pm ? fmtHuf(r.pm.totals.tb + r.pm.totals.tbCompany) : "–"}</td>
+                  <td className="num">{r.pm ? fmtHuf(r.pm.totals.szocho) : "–"}</td>
+                  <td className="num">{r.pm ? fmtHuf(r.pm.totals.szja) : "–"}</td>
+                  <td className="num"><b>{fmtHuf(r.toNav)}</b></td>
+                  <td>{tpl && r.toNav > 0 && r.status !== "upcoming"
+                    ? <a className="btn" href={`/c/${cid}/filings/payroll/${r.period}/xml`}><FileDown size={13} /> XML</a>
+                    : <span className="muted">{r.status === "upcoming" ? "folyó hónap" : "–"}</span>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted" style={{ marginTop: 10 }}>
+        A ZIP-ben a még be nem küldött (hiányzó vagy esedékes) hónapok vannak, időrendben. Fizetéses jogviszonynál (bér, SZJA) a minta még csak a TB-járulékot és a szochót tölti – ilyen dolgozónál az első hónapot töltsd ki az ÁNYK-ban.
+      </p>
+    </>
+  );
+}
+
 async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp: Record<string, string>; companyName: string; canWrite: boolean }) {
+  if (sp.kind === "payroll") return <PayrollExportPage cid={cid} companyName={companyName} />;
   const date = isDate(sp.date) ? sp.date : today();
   const place = sp.place ?? "";
   const { rows } = await vatPlan(cid, date);
@@ -252,6 +332,7 @@ async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp:
         <div className="row"><Link className="btn" href="?tab=mcheck">M-lap ellenőrzés</Link><Link className="btn" href="?tab=vat">← ÁFA-bevallás</Link></div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
+      <ExportKindFilter kind="vat" />
       <div className="grid cols-4 lp-kpi">
         <div className="card stat"><div className="label">Önellenőrzendő / új</div><div className="value">{todo.length}<small>hónap</small></div></div>
         <div className="card stat"><div className="label">Egyenleg-változás (e Ft)</div><div className="value" style={extra > 0 ? { color: "var(--neg)" } : undefined}>{extra > 0 ? "+" : ""}{fmtHuf(extra)}<small>e Ft</small></div></div>
@@ -267,7 +348,7 @@ async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp:
         <label>Benyújtás napja (pótlék eddig)<input type="date" name="date" defaultValue={date} /></label>
         <label>Aláírás helye<input name="place" defaultValue={place} placeholder="a beadott bevallásból" /></label>
         <button>Újraszámolás</button>
-        <a className="btn primary" href={`/c/${cid}/filings/vat/zip${q({}).replace("?tab=revise&", "?")}`}><FileDown size={14} /> Összes XML (ZIP)</a>
+        <a className="btn primary" href={`/c/${cid}/filings/export/zip${q({ kind: "vat" }).replace("?tab=revise&", "?")}`}><FileDown size={14} /> Összes XML (ZIP)</a>
         {canWrite && (
           <span>
             <button formAction={fillPartnerTaxAction} formMethod="post" name="cid" value={cid} className="btn" title="A beadott M-lapokról a partnerek törzsszáma">Partner-adószámok az M-lapokról</button>

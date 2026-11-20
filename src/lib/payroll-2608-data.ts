@@ -5,6 +5,7 @@ import * as s from "@/db/schema";
 import { buildAnykXml, isPayrollForm } from "./anyk";
 import { build2608Sheets, type Person2608 } from "./payroll-2608";
 import { loadMonth, periodEnd } from "./payroll";
+import { filingsOverview } from "./filings";
 
 /** A sablon: a legkésőbbi időszakú (azon belül a beküldött, majd a legutóbb mentett) betöltött 2608. */
 export async function template2608(companyId: number) {
@@ -32,4 +33,26 @@ export async function payroll2608Xml(companyId: number, period: string) {
   const main = t.sheets.find((x) => /08A$/.test(x.id))?.fields ?? {};
   const xml = buildAnykXml({ taxNumber: company.taxNumber || main["0_0A0001C002A"] || "", taxpayerName: main["0_0A0001C013A"] || company.name, from, to, sheets: r.sheets });
   return { xml, warnings: r.warnings, totals: r.totals, template: t };
+}
+
+/** A még be nem küldött, lejárt vagy esedékes hónapok 2608 XML-jei egy ZIP-be (időrendben) + összesítő. */
+export async function payrollExportRows(companyId: number) {
+  const o = await filingsOverview(companyId);
+  return [...o.payroll].reverse().map((r) => {
+    const pm = o.payrollMonths[r.period];
+    const toNav = pm ? pm.totals.szja + pm.totals.tb + pm.totals.tbCompany + pm.totals.szocho : 0;
+    return { ...r, pm, toNav, todo: toNav > 0 && (r.status === "missing" || r.status === "due") };
+  });
+}
+
+export async function payrollZipFiles(companyId: number) {
+  const rows = (await payrollExportRows(companyId)).filter((r) => r.todo);
+  const files: Record<string, string> = {};
+  const csv = ["időszak;határidő;személyek;TB-járulék (Ft);szocho (Ft);SZJA (Ft);befizetendő (Ft);figyelmeztetés"];
+  for (const r of rows) {
+    const x = await payroll2608Xml(companyId, r.period);
+    files[`2608_${r.period}_eredeti.xml`] = x.xml;
+    csv.push([r.period, r.due, r.pm?.people.map((p) => p.name).join(", ") ?? "", x.totals.tb, x.totals.szocho, r.pm?.totals.szja ?? 0, r.toNav, x.warnings.join(" ")].join(";"));
+  }
+  return { files, csv: csv.join("\n"), count: rows.length };
 }
