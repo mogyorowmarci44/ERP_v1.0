@@ -243,7 +243,8 @@ export function buildVatSheets(o: BuildOpts): AnykSheet[] {
   const f: Record<string, string> = {};
   // fejadatok az előző bevallásból (sorok, számított mezők, jelleg nélkül)
   for (const [k, v] of Object.entries(o.baseFields ?? {})) {
-    if (ROW_DATA.test(k) || ANNEX_DATA.test(k) || /^0_\d+$/.test(k)) continue;
+    // a dinamikus lapokat (XXXX) nem visszük át – az M-lapokat újra előállítjuk, a többi (pl. 09-es lap) itt nem kell
+    if (ROW_DATA.test(k) || ANNEX_DATA.test(k) || /^0_\d+$/.test(k) || k.includes("XXXX") || /^\d+_0[A-Z]\d{4}/.test(k) && !k.includes("0001")) continue;
     f[k] = v;
   }
   const lap04 = is26 ? "0_0A0001F015A" : "0_0A0001F014A";

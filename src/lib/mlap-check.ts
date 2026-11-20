@@ -27,9 +27,9 @@ export async function submittedMRows(companyId: number): Promise<SubmittedRow[]>
       const tax8 = (sh.fields["0_0A0001C005A"] ?? "").replace(/\D/g, "");
       const partnerName = sh.fields["0_0A0001C006A"] || sh.fields["0_0BXXXXB005A"] || "";
       for (const [k, v] of Object.entries(sh.fields)) {
-        const m = k.match(/^(\d+)_0BXXXXC(\d{4})AA$/);
+        const m = k.match(/^(\d+_0B(?:XXXX|\d{4}))C(\d{4})AA$/);
         if (!m || !v || m[2] === "0037") continue;
-        const p = `${m[1]}_0BXXXXC${m[2]}`;
+        const p = `${m[1]}C${m[2]}`;
         const d = sh.fields[`${p}BA`];
         out.push({
           period, number: v.trim(), date: d && /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : null,

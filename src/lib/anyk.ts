@@ -140,12 +140,21 @@ export function buildAnykXml(b: BuildInput): string {
     for (const k of Object.keys(s.fields).sort()) {
       const v = s.fields[k];
       if (v === null || v === undefined || v === "") continue;
-      out.push(`      <mezo eazon="${xmlEncode(k)}">${xmlEncode(String(v))}</mezo>`);
+      out.push(`      <mezo eazon="${xmlEncode(importEazon(k))}">${xmlEncode(String(v))}</mezo>`);
     }
     out.push(`    </mezok>`, `  </nyomtatvany>`);
   }
   out.push(`</nyomtatvanyok>`, ``);
   return out.join("\n");
+}
+
+/**
+ * Dinamikus (több példányban előforduló) lapok mezőkódja: az ÁNYK mentésében „n_0BXXXX…” (n = a lap 0-tól számolt
+ * példánya), az importált XML-ben viszont az XXXX helyére a lap sorszáma kerül: „0_0B0001…”, „0_0B0002…”.
+ */
+export function importEazon(k: string) {
+  const m = k.match(/^(\d+)_(0[A-Z])XXXX(.+)$/);
+  return m ? `0_${m[2]}${String(Number(m[1]) + 1).padStart(4, "0")}${m[3]}` : k;
 }
 
 // --- bevallás-jelleg, ÁFA eredménysorok ------------------------------------------------------------

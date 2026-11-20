@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAnykXml, dueDate, familyOf, formFor, kindOf, monthsBetween, parseAnyk, sameTaxpayer, summarize, vatChainIssues, vatResult } from "@/lib/anyk";
+import { buildAnykXml, importEazon, dueDate, familyOf, formFor, kindOf, monthsBetween, parseAnyk, sameTaxpayer, summarize, vatChainIssues, vatResult } from "@/lib/anyk";
 
 // Egy .frm.enyk szerkezete (a mezőértékek kitaláltak)
 const ENYK = `<?xml version="1.0" encoding="utf-8"?>
@@ -75,7 +75,9 @@ describe("ÁNYK XML előállítás", () => {
     expect(xml).toContain("Teszt &amp; Társa Kft.");
     const back = parseAnyk(xml);
     expect(back.form).toBe("2665");
-    expect(back.sheets).toEqual(f.sheets);
+    // az import-XML-ben a dinamikus lap XXXX helyett lapsorszámot kap
+    expect(back.sheets).toEqual(f.sheets.map((sh) => ({ ...sh, fields: Object.fromEntries(Object.entries(sh.fields).map(([k, v]) => [importEazon(k), v])) })));
+    expect(xml).not.toContain("XXXX");
     expect(back.from).toBe("2026-09-01");
   });
   it("üres mezők kimaradnak", () => {
@@ -121,5 +123,15 @@ describe("időszakok és határidők", () => {
   it("adózó egyezése a törzsszám alapján", () => {
     expect(sameTaxpayer("32811902-2-07", "32811902207")).toBe(true);
     expect(sameTaxpayer("32811902207", "12345678242")).toBe(false);
+  });
+});
+
+describe("importEazon", () => {
+  it("dinamikus lap XXXX → lapsorszám", async () => {
+    const { importEazon } = await import("@/lib/anyk");
+    expect(importEazon("0_0BXXXXC0001AA")).toBe("0_0B0001C0001AA");
+    expect(importEazon("2_0BXXXXC0037CA")).toBe("0_0B0003C0037CA");
+    expect(importEazon("0_0HXXXXB001A")).toBe("0_0H0001B001A");
+    expect(importEazon("0_0A0001C001A")).toBe("0_0A0001C001A");
   });
 });

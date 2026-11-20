@@ -39,6 +39,11 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.7.4 – ÁNYK import: dinamikus lapok
+
+- Az ÁNYK-ba importálható XML-ben a dinamikus lapok (pl. M-lapok) mezőkódjában az `XXXX` helyére a lap sorszáma kerül (`0001`, `0002`…) – eddig az ÁNYK „Érvénytelen mezőkód” hibával elutasította.
+- Az alapbevallásból a dinamikus lapokat nem másoljuk át (az M-lapokat újra előállítjuk).
+
 ## v3.7.3 – Fülnevek
 
 NAV-bevallások: „ÁFA (2565 / 2665)” → **ÁFA-bevallás**, „ÁFA az ERP-ből (önellenőrzés)” → **ÁNYK Export**.
