@@ -39,6 +39,10 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.7.6 – 108. sor h oszlop
+
+- A 108. sor h oszlopa (levonásba helyezett adó) az M-főlapok 07. sorának g oszlopából kitöltve (ÁNYK R177).
+
 ## v3.7.5 – ÁNYK import javítás
 
 - Az ÁNYK-ba importálható XML-ben a mezőkód „n_” előtag nélkül szerepel, a dinamikus lapok (pl. M-lapok számlasorai) kódjában pedig az `XXXX` helyére a lap sorszáma kerül (`0B0001…`, `0B0002…`). Eddig az ÁNYK „Érvénytelen mezőkód”, majd „A sablon nem tartalmazza” hibával nem töltötte be.
