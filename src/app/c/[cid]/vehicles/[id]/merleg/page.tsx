@@ -4,6 +4,7 @@ import { Flash } from "@/components/Flash";
 import { AutoMerlegView } from "@/components/AutoMerleg";
 import { loadAutoMerleg } from "@/lib/auto-merleg";
 import { saveHoldingAction } from "./actions";
+import { holdingSuggestion } from "@/lib/holding-suggest";
 
 export const dynamic = "force-dynamic";
 
@@ -13,12 +14,12 @@ export default async function AutoMerlegPage({ params, searchParams }: { params:
   const sp = await searchParams;
   const cid = Number(c);
   const { role } = await requireCompany(cid);
-  const data = await loadAutoMerleg(cid, Number(id));
+  const [data, suggestion] = await Promise.all([loadAutoMerleg(cid, Number(id)), sp.javaslat ? holdingSuggestion(cid) : Promise.resolve(null)]);
   if (!data) notFound();
   return (
     <>
       <Flash error={sp.error} ok={sp.ok} />
-      <AutoMerlegView input={data.input} meta={data.meta} cid={cid} canWrite={role !== "viewer"} saveHolding={saveHoldingAction} />
+      <AutoMerlegView input={data.input} meta={data.meta} cid={cid} canWrite={role !== "viewer"} saveHolding={saveHoldingAction} suggestion={suggestion} />
     </>
   );
 }

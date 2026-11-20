@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { autoMerleg, type MerlegInput } from "@/lib/auto-merleg-calc";
 import type { MerlegMeta } from "@/lib/auto-merleg";
+import type { HoldingSuggestion } from "@/lib/holding-suggest";
 import { fmtHuf } from "@/lib/money";
 
 const ft = (n: number) => `${n < 0 ? "−" : ""}${fmtHuf(Math.abs(Math.round(n)))} Ft`;
@@ -13,8 +14,9 @@ const hu = (d: string | null) => (d ? `${d.slice(0, 4)}. ${d.slice(5, 7)}. ${d.s
 const num = (s: string) => Number(s.replace(",", ".").replace(/[^0-9.]/g, "")) || 0;
 const WATER_COLOR: Record<string, string> = { buy: "var(--am-buy)", cost: "var(--am-cost)", epr: "var(--am-epr)", hold: "var(--am-hold)", vat: "var(--am-vat)", margin: "var(--pos)", loss: "var(--neg)" };
 
-export function AutoMerlegView({ input, meta, cid, canWrite, saveHolding }: {
+export function AutoMerlegView({ input, meta, cid, canWrite, saveHolding, suggestion }: {
   input: MerlegInput; meta: MerlegMeta; cid: number; canWrite: boolean; saveHolding: (fd: FormData) => Promise<void>;
+  suggestion?: HoldingSuggestion | { error: string } | null;
 }) {
   const [rate, setRate] = useState(String(input.holding.ratePct).replace(".", ","));
   const [fix, setFix] = useState(String(input.holding.fixPerDay));
@@ -113,8 +115,29 @@ export function AutoMerlegView({ input, meta, cid, canWrite, saveHolding }: {
           {meta.eprNote && <p className="muted am-note">{meta.eprNote}</p>}
           {!input.costs.length && <p className="muted am-note">Még nincs a gépkocsihoz rendelt költség.</p>}
         </div>
-        <div className="card am-hold">
-          <h2>Tartási költség</h2>
+        <div className="card am-hold" id="tartasi">
+          <div className="am-card-head"><h2>Tartási költség</h2>{!suggestion && <Link className="no-print" href={`?javaslat=1#tartasi`}>Javaslat a könyvelésből</Link>}</div>
+          {suggestion && "error" in suggestion && <p className="am-warn">{suggestion.error}</p>}
+          {suggestion && !("error" in suggestion) && (
+            <div className="am-suggest">
+              <div className="am-card-head"><b>Javaslat a könyvelésből</b><span className="muted">{hu(suggestion.from)} – {hu(suggestion.to)} · átlag {String(suggestion.avgStock).replace(".", ",")} autó készleten</span></div>
+              <div className="am-suggest-grid">
+                <div>
+                  <div className="am-suggest-big">{String(suggestion.ratePct).replace(".", ",")} %/év</div>
+                  <div className="am-kv"><span>Pénz költsége{suggestion.financingPct != null ? ` (kamat ${String(suggestion.financingPct).replace(".", ",")}% vs. alternatív hozam ${String(suggestion.opportunityPct).replace(".", ",")}%)` : ` (nincs kamatráfordítás – alternatív hozam)`}</span><b>{String(suggestion.moneyPct).replace(".", ",")} %</b></div>
+                  <div className="am-kv"><span>Árvesztés {suggestion.slipFromData ? `(${suggestion.slipCars} eladott autó a Forecast-tervhez képest)` : "(óvatos ráhagyás – kevés tervvel eladott autó)"}</span><b>{String(suggestion.slipPct).replace(".", ",")} %</b></div>
+                  {suggestion.interest > 0 && <div className="muted am-note">872 kamatok {ft(suggestion.interest)} · átlagosan lekötött készletérték {ft(suggestion.avgCapital)}</div>}
+                </div>
+                <div>
+                  <div className="am-suggest-big">{fmtHuf(suggestion.fixPerDay)} Ft/nap</div>
+                  {suggestion.parts.map((p) => <div key={p.code} className="am-kv"><span>{p.code} {p.label}</span><b>{ft(p.amount)}</b></div>)}
+                  <div className="muted am-note">{ft(suggestion.fixedTotal)} ÷ ({String(suggestion.avgStock).replace(".", ",")} autó × {suggestion.days} nap) · az autóhoz rendelt tételek nélkül</div>
+                </div>
+              </div>
+              {canWrite && <button type="button" className="primary no-print" onClick={() => { setRate(String(suggestion.ratePct).replace(".", ",")); setFix(String(suggestion.fixPerDay)); }}>Javaslat átvétele</button>}
+              {suggestion.avgStock <= 0 && <p className="am-warn">Nincs adat az átlagos készletről – a napi költség nem számolható.</p>}
+            </div>
+          )}
           <form action={saveHolding} className="am-hold-form">
             <input type="hidden" name="cid" value={cid} /><input type="hidden" name="vehicle" value={meta.vehicleId} />
             <label>Lekötött pénz költsége<span><input name="rate" className="num" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} disabled={!canWrite} />%/év</span></label>
