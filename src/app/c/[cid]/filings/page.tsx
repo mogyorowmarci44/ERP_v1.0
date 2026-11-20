@@ -88,9 +88,9 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
 
       <div className="row" style={{ marginBottom: 12 }}>
         <div className="segmented" role="tablist" aria-label="Bevallás">
-          <Link className={tab === "vat" ? "on" : undefined} href="?tab=vat">ÁFA (2565 / 2665)</Link>
+          <Link className={tab === "vat" ? "on" : undefined} href="?tab=vat">ÁFA-bevallás</Link>
           <Link className={tab === "payroll" ? "on" : undefined} href="?tab=payroll">Járulék (2608)</Link>
-          <Link href="?tab=revise">ÁFA az ERP-ből (önellenőrzés)</Link>
+          <Link href="?tab=revise">ÁNYK Export</Link>
           <Link href="?tab=mcheck">M-lap ellenőrzés</Link>
         </div>
         {canWrite && rows.some((r) => r.versions.length) && (
@@ -217,7 +217,7 @@ function Versions({ cid, tab, versions, canWrite }: { cid: number; tab: string; 
   );
 }
 
-// --- ÁFA az ERP-ből: önellenőrzés ----------------------------------------------------------------------
+// --- ÁNYK Export: ÁFA-bevallás és önellenőrzés az ERP-ből ----------------------------------------------------------------------
 
 const kft = (n: number | null | undefined) => (n == null ? "–" : fmtHuf(n));
 const res = (r: PlanRow["prev"]) => !r ? "–" : r["84"]?.c ? `fiz. ${fmtHuf(r["84"].c)}` : r["86"]?.c ? `átv. ${fmtHuf(r["86"].c)}` : "0";
@@ -242,10 +242,10 @@ async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp:
     <>
       <div className="topbar">
         <div>
-          <h1>ÁFA az ERP-ből – önellenőrzés</h1>
+          <h1>ÁNYK Export</h1>
           <span className="muted">{companyName} · a könyvelt számlákból számolt bevallás a beküldött változathoz képest, időrendben láncolva</span>
         </div>
-        <div className="row"><Link className="btn" href="?tab=mcheck">M-lap ellenőrzés</Link><Link className="btn" href="?tab=vat">← Beolvasott bevallások</Link></div>
+        <div className="row"><Link className="btn" href="?tab=mcheck">M-lap ellenőrzés</Link><Link className="btn" href="?tab=vat">← ÁFA-bevallás</Link></div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
       <div className="grid cols-4 lp-kpi">
@@ -333,7 +333,7 @@ async function MCheckPage({ cid, sp, companyName }: { cid: number; sp: Record<st
           <h1>M-lap ellenőrzés</h1>
           <span className="muted">{companyName} · a beadott M-lapok {c.submittedCount} számlája az ERP könyvelésével összevetve, és az M-laphoz hiányzó adatok</span>
         </div>
-        <div className="row"><Link className="btn" href="?tab=revise">ÁFA az ERP-ből</Link><Link className="btn" href="?tab=vat">← Beolvasott bevallások</Link></div>
+        <div className="row"><Link className="btn" href="?tab=revise">ÁNYK Export</Link><Link className="btn" href="?tab=vat">← ÁFA-bevallás</Link></div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
       <div className="grid cols-4 lp-kpi">
