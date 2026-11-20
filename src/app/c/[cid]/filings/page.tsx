@@ -8,7 +8,10 @@ import { fmtDate, today } from "@/lib/dates";
 import { fmtHuf } from "@/lib/money";
 import { KIND_LABEL, type VatResult } from "@/lib/anyk";
 import { filingsOverview, type FilingVersion, type PeriodRow } from "@/lib/filings";
-import { deleteFilingAction, markSubmittedAction, uploadFilingsAction } from "./actions";
+import { deleteFilingAction, fillPartnerTaxAction, markLatestAction, markSubmittedAction, uploadFilingsAction } from "./actions";
+import { isDate } from "@/lib/dates";
+import { vatPlan, type PlanRow } from "@/lib/vat-return-data";
+import { mSheetCheck } from "@/lib/mlap-check";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +40,9 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
   const sp = await searchParams;
   const { company, role } = await requireCompany(cid);
   const canWrite = role !== "viewer";
-  const tab = sp.tab === "payroll" ? "payroll" : "vat";
+  const tab = sp.tab === "payroll" ? "payroll" : sp.tab === "revise" ? "revise" : "vat";
+  if (tab === "revise") return <RevisePage cid={cid} sp={sp} companyName={company.name} canWrite={canWrite} />;
+  if (sp.tab === "mcheck") return <MCheckPage cid={cid} sp={sp} companyName={company.name} />;
   const o = await filingsOverview(cid);
   const t = today();
   const rows = tab === "vat" ? o.vat : o.payroll;
@@ -85,7 +90,15 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
         <div className="segmented" role="tablist" aria-label="Bevallás">
           <Link className={tab === "vat" ? "on" : undefined} href="?tab=vat">ÁFA (2565 / 2665)</Link>
           <Link className={tab === "payroll" ? "on" : undefined} href="?tab=payroll">Járulék (2608)</Link>
+          <Link href="?tab=revise">ÁFA az ERP-ből (önellenőrzés)</Link>
+          <Link href="?tab=mcheck">M-lap ellenőrzés</Link>
         </div>
+        {canWrite && rows.some((r) => r.versions.length) && (
+          <form action={markLatestAction}>
+            <input type="hidden" name="cid" value={cid} /><input type="hidden" name="tab" value={tab} />
+            <ConfirmButton className="btn" message="Minden hónapban a legutolsó mentett változatot jelölöm beküldöttnek (a többi jelölés lekerül). Mehet?" pendingText="Jelölés…">Mindenhol a legutolsó ment be</ConfirmButton>
+          </form>
+        )}
       </div>
 
       {tab === "vat" && o.chain.length > 0 && (
@@ -201,5 +214,172 @@ function Versions({ cid, tab, versions, canWrite }: { cid: number; tab: string; 
         ))}
       </tbody>
     </table>
+  );
+}
+
+// --- ÁFA az ERP-ből: önellenőrzés ----------------------------------------------------------------------
+
+const kft = (n: number | null | undefined) => (n == null ? "–" : fmtHuf(n));
+const res = (r: PlanRow["prev"]) => !r ? "–" : r["84"]?.c ? `fiz. ${fmtHuf(r["84"].c)}` : r["86"]?.c ? `átv. ${fmtHuf(r["86"].c)}` : "0";
+const ROW_LABEL: Record<string, string> = {
+  "05": "05 – 5% értékesítés", "06": "06 – 18% értékesítés", "07": "07 – 27% értékesítés (általános)", "09": "09 – különös szabályok (különbözeti)",
+  "12": "12 – KBB 5%", "13": "13 – KBB 18%", "14": "14 – KBB 27%", "36": "36 – fizetendő összesen", "50": "50 – használt cikk (a 09-ből)",
+  "64": "64 – levonható 5%", "65": "65 – levonható 18%", "66": "66 – levonható 27%", "69": "69 – KBB levonható", "76": "76 – levonható összesen",
+  "82": "82 – előző időszakról áthozott", "83": "83 – különbözet", "84": "84 – befizetendő", "85": "85 – visszaigényelt", "86": "86 – átvihető",
+};
+
+async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp: Record<string, string>; companyName: string; canWrite: boolean }) {
+  const date = isDate(sp.date) ? sp.date : today();
+  const place = sp.place ?? "";
+  const { rows } = await vatPlan(cid, date);
+  const todo = rows.filter((r) => r.mode !== "same");
+  const extra = todo.reduce((a, r) => a + ((r.next["84"]?.c ?? 0) - (r.next["86"]?.c ?? 0)) - ((r.prev?.["84"]?.c ?? 0) - (r.prev?.["86"]?.c ?? 0)), 0);
+  const surcharge = todo.reduce((a, r) => a + r.surcharge.amount, 0);
+  const warnings = [...new Set(rows.flatMap((r) => r.computed.warnings.map((w) => `${label(r.period)}: ${w}`)))];
+  const unconfirmed = rows.filter((r) => r.base && !r.base.confirmed).length;
+  const q = (o: Record<string, string>) => `?${new URLSearchParams({ tab: "revise", date, ...(place ? { place } : {}), ...o })}`;
+  return (
+    <>
+      <div className="topbar">
+        <div>
+          <h1>ÁFA az ERP-ből – önellenőrzés</h1>
+          <span className="muted">{companyName} · a könyvelt számlákból számolt bevallás a beküldött változathoz képest, időrendben láncolva</span>
+        </div>
+        <div className="row"><Link className="btn" href="?tab=mcheck">M-lap ellenőrzés</Link><Link className="btn" href="?tab=vat">← Beolvasott bevallások</Link></div>
+      </div>
+      <Flash error={sp.error} ok={sp.ok} />
+      <div className="grid cols-4 lp-kpi">
+        <div className="card stat"><div className="label">Önellenőrzendő / új</div><div className="value">{todo.length}<small>hónap</small></div></div>
+        <div className="card stat"><div className="label">Egyenleg-változás (e Ft)</div><div className="value" style={extra > 0 ? { color: "var(--neg)" } : undefined}>{extra > 0 ? "+" : ""}{fmtHuf(extra)}<small>e Ft</small></div></div>
+        <div className="card stat"><div className="label">Önellenőrzési pótlék</div><div className="value">{fmtHuf(surcharge)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Beküldés nem jelölve</div><div className="value">{unconfirmed}<small>hónap</small></div></div>
+      </div>
+
+      <form className="row card no-print" style={{ marginBottom: 12, alignItems: "flex-end" }}>
+        <input type="hidden" name="tab" value="revise" />
+        <label>Benyújtás napja (pótlék eddig)<input type="date" name="date" defaultValue={date} /></label>
+        <label>Aláírás helye<input name="place" defaultValue={place} placeholder="a beadott bevallásból" /></label>
+        <button>Újraszámolás</button>
+        <a className="btn primary" href={`/c/${cid}/filings/vat/zip${q({}).replace("?tab=revise&", "?")}`}><FileDown size={14} /> Összes XML (ZIP)</a>
+        {canWrite && (
+          <span>
+            <button formAction={fillPartnerTaxAction} formMethod="post" name="cid" value={cid} className="btn" title="A beadott M-lapokról a partnerek törzsszáma">Partner-adószámok az M-lapokról</button>
+          </span>
+        )}
+      </form>
+
+      {warnings.length > 0 && (
+        <div className="card" style={{ borderColor: "var(--warn)", marginBottom: 14 }}>
+          <h3 style={{ marginTop: 0 }}><CircleAlert size={16} style={{ verticalAlign: -2 }} /> Ellenőrizendő</h3>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>{warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+        </div>
+      )}
+
+      <div className="card table-wrap">
+        <table>
+          <thead><tr><th>Időszak</th><th>Mérvadó beadott</th><th>Beadott (e Ft)</th><th>ERP szerint (e Ft)</th><th>Pótlék</th><th>Teendő</th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.period}>
+                <td><b>{label(r.period)}</b><div className="muted" style={{ fontSize: 12 }}>{r.form} · határidő {fmtDate(r.due)}</div></td>
+                <td>{r.base ? <>{KIND_LABEL[r.base.kind]}<div className="muted" style={{ fontSize: 12 }}>mentve {r.base.savedAt}{r.base.confirmed ? "" : " · nem jelölt"}</div></> : <span className="badge overdue">nincs beadva</span>}</td>
+                <td>{res(r.prev)}</td>
+                <td><b>{res(r.next)}</b>{r.next["82"]?.c ? <div className="muted" style={{ fontSize: 12 }}>áthozott {kft(r.next["82"].c)}</div> : null}</td>
+                <td>{r.mode === "self_revision" ? (r.surcharge.amount ? <>{fmtHuf(r.surcharge.amount)} Ft<div className="muted" style={{ fontSize: 12 }}>alap {kft(r.surcharge.baseK)} e Ft · {r.surcharge.days} nap{r.repeated ? " · ismételt (×1,5)" : ""}{r.surcharge.chainReduced ? " · göngyölítés (05)" : ""}</div></> : "0") : "–"}</td>
+                <td>
+                  {r.mode === "same" ? <span className="badge posted"><CircleCheck size={11} /> egyezik</span> : (
+                    <>
+                      <a className="btn" href={`/c/${cid}/filings/vat/${r.period}/xml?${new URLSearchParams({ date, ...(place ? { place } : {}) })}`}><FileDown size={13} /> {r.mode === "original" ? "Eredeti XML" : "Önellenőrzés XML"}</a>
+                      <details style={{ marginTop: 4 }}>
+                        <summary className="muted" style={{ fontSize: 12 }}>{r.diffRows.length} eltérő sor{r.computed.partners.length ? ` · ${r.computed.partners.length} M-lap` : ""}</summary>
+                        <table style={{ fontSize: 12 }}>
+                          <thead><tr><th>Sor</th><th className="num">Beadott b</th><th className="num">Beadott c</th><th className="num">ERP b</th><th className="num">ERP c</th></tr></thead>
+                          <tbody>{r.diffRows.map((d) => <tr key={d.row}><td>{ROW_LABEL[d.row] ?? d.row}</td><td className="num">{kft(d.prevB)}</td><td className="num">{kft(d.prevC)}</td><td className="num">{kft(d.nextB)}</td><td className="num"><b>{kft(d.nextC)}</b></td></tr>)}</tbody>
+                        </table>
+                      </details>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted" style={{ marginTop: 10 }}>
+        Az önellenőrzés a 82–86. sor „b” oszlopába a mérvadó beadott változat értékeit, a „c” oszlopba a helyes (ERP szerinti) értékeket írja; a 04. lapon
+        a pótlékalap, a pótlék (a jegybanki alapkamat 365-öd része naponta, ismételt önellenőrzésnél másfélszerese), a kötelezettség növekedése / csökkenése.
+        A különbözeti adózás a 09. sorba kerül, kiemelve az 50. sorban. Az ÁNYK-ban importálás után futtasd le az ellenőrzést; a ZIP-ben a fájlok időrendben
+        vannak – ebben a sorrendben kell beküldeni.
+      </p>
+    </>
+  );
+}
+
+// --- M-lap ellenőrzés ------------------------------------------------------------------------------------
+
+const KIND_HU: Record<string, string> = { normal: "levonható", non_deductible: "nem levonható", out_of_scope: "TAH", exempt: "adómentes", margin: "különbözeti", eu_acquisition: "KBB", reverse_charge: "fordított" };
+
+async function MCheckPage({ cid, sp, companyName }: { cid: number; sp: Record<string, string>; companyName: string }) {
+  const c = await mSheetCheck(cid);
+  const nd = c.issues.filter((i) => i.type === "not_deductible");
+  const mm = c.issues.filter((i) => i.type === "number_mismatch");
+  const miss = c.issues.filter((i) => i.type === "missing");
+  const ft = (n: number) => fmtHuf(Math.round(n));
+  const invLink = (id: number, label: string) => <Link href={`/c/${cid}/invoices/${id}`}>{label}</Link>;
+  return (
+    <>
+      <div className="topbar">
+        <div>
+          <h1>M-lap ellenőrzés</h1>
+          <span className="muted">{companyName} · a beadott M-lapok {c.submittedCount} számlája az ERP könyvelésével összevetve, és az M-laphoz hiányzó adatok</span>
+        </div>
+        <div className="row"><Link className="btn" href="?tab=revise">ÁFA az ERP-ből</Link><Link className="btn" href="?tab=vat">← Beolvasott bevallások</Link></div>
+      </div>
+      <Flash error={sp.error} ok={sp.ok} />
+      <div className="grid cols-4 lp-kpi">
+        <div className="card stat"><div className="label">Partner adószám nélkül</div><div className="value" style={c.missingTax.length ? { color: "var(--neg)" } : undefined}>{c.missingTax.length}<small>partner</small></div></div>
+        <div className="card stat"><div className="label">Számlaszám eltér</div><div className="value">{mm.length}<small>számla</small></div></div>
+        <div className="card stat"><div className="label">Korábban levonva, ERP-ben nem levonható</div><div className="value">{nd.length}<small>számla</small></div></div>
+        <div className="card stat"><div className="label">Nincs meg az ERP-ben</div><div className="value">{miss.length}<small>számla</small></div></div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3 style={{ marginTop: 0 }}>1. Levonható áfa adószám nélküli partnertől</h3>
+        <p className="muted" style={{ marginTop: 0 }}>Ezek a számlák nem kerülhetnek M-lapra, amíg a partnernek nincs adószáma (Partnerek › szerkesztés). Külföldi (OSS) eladónál a magyar áfa általában nem vonható le.</p>
+        {c.missingTax.length === 0 ? <p className="muted">Nincs ilyen partner.</p> : (
+          <table><thead><tr><th>Partner</th><th className="num">Számla</th><th className="num">Levonható áfa</th></tr></thead>
+            <tbody>{c.missingTax.map((p) => <tr key={p.partnerId}><td><Link href={`/c/${cid}/partners`}>{p.name}</Link></td><td className="num">{p.invoices}</td><td className="num">{ft(p.vat)} Ft</td></tr>)}</tbody></table>
+        )}
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3 style={{ marginTop: 0 }}>2. Számlaszám-eltérés (beadott M-lap ↔ ERP)</h3>
+        <p className="muted" style={{ marginTop: 0 }}>Ugyanaz a számla (partner és összeg alapján) más számlaszámmal. A helyes az, ami az eredeti számlán áll – ha az ERP-ben rossz, javítsd a számlán; ha a beadott M-lapon volt rossz, az önellenőrzés az ERP szerintit küldi be.</p>
+        {mm.length === 0 ? <p className="muted">Nincs eltérés.</p> : (
+          <table style={{ fontSize: 13 }}><thead><tr><th>Időszak</th><th>Beadott M-lapon</th><th>ERP-ben</th><th>Partner</th><th className="num">Áfa</th><th>Egyezés</th></tr></thead>
+            <tbody>{mm.map((i, k) => i.type === "number_mismatch" && <tr key={k}><td>{label(i.sub.period)}</td><td><code>{i.sub.number}</code></td><td><code>{invLink(i.erp.id, i.erp.number || "(üres)")}</code></td><td>{i.erp.partnerName}</td><td className="num">{ft(i.sub.vat)}</td><td className="muted">{i.hint}</td></tr>)}</tbody></table>
+        )}
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3 style={{ marginTop: 0 }}>3. Korábban levonva – az ERP-ben nem levonható</h3>
+        <p className="muted" style={{ marginTop: 0 }}>A beadott bevallásban levont áfa, az ERP-ben nem levonható (27NL), TAH vagy adómentes kóddal. Számlánként érdemes megnézni: vegyes számlánál (pl. hatósági díj + szolgáltatás) a szolgáltatás áfája levonható lehet.</p>
+        {nd.length === 0 ? <p className="muted">Nincs ilyen számla.</p> : (
+          <table style={{ fontSize: 13 }}><thead><tr><th>Időszak</th><th>Számla</th><th>Partner</th><th>ERP-kód</th><th className="num">Korábban levont áfa</th></tr></thead>
+            <tbody>{nd.map((i, k) => i.type === "not_deductible" && <tr key={k}><td>{label(i.sub.period)}</td><td><code>{invLink(i.erp.id, i.erp.number)}</code></td><td>{i.erp.partnerName}</td><td>{i.erp.kinds.map((x) => KIND_HU[x] ?? x).join(", ")}</td><td className="num">{ft(i.sub.vat)} Ft</td></tr>)}</tbody>
+            <tfoot><tr><td colSpan={4}>Összesen</td><td className="num"><b>{ft(nd.reduce((a, i) => a + i.sub.vat, 0))} Ft</b></td></tr></tfoot></table>
+        )}
+      </div>
+
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>4. A beadott M-lapon szerepel, az ERP-ben nincs meg</h3>
+        <p className="muted" style={{ marginTop: 0 }}>Se számlaszám, se partner + összeg alapján nincs párja. Vagy hiányzik a könyvelésből, vagy a régi bevallásban szerepelt tévesen.</p>
+        {miss.length === 0 ? <p className="muted">Nincs ilyen számla.</p> : (
+          <table style={{ fontSize: 13 }}><thead><tr><th>Időszak</th><th>Számla</th><th>Partner (törzsszám)</th><th>Teljesítés</th><th className="num">Adóalap</th><th className="num">Áfa</th></tr></thead>
+            <tbody>{miss.map((i, k) => <tr key={k}><td>{label(i.sub.period)}</td><td><code>{i.sub.number}</code></td><td>{i.sub.partnerName} ({i.sub.tax8})</td><td>{fmtDate(i.sub.date)}</td><td className="num">{ft(i.sub.base)}</td><td className="num">{ft(i.sub.vat)}</td></tr>)}</tbody>
+            <tfoot><tr><td colSpan={5}>Összesen</td><td className="num"><b>{ft(miss.reduce((a, i) => a + i.sub.vat, 0))} Ft</b></td></tr></tfoot></table>
+        )}
+      </div>
+    </>
   );
 }
