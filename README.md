@@ -39,11 +39,15 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.7.6 – 108. sor h oszlop
+
+- A 108. sor h oszlopa (levonásba helyezett adó) az M-főlapok 07. sorának g oszlopából kitöltve (ÁNYK R177).
+
 ## v3.7.5 – ÁNYK import javítás
 
 - Az ÁNYK-ba importálható XML-ben a mezőkód „n_” előtag nélkül szerepel, a dinamikus lapok (pl. M-lapok számlasorai) kódjában pedig az `XXXX` helyére a lap sorszáma kerül (`0B0001…`, `0B0002…`). Eddig az ÁNYK „Érvénytelen mezőkód”, majd „A sablon nem tartalmazza” hibával nem töltötte be.
 - Az M-lap alnyomtatványok `albizonylatazonositas` blokkot kapnak (partner adószáma és neve).
-- 105–109. sor az ÁNYK számítása szerint: a 105/108. sor a partnerenként ezer Ft-ra kerekített M-főlap összegek összege, a 106. sor b–e oszlopa 0-val kitöltve, 2665-nél a 105. sor „levonásba helyezett” (h) oszlopa is (a 106/108. h üres), az M-főlap 07. sorában is a g oszlop, és a 109. sor (c; e csak ha a 108 e nem több a 109 c-nél).
+- 105–109. sor az ÁNYK számítása szerint: a 105/108. sor a partnerenként ezer Ft-ra kerekített M-főlap összegek összege, a 106. sor b–e oszlopa 0-val kitöltve, 2665-nél a 105. sor „levonásba helyezett” (h) oszlopa is (a 108. h ugyanez, a 106. h üres), az M-főlap 07. sorában is a g oszlop, és a 109. sor (c; e csak ha a 108 e nem több a 109 c-nél).
 
 ## v3.7.4 – ÁNYK import: dinamikus lapok
 

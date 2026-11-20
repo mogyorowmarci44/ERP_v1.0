@@ -278,7 +278,8 @@ export function buildVatSheets(o: BuildOpts): AnykSheet[] {
     for (const c of ["B", "C", "D", "E"]) f[`0_0F0001D0106${c}A`] = "0";
     if (is26) {
       const h = o.computed.partners.reduce((a, p) => a + K(p.invoices.reduce((q, i) => q + i.deducted, 0)), 0);
-      f["0_0F0001D0105HA"] = String(h); // a 106. és 108. sor h oszlopa üresen marad
+      // 105 h = M-főlapok 04. sor g, 108 h = M-főlapok 07. sor g; a 106. sor h oszlopa üres
+      f["0_0F0001D0105HA"] = f["0_0F0001D0108HA"] = String(h);
     }
   }
   // 109. sor: levonásba helyezett belföldi adó (64–66., 68. sor c – a, – 31. a) és az M-lapok adójának különbözete
