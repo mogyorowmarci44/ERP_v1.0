@@ -107,6 +107,67 @@ export type BuildInput = {
   programVersion?: string;
 };
 
+/** Az ÁNYK aktuális sablonverziója nyomtatványcsaládonként (a mentett .frm.enyk-hoz). */
+export const TEMPLATE_VER: Record<string, string> = { "2565": "4.0", "2665": "2.0" };
+
+/**
+ * ÁNYK-mentés (.frm.enyk) – ugyanaz a formátum, amit az ÁNYK maga ment. Az abevjava „mentesek” mappájába másolva a
+ * Nyomtatvány megnyitása listából nyitható, és (az importált XML-lel szemben) megjelölhető elektronikus beküldésre.
+ * A mezőkódok itt az ÁNYK belső alakjában maradnak („0_…”, dinamikus lapnál „n_0BXXXX…”).
+ */
+export function buildAnykEnyk(b: BuildInput & { form: string; templateVer?: string; programVersion?: string }): string {
+  const d8 = (iso: string) => iso.replace(/-/g, "");
+  const tax = b.taxNumber.replace(/\D/g, "").slice(0, 11);
+  const tv = b.templateVer ?? TEMPLATE_VER[b.form] ?? "1.0";
+  const pv = b.programVersion ?? "v.3.49.0";
+  const name = `${b.form} kötegelt nyomtatvány`;
+  const now = new Date();
+  const saved = now.toISOString().replace(/\D/g, "").slice(0, 17);
+  const a = (v: string) => xmlEncode(v);
+  const out: string[] = [
+    `<?xml version="1.0" encoding="utf-8"?>`,
+    `<file>`,
+    `  <head filetype="zn1810">`,
+    `    <type>multi</type>`,
+    `    <saved>${saved}</saved>`,
+    `    <docinfo name="${a(name)}" id="${a(b.form)}" count="${b.sheets.length}" note="" ver="${a(pv)}" org="NAV" templatever="${a(tv)}" tax_number="${tax}" from_date="${d8(b.from)}" to_date="${d8(b.to)}" person_name="${a(b.taxpayerName)}" account_name="" calculated="false" seq="${b.sheets.length}" avdh_cst="" />`,
+    `  </head>`,
+    `  <nyomtatvanyok xmlns="${ANYK_NS}" template="NAV_${a(b.form)}_${tv.replace(".", "_")}" name="${a(name)}" id="${a(b.form)}">`,
+    `    <abev>`,
+    `      <hibakszama>-1</hibakszama>`,
+    `      <hash>${" ".repeat(40)}</hash>`,
+    `      <programverzio>${a(pv)}</programverzio>`,
+    `    </abev>`,
+  ];
+  b.sheets.forEach((s, sn) => {
+    out.push(
+      `    <nyomtatvany sn="${sn}">`,
+      `      <nyomtatvanyinformacio>`,
+      `        <nyomtatvanyazonosito>${a(s.id)}</nyomtatvanyazonosito>`,
+      `        <nyomtatvanyverzio>${a(tv)}</nyomtatvanyverzio>`,
+      `        <adozo>`,
+      `          <nev>${a(b.taxpayerName)}</nev>`,
+      `          <adoszam>${tax}</adoszam>`,
+      `        </adozo>`,
+      ...albizonylat(s).map((l) => "  " + l),
+      `        <idoszak>`,
+      `          <tol>${d8(b.from)}</tol>`,
+      `          <ig>${d8(b.to)}</ig>`,
+      `        </idoszak>`,
+      `      </nyomtatvanyinformacio>`,
+      `      <mezok>`,
+    );
+    for (const k of Object.keys(s.fields).sort()) {
+      const v = s.fields[k];
+      if (v === null || v === undefined || v === "") continue;
+      out.push(`        <mezo eazon="${a(k)}">${a(String(v))}</mezo>`);
+    }
+    out.push(`      </mezok>`, `    </nyomtatvany>`);
+  });
+  out.push(`  </nyomtatvanyok>`, `</file>`, ``);
+  return out.join("\n");
+}
+
 /** Alnyomtatvány (pl. 2665M) azonosítása: partner adószáma és neve – nélküle az ÁNYK nem rendeli a laphoz. */
 function albizonylat(s: BuildInput["sheets"][number]): string[] {
   if (!/M$/.test(s.id)) return [];

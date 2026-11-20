@@ -255,12 +255,16 @@ async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp:
         <div className="card stat"><div className="label">Beküldés nem jelölve</div><div className="value">{unconfirmed}<small>hónap</small></div></div>
       </div>
 
+      <p className="muted no-print" style={{ margin: "0 0 8px" }}>
+        A letöltött <code>.frm.enyk</code> fájlokat másold az ÁNYK mentési mappájába (<code>abevjava\mentesek</code>), majd az ÁNYK-ban
+        Adatok › Nyomtatvány megnyitása. Innen ellenőrizhető és megjelölhető elektronikus beküldésre.
+      </p>
       <form className="row card no-print" style={{ marginBottom: 12, alignItems: "flex-end" }}>
         <input type="hidden" name="tab" value="revise" />
         <label>Benyújtás napja (pótlék eddig)<input type="date" name="date" defaultValue={date} /></label>
         <label>Aláírás helye<input name="place" defaultValue={place} placeholder="a beadott bevallásból" /></label>
         <button>Újraszámolás</button>
-        <a className="btn primary" href={`/c/${cid}/filings/vat/zip${q({}).replace("?tab=revise&", "?")}`}><FileDown size={14} /> Összes XML (ZIP)</a>
+        <a className="btn primary" href={`/c/${cid}/filings/vat/zip${q({}).replace("?tab=revise&", "?")}`}><FileDown size={14} /> Összes ÁNYK-fájl (ZIP)</a>
         {canWrite && (
           <span>
             <button formAction={fillPartnerTaxAction} formMethod="post" name="cid" value={cid} className="btn" title="A beadott M-lapokról a partnerek törzsszáma">Partner-adószámok az M-lapokról</button>
@@ -289,7 +293,7 @@ async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp:
                 <td>
                   {r.mode === "same" ? <span className="badge posted"><CircleCheck size={11} /> egyezik</span> : (
                     <>
-                      <a className="btn" href={`/c/${cid}/filings/vat/${r.period}/xml?${new URLSearchParams({ date, ...(place ? { place } : {}) })}`}><FileDown size={13} /> {r.mode === "original" ? "Eredeti XML" : "Önellenőrzés XML"}</a>
+                      <a className="btn" href={`/c/${cid}/filings/vat/${r.period}/xml?${new URLSearchParams({ date, ...(place ? { place } : {}) })}`}><FileDown size={13} /> {r.mode === "original" ? "Eredeti (ÁNYK)" : "Önellenőrzés (ÁNYK)"}</a>
                       <details style={{ marginTop: 4 }}>
                         <summary className="muted" style={{ fontSize: 12 }}>{r.diffRows.length} eltérő sor{r.computed.partners.length ? ` · ${r.computed.partners.length} M-lap` : ""}</summary>
                         <table style={{ fontSize: 12 }}>

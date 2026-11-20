@@ -6,7 +6,7 @@ import { and, asc, eq, gte, lte } from "drizzle-orm";
 import { zipSync, strToU8 } from "fflate";
 import { db, schema } from "@/db";
 import { today } from "./dates";
-import { buildAnykXml, dueDate, formFor, isVatForm, monthsBetween, periodOf, type FilingKind } from "./anyk";
+import { buildAnykEnyk, buildAnykXml, dueDate, formFor, isVatForm, monthsBetween, periodOf, type FilingKind } from "./anyk";
 import {
   buildVatSheets, computeVatReturn, K, rowsFromFields, selfRevisionSurcharge, surchargeBase,
   type Computed, type Rows, type VatLine,
@@ -100,12 +100,15 @@ function diffOf(prev: Rows | null, next: Rows) {
   return out;
 }
 
-/** Egy időszak ÁNYK-XML-je (önellenőrzés vagy eredeti). */
-export async function vatXml(companyId: number, period: string, submitDate = today(), place?: string | null) {
+/** ÁNYK-fájl formátuma: „enyk” = ÁNYK-mentés (.frm.enyk, megnyitható és beküldhető), „xml” = importálható XML. */
+export type AnykFormat = "enyk" | "xml";
+
+/** Egy időszak ÁNYK-fájlja (önellenőrzés vagy eredeti). */
+export async function vatXml(companyId: number, period: string, submitDate = today(), place?: string | null, format: AnykFormat = "enyk") {
   const { rows, company } = await vatPlan(companyId, submitDate);
   const r = rows.find((x) => x.period === period);
   if (!r) throw new Error("Nincs ilyen ÁFA-időszak.");
-  return { xml: await buildPeriodXml(companyId, r, company, submitDate, place), row: r, company };
+  return { xml: await buildPeriodXml(companyId, r, company, submitDate, place, format), row: r, company };
 }
 
 /** A mérvadó beadott változat főlapja (fejadatokhoz). */
@@ -115,7 +118,7 @@ async function baseFieldsOf(companyId: number, id: number | undefined) {
   return f?.sheets[0]?.fields ?? null;
 }
 
-export async function buildPeriodXml(companyId: number, r: PlanRow, company: { name: string; taxNumber: string }, submitDate: string, place?: string | null) {
+export async function buildPeriodXml(companyId: number, r: PlanRow, company: { name: string; taxNumber: string }, submitDate: string, place?: string | null, format: AnykFormat = "enyk") {
   const baseFields = await baseFieldsOf(companyId, r.base?.id);
   const sheets = buildVatSheets({
     form: r.form, from: r.from, to: r.to, taxNumber: company.taxNumber, taxpayerName: company.name, baseFields, computed: r.computed, signDate: submitDate, signPlace: place,
@@ -124,21 +127,28 @@ export async function buildPeriodXml(companyId: number, r: PlanRow, company: { n
       increaseK: r.surcharge.increaseK, decreaseK: r.surcharge.decreaseK, chainReduced: r.surcharge.chainReduced,
     } : null,
   });
-  return buildAnykXml({ taxNumber: company.taxNumber, taxpayerName: company.name, from: r.from, to: r.to, sheets });
+  const input = { taxNumber: company.taxNumber, taxpayerName: company.name, from: r.from, to: r.to, sheets };
+  return format === "enyk" ? buildAnykEnyk({ ...input, form: r.form }) : buildAnykXml(input);
 }
 
-export const xmlName = (company: string, r: Pick<PlanRow, "form" | "period" | "mode">) => {
+export const xmlName = (company: string, r: Pick<PlanRow, "form" | "period" | "mode">, format: AnykFormat = "enyk") => {
   const slug = company.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  return `${r.period}_${r.form}_${r.mode === "original" ? "eredeti" : "onellenorzes"}_${slug}.xml`;
+  const base = `${r.period}_${r.mode === "original" ? "eredeti" : "onellenorzes"}_${slug}`;
+  // az ÁNYK-mentés neve a nyomtatvány azonosítójával kezdődik, mint az ÁNYK saját mentéseié
+  return format === "enyk" ? `${r.form}A_${base}.frm.enyk` : `${r.period}_${r.form}_${base.slice(8)}.xml`;
 };
 
-/** Az összes eltérő időszak XML-je egy ZIP-ben, időrendben + egy összesítő CSV. */
+/** Az összes eltérő időszak ÁNYK-mentése (.frm.enyk) egy ZIP-ben, időrendben, az import-XML-ek az xml/ mappában + összesítő CSV. */
 export async function vatZip(companyId: number, submitDate = today(), place?: string | null) {
   const { rows, company } = await vatPlan(companyId, submitDate);
   const files: Record<string, Uint8Array> = {};
   const todo = rows.filter((r) => r.mode !== "same");
   let i = 1;
-  for (const r of todo) files[`${String(i++).padStart(2, "0")}_${xmlName(company.name, r)}`] = strToU8(await buildPeriodXml(companyId, r, company, submitDate, place));
+  for (const r of todo) {
+    const nn = String(i++).padStart(2, "0");
+    files[`${nn}_${xmlName(company.name, r)}`] = strToU8(await buildPeriodXml(companyId, r, company, submitDate, place, "enyk"));
+    files[`xml/${nn}_${xmlName(company.name, r, "xml")}`] = strToU8(await buildPeriodXml(companyId, r, company, submitDate, place, "xml"));
+  }
   const csv = ["időszak;nyomtatvány;jelleg;beadott befizetendő (e Ft);beadott átvihető;helyes befizetendő;helyes átvihető;pótlékalap (e Ft);pótlék (Ft);ismételt"]
     .concat(todo.map((r) => [r.period, r.form, r.mode === "original" ? "eredeti" : "önellenőrzés", r.prev?.["84"]?.c ?? "", r.prev?.["86"]?.c ?? "", r.next["84"]?.c ?? "", r.next["86"]?.c ?? "", r.surcharge.baseK, r.surcharge.amount, r.repeated ? "igen" : "nem"].join(";")));
   files["00_osszesito.csv"] = strToU8("﻿" + csv.join("\n"));
