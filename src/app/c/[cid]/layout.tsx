@@ -34,6 +34,7 @@ import {
   BookOpenCheck,
   Package,
   BadgeEuro,
+  FileCheck2,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
 import { APP_VERSION } from "@/lib/version";
@@ -113,6 +114,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/money`}><Wallet />Pénztár és bank</NavLink>
           <NavLink href={`${b}/member-loans`}><HandCoins />Tagi kölcsön</NavLink>
           <NavLink href={`${b}/payroll`}><BadgeEuro />Bérszámfejtés</NavLink>
+          <NavLink href={`${b}/filings`}><FileCheck2 />NAV-bevallások (ÁNYK)</NavLink>
 
           <div className="group">Tervezés</div>
           <NavLink href={`${b}/forecast`}><TrendingUp />Forecast</NavLink>

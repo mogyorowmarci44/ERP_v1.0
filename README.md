@@ -39,6 +39,20 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.6.0 – NAV-bevallások (ÁNYK): nyilvántartás, határidők, átviteli lánc
+
+Új oldal: Pénzügy › **NAV-bevallások (ÁNYK)**.
+
+| Terület | Funkció |
+|---|---|
+| ÁNYK-motor | Az ÁNYK mentett nyomtatványainak (`.frm.enyk`) és XML-jeinek beolvasása, illetve ÁNYK-ba importálható XML előállítása (Adatok › Import) – minden nyomtatványra ugyanaz a motor (`src/lib/anyk.ts`) |
+| Betöltés | Több fájl vagy egy ZIP az `abevjava/mentesek` mappáról; csak a cég saját ÁFA- (2565 / 2665) és járulékbevallásai (2608) kerülnek be, a többit (TAO, HIPA, más adózó) kihagyja, ugyanaz a fájl kétszer nem töltődik be |
+| Változatok | Időszakonként az összes mentés: eredeti / önellenőrzés / helyesbítés, mentés és aláírás ideje, KR-állomány neve, ÁFA eredménysorok (82–86., ezer Ft), M-lapok száma; „Ez ment be” jelölés (+ érkeztetési szám); XML-letöltés |
+| Mérvadó változat | A legutolsó beküldöttnek jelölt – ennek híján a legutolsó mentés („nem megerősített”); ehhez képest számol majd az önellenőrzés |
+| Átviteli lánc | Ha az előző hónap 86. sorában átvihető követelés van, annak a következő hónap 82. sorában kell szerepelnie – az eltéréseket kiemeli |
+| Határidő-naptár | ÁFA havonta a tárgyhót követő hó 20-a, 2608 a 12-e (munkaszüneti napnál a következő munkanap); állapot: beküldve / nem jelölve / esedékes / hiányzik |
+| Járulék (2608) | Azokra a hónapokra, amikor a Bérszámfejtésben élő jogviszony van: SZJA, TB-járulék (a társas vállalkozó minimumjárulékából a cég által viselt rész külön), szocho, befizetendő összesen. Az XML-kitöltéshez egy beadott 2608 `.frm.enyk` kell mintának (a mezőkódokhoz) |
+
 ## v3.5.1 – Tartási költség javaslat a könyvelésből
 
 AutóMérleg › Tartási költség › **Javaslat a könyvelésből** (az elmúlt 12 hónap, ill. a működés kezdete óta):
