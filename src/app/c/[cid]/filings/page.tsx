@@ -11,6 +11,7 @@ import { filingsOverview, type FilingVersion, type PeriodRow } from "@/lib/filin
 import { deleteFilingAction, fillPartnerTaxAction, markLatestAction, markSubmittedAction, uploadFilingsAction } from "./actions";
 import { isDate } from "@/lib/dates";
 import { vatPlan, type PlanRow } from "@/lib/vat-return-data";
+import { mSheetCheck } from "@/lib/mlap-check";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
   const canWrite = role !== "viewer";
   const tab = sp.tab === "payroll" ? "payroll" : sp.tab === "revise" ? "revise" : "vat";
   if (tab === "revise") return <RevisePage cid={cid} sp={sp} companyName={company.name} canWrite={canWrite} />;
+  if (sp.tab === "mcheck") return <MCheckPage cid={cid} sp={sp} companyName={company.name} />;
   const o = await filingsOverview(cid);
   const t = today();
   const rows = tab === "vat" ? o.vat : o.payroll;
@@ -89,6 +91,7 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
           <Link className={tab === "vat" ? "on" : undefined} href="?tab=vat">ÁFA (2565 / 2665)</Link>
           <Link className={tab === "payroll" ? "on" : undefined} href="?tab=payroll">Járulék (2608)</Link>
           <Link href="?tab=revise">ÁFA az ERP-ből (önellenőrzés)</Link>
+          <Link href="?tab=mcheck">M-lap ellenőrzés</Link>
         </div>
         {canWrite && rows.some((r) => r.versions.length) && (
           <form action={markLatestAction}>
@@ -242,7 +245,7 @@ async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp:
           <h1>ÁFA az ERP-ből – önellenőrzés</h1>
           <span className="muted">{companyName} · a könyvelt számlákból számolt bevallás a beküldött változathoz képest, időrendben láncolva</span>
         </div>
-        <div className="row"><Link className="btn" href="?tab=vat">← Beolvasott bevallások</Link></div>
+        <div className="row"><Link className="btn" href="?tab=mcheck">M-lap ellenőrzés</Link><Link className="btn" href="?tab=vat">← Beolvasott bevallások</Link></div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
       <div className="grid cols-4 lp-kpi">
@@ -308,6 +311,75 @@ async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp:
         A különbözeti adózás a 09. sorba kerül, kiemelve az 50. sorban. Az ÁNYK-ban importálás után futtasd le az ellenőrzést; a ZIP-ben a fájlok időrendben
         vannak – ebben a sorrendben kell beküldeni.
       </p>
+    </>
+  );
+}
+
+// --- M-lap ellenőrzés ------------------------------------------------------------------------------------
+
+const KIND_HU: Record<string, string> = { normal: "levonható", non_deductible: "nem levonható", out_of_scope: "TAH", exempt: "adómentes", margin: "különbözeti", eu_acquisition: "KBB", reverse_charge: "fordított" };
+
+async function MCheckPage({ cid, sp, companyName }: { cid: number; sp: Record<string, string>; companyName: string }) {
+  const c = await mSheetCheck(cid);
+  const nd = c.issues.filter((i) => i.type === "not_deductible");
+  const mm = c.issues.filter((i) => i.type === "number_mismatch");
+  const miss = c.issues.filter((i) => i.type === "missing");
+  const ft = (n: number) => fmtHuf(Math.round(n));
+  const invLink = (id: number, label: string) => <Link href={`/c/${cid}/invoices/${id}`}>{label}</Link>;
+  return (
+    <>
+      <div className="topbar">
+        <div>
+          <h1>M-lap ellenőrzés</h1>
+          <span className="muted">{companyName} · a beadott M-lapok {c.submittedCount} számlája az ERP könyvelésével összevetve, és az M-laphoz hiányzó adatok</span>
+        </div>
+        <div className="row"><Link className="btn" href="?tab=revise">ÁFA az ERP-ből</Link><Link className="btn" href="?tab=vat">← Beolvasott bevallások</Link></div>
+      </div>
+      <Flash error={sp.error} ok={sp.ok} />
+      <div className="grid cols-4 lp-kpi">
+        <div className="card stat"><div className="label">Partner adószám nélkül</div><div className="value" style={c.missingTax.length ? { color: "var(--neg)" } : undefined}>{c.missingTax.length}<small>partner</small></div></div>
+        <div className="card stat"><div className="label">Számlaszám eltér</div><div className="value">{mm.length}<small>számla</small></div></div>
+        <div className="card stat"><div className="label">Korábban levonva, ERP-ben nem levonható</div><div className="value">{nd.length}<small>számla</small></div></div>
+        <div className="card stat"><div className="label">Nincs meg az ERP-ben</div><div className="value">{miss.length}<small>számla</small></div></div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3 style={{ marginTop: 0 }}>1. Levonható áfa adószám nélküli partnertől</h3>
+        <p className="muted" style={{ marginTop: 0 }}>Ezek a számlák nem kerülhetnek M-lapra, amíg a partnernek nincs adószáma (Partnerek › szerkesztés). Külföldi (OSS) eladónál a magyar áfa általában nem vonható le.</p>
+        {c.missingTax.length === 0 ? <p className="muted">Nincs ilyen partner.</p> : (
+          <table><thead><tr><th>Partner</th><th className="num">Számla</th><th className="num">Levonható áfa</th></tr></thead>
+            <tbody>{c.missingTax.map((p) => <tr key={p.partnerId}><td><Link href={`/c/${cid}/partners`}>{p.name}</Link></td><td className="num">{p.invoices}</td><td className="num">{ft(p.vat)} Ft</td></tr>)}</tbody></table>
+        )}
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3 style={{ marginTop: 0 }}>2. Számlaszám-eltérés (beadott M-lap ↔ ERP)</h3>
+        <p className="muted" style={{ marginTop: 0 }}>Ugyanaz a számla (partner és összeg alapján) más számlaszámmal. A helyes az, ami az eredeti számlán áll – ha az ERP-ben rossz, javítsd a számlán; ha a beadott M-lapon volt rossz, az önellenőrzés az ERP szerintit küldi be.</p>
+        {mm.length === 0 ? <p className="muted">Nincs eltérés.</p> : (
+          <table style={{ fontSize: 13 }}><thead><tr><th>Időszak</th><th>Beadott M-lapon</th><th>ERP-ben</th><th>Partner</th><th className="num">Áfa</th><th>Egyezés</th></tr></thead>
+            <tbody>{mm.map((i, k) => i.type === "number_mismatch" && <tr key={k}><td>{label(i.sub.period)}</td><td><code>{i.sub.number}</code></td><td><code>{invLink(i.erp.id, i.erp.number || "(üres)")}</code></td><td>{i.erp.partnerName}</td><td className="num">{ft(i.sub.vat)}</td><td className="muted">{i.hint}</td></tr>)}</tbody></table>
+        )}
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3 style={{ marginTop: 0 }}>3. Korábban levonva – az ERP-ben nem levonható</h3>
+        <p className="muted" style={{ marginTop: 0 }}>A beadott bevallásban levont áfa, az ERP-ben nem levonható (27NL), TAH vagy adómentes kóddal. Számlánként érdemes megnézni: vegyes számlánál (pl. hatósági díj + szolgáltatás) a szolgáltatás áfája levonható lehet.</p>
+        {nd.length === 0 ? <p className="muted">Nincs ilyen számla.</p> : (
+          <table style={{ fontSize: 13 }}><thead><tr><th>Időszak</th><th>Számla</th><th>Partner</th><th>ERP-kód</th><th className="num">Korábban levont áfa</th></tr></thead>
+            <tbody>{nd.map((i, k) => i.type === "not_deductible" && <tr key={k}><td>{label(i.sub.period)}</td><td><code>{invLink(i.erp.id, i.erp.number)}</code></td><td>{i.erp.partnerName}</td><td>{i.erp.kinds.map((x) => KIND_HU[x] ?? x).join(", ")}</td><td className="num">{ft(i.sub.vat)} Ft</td></tr>)}</tbody>
+            <tfoot><tr><td colSpan={4}>Összesen</td><td className="num"><b>{ft(nd.reduce((a, i) => a + i.sub.vat, 0))} Ft</b></td></tr></tfoot></table>
+        )}
+      </div>
+
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>4. A beadott M-lapon szerepel, az ERP-ben nincs meg</h3>
+        <p className="muted" style={{ marginTop: 0 }}>Se számlaszám, se partner + összeg alapján nincs párja. Vagy hiányzik a könyvelésből, vagy a régi bevallásban szerepelt tévesen.</p>
+        {miss.length === 0 ? <p className="muted">Nincs ilyen számla.</p> : (
+          <table style={{ fontSize: 13 }}><thead><tr><th>Időszak</th><th>Számla</th><th>Partner (törzsszám)</th><th>Teljesítés</th><th className="num">Adóalap</th><th className="num">Áfa</th></tr></thead>
+            <tbody>{miss.map((i, k) => <tr key={k}><td>{label(i.sub.period)}</td><td><code>{i.sub.number}</code></td><td>{i.sub.partnerName} ({i.sub.tax8})</td><td>{fmtDate(i.sub.date)}</td><td className="num">{ft(i.sub.base)}</td><td className="num">{ft(i.sub.vat)}</td></tr>)}</tbody>
+            <tfoot><tr><td colSpan={5}>Összesen</td><td className="num"><b>{ft(miss.reduce((a, i) => a + i.sub.vat, 0))} Ft</b></td></tr></tfoot></table>
+        )}
+      </div>
     </>
   );
 }
