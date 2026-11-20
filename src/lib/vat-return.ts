@@ -127,9 +127,10 @@ export function computeVatReturn(lines: VatLine[], prevCarryK: number): Computed
   for (const p of partners) p.invoices.sort((a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number));
   const nInv = partners.reduce((a, p) => a + p.invoices.length, 0);
   if (partners.length) {
-    const tb = partners.reduce((a, p) => a + p.invoices.reduce((q, i) => q + i.base, 0), 0);
-    const tv = partners.reduce((a, p) => a + p.invoices.reduce((q, i) => q + i.vat, 0), 0);
-    rows["105"] = { b: partners.length, c: nInv, ...{ d: K(tb), e: K(tv) } } as Cell;
+    // az ÁNYK a partnerenként (M-főlapon) ezer Ft-ra kerekített összegeket adja össze
+    const tb = partners.reduce((a, p) => a + K(p.invoices.reduce((q, i) => q + i.base, 0)), 0);
+    const tv = partners.reduce((a, p) => a + K(p.invoices.reduce((q, i) => q + i.vat, 0)), 0);
+    rows["105"] = { b: partners.length, c: nInv, ...{ d: tb, e: tv } } as Cell;
     rows["108"] = { ...(rows["105"] as Cell) };
   }
   return { rows, partners, warnings: w, huf: { marginBase: marginB, marginVat: marginC, normalOut, deductible, kbb } };
@@ -271,6 +272,20 @@ export function buildVatSheets(o: BuildOpts): AnykSheet[] {
     if (cell.b != null && cell.b !== 0) f[fieldOf(row, "B")] = String(cell.b);
     if (cell.c != null && cell.c !== 0) f[fieldOf(row, "C")] = String(cell.c);
   }
+  // 105–109. sor: M-lapok összesítője. A 106. (korrekciók) b–e 0-val kitöltendő, a 108. = 105. + 106.
+  const r105 = rows["105"] as (Cell & { d?: number; e?: number }) | undefined;
+  if (r105) {
+    for (const c of ["B", "C", "D", "E"]) f[`0_0F0001D0106${c}A`] = "0";
+    if (is26) {
+      const h = o.computed.partners.reduce((a, p) => a + K(p.invoices.reduce((q, i) => q + i.deducted, 0)), 0);
+      f["0_0F0001D0105HA"] = String(h); // a 106. és 108. sor h oszlopa üresen marad
+    }
+  }
+  // 109. sor: levonásba helyezett belföldi adó (64–66., 68. sor c – a, – 31. a) és az M-lapok adójának különbözete
+  const c109 = (["64", "65", "66"] as RowKey[]).reduce((a, r) => a + (rows[r]?.c ?? 0), 0);
+  f["0_0F0001D0109CA"] = String(c109);
+  // 109 e: csak ha az M-lapok adója (108 e) nem több a levonásba helyezettnél; egyezésnél 0, ha több: üres
+  if (c109 >= (r105?.e ?? 0)) f["0_0F0001D0109EA"] = String(c109 - (r105?.e ?? 0));
   // a 83. sor 0 is kitöltendő (különbözet)
   f[fieldOf("83", "C")] = String(rows["83"]?.c ?? 0);
   if (o.computed.partners.length) f["0_0A0001F021A"] = String(o.computed.partners.length);
@@ -312,7 +327,8 @@ function mSheet(o: BuildOpts, p: MPartner, tax11: string): AnykSheet {
   f["0_0A0001E0004BA"] = String(p.invoices.length);
   f["0_0A0001E0004CA"] = String(K(tb));
   f["0_0A0001E0004DA"] = String(K(tv));
-  if (o.form === "2665") f["0_0A0001E0004GA"] = String(K(p.invoices.reduce((a, i) => a + i.deducted, 0)));
+  // 2665: levonásba helyezett adó (f3 → g oszlop) a 04. és az összesen (07.) sorban is
+  if (o.form === "2665") f["0_0A0001E0004GA"] = f["0_0A0001E0007GA"] = String(K(p.invoices.reduce((a, i) => a + i.deducted, 0)));
   f["0_0A0001E0007BA"] = String(p.invoices.length);
   f["0_0A0001E0007CA"] = String(K(tb));
   f["0_0A0001E0007DA"] = String(K(tv));

@@ -80,7 +80,7 @@ export function parseAnyk(xml: string): AnykForm {
     const id = text(ni, "nyomtatvanyazonosito");
     if (!id) continue;
     const fields: Record<string, string> = {};
-    for (const f of body.matchAll(/<mezo\s+eazon="([^"]+)"\s*(?:\/>|>([\s\S]*?)<\/mezo>)/g)) fields[f[1]] = xmlDecode(f[2] ?? "");
+    for (const f of body.matchAll(/<mezo\s+eazon="([^"]+)"\s*(?:\/>|>([\s\S]*?)<\/mezo>)/g)) fields[/^0[A-Z]\d{4}/.test(f[1]) ? `0_${f[1]}` : f[1]] = xmlDecode(f[2] ?? "");
     sheets.push({ id, version: text(ni, "nyomtatvanyverzio"), fields });
     if (!info) info = { tax: text(ni, "adoszam"), name: text(ni, "nev"), from: ymd(text(ni, "tol")), to: ymd(text(ni, "ig")) };
   }
@@ -107,6 +107,19 @@ export type BuildInput = {
   programVersion?: string;
 };
 
+/** Alnyomtatvány (pl. 2665M) azonosítása: partner adószáma és neve – nélküle az ÁNYK nem rendeli a laphoz. */
+function albizonylat(s: BuildInput["sheets"][number]): string[] {
+  if (!/M$/.test(s.id)) return [];
+  const id = s.fields["0_0A0001C005A"], name = s.fields["0_0A0001C006A"];
+  if (!id && !name) return [];
+  return [
+    `      <albizonylatazonositas>`,
+    `        <megnevezes>${xmlEncode(String(name ?? ""))}</megnevezes>`,
+    `        <azonosito>${xmlEncode(String(id ?? ""))}</azonosito>`,
+    `      </albizonylatazonositas>`,
+  ];
+}
+
 /** ÁNYK-ba importálható XML (Adatok › Import / XML állomány). A mezők eazon szerint rendezve, üres értékek nélkül. */
 export function buildAnykXml(b: BuildInput): string {
   const d8 = (iso: string) => iso.replace(/-/g, "");
@@ -130,6 +143,7 @@ export function buildAnykXml(b: BuildInput): string {
       `        <nev>${xmlEncode(b.taxpayerName)}</nev>`,
       `        <adoszam>${tax}</adoszam>`,
       `      </adozo>`,
+      ...albizonylat(s),
       `      <idoszak>`,
       `        <tol>${d8(b.from)}</tol>`,
       `        <ig>${d8(b.to)}</ig>`,
@@ -149,12 +163,14 @@ export function buildAnykXml(b: BuildInput): string {
 }
 
 /**
- * Dinamikus (több példányban előforduló) lapok mezőkódja: az ÁNYK mentésében „n_0BXXXX…” (n = a lap 0-tól számolt
- * példánya), az importált XML-ben viszont az XXXX helyére a lap sorszáma kerül: „0_0B0001…”, „0_0B0002…”.
+ * Mezőkód az importálható XML-be. Az ÁNYK mentésében (.enyk) a kód „n_EAZON”, ahol n a lap 0-tól számolt példánya és a
+ * dinamikus lapok kódjában „XXXX” áll. Az import-XML-ben nincs „n_” előtag, a dinamikus lapnál pedig az XXXX helyére a
+ * lap sorszáma kerül: „1_0BXXXXC0001AA” → „0B0002C0001AA”, „0_0A0001C001A” → „0A0001C001A”.
  */
 export function importEazon(k: string) {
   const m = k.match(/^(\d+)_(0[A-Z])XXXX(.+)$/);
-  return m ? `0_${m[2]}${String(Number(m[1]) + 1).padStart(4, "0")}${m[3]}` : k;
+  if (m) return `${m[2]}${String(Number(m[1]) + 1).padStart(4, "0")}${m[3]}`;
+  return k.replace(/^\d+_(?=0[A-Z]\d{4})/, "");
 }
 
 // --- bevallás-jelleg, ÁFA eredménysorok ------------------------------------------------------------
