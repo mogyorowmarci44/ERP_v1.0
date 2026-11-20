@@ -29,15 +29,21 @@ export type EprOptions = {
   rateLabel: string;
 };
 
-export function ArSugo({ medianMargin, soldCount, epr }: { medianMargin: number | null; soldCount: number; epr: EprOptions }) {
-  const [buy, setBuy] = useState(0);
-  const [buyMode, setBuyMode] = useState<VatMode>("margin");
-  const [sellMode, setSellMode] = useState<VatMode>("margin");
-  const [costs, setCosts] = useState<Cost[]>([]);
-  const [nextId, setNextId] = useState(1);
-  const [eprCat, setEprCat] = useState<EprCat>("M1");
-  const [eprDrive, setEprDrive] = useState<EprDriveKey>("ice");
-  const [massKg, setMassKg] = useState(0);
+/** v3.4.0 – előtöltés egy meglévő autóból (AutóMérleg → „Árazás az ÁrSugóban”). */
+export type ArSugoInitial = {
+  title: string; vehicleId: number; buy: number; buyMode: VatMode; sellMode: VatMode;
+  costs: { name: string; amount: number }[]; eprCat: EprCat; eprDrive: EprDriveKey; massKg: number;
+};
+
+export function ArSugo({ medianMargin, soldCount, epr, initial, cid }: { medianMargin: number | null; soldCount: number; epr: EprOptions; initial?: ArSugoInitial; cid?: number }) {
+  const [buy, setBuy] = useState(initial?.buy ?? 0);
+  const [buyMode, setBuyMode] = useState<VatMode>(initial?.buyMode ?? "margin");
+  const [sellMode, setSellMode] = useState<VatMode>(initial?.sellMode ?? "margin");
+  const [costs, setCosts] = useState<Cost[]>(initial?.costs.map((c, i) => ({ id: i + 1, name: c.name, amount: c.amount })) ?? []);
+  const [nextId, setNextId] = useState((initial?.costs.length ?? 0) + 1);
+  const [eprCat, setEprCat] = useState<EprCat>(initial?.eprCat ?? "M1");
+  const [eprDrive, setEprDrive] = useState<EprDriveKey>(initial?.eprDrive ?? "ice");
+  const [massKg, setMassKg] = useState(initial?.massKg ?? 0);
   const [showCosts, setShowCosts] = useState(true);
   const [trial, setTrial] = useState<number | null>(null);
 
@@ -69,11 +75,17 @@ export function ArSugo({ medianMargin, soldCount, epr }: { medianMargin: number 
 
   return (
     <div className="as">
+      {initial && cid && (
+        <div className="as-note" style={{ flex: "none" }}>
+          Előtöltve: {initial.title} – a beszerzés és az eddig könyvelt költségek. A hátralévő tervezett költségeket add hozzá.{" "}
+          <a href={`/c/${cid}/vehicles/${initial.vehicleId}/merleg`}>Vissza az AutóMérleghez</a>
+        </div>
+      )}
       <div className="card as-inputs">
         <label className="as-field">
           <span>Beszerzési ár{buyMode === "normal" ? " (bruttó)" : ""}</span>
           <span className="as-money">
-            <input inputMode="numeric" value={buy ? fmtHuf(buy) : ""} placeholder="0" onChange={(e) => { setBuy(parseFt(e.target.value)); reset(); }} autoFocus />
+            <input inputMode="numeric" value={buy ? fmtHuf(buy) : ""} placeholder="0" onChange={(e) => { setBuy(parseFt(e.target.value)); reset(); }} autoFocus={!initial} />
             <span>Ft</span>
           </span>
         </label>

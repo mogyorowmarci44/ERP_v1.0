@@ -265,6 +265,9 @@ export type CompanySettings = {
   hipaSites?: { zip: string; city: string; role: "seat" | "site"; share: number }[] | null;
   /** v3.3.3 – Adóévenkénti kézi tételek (üzleti év kezdőéve → összegek). */
   taxAdjustments?: Record<string, { taoIncrease?: number; taoDecrease?: number; hipaSubcontract?: number; hipaRnd?: number }> | null;
+  /** v3.4.0 – AutóMérleg tartási költség: a lekötött pénz költsége (%/év) és a fix napi költség (Ft/nap). */
+  holdingRatePct?: number | null;
+  holdingFixPerDay?: number | null;
   /** v3.3.3 – Az ERP előtti évek elhatárolt vesztesége (keletkezés éve, összeg). */
   openingLosses?: { year: string; amount: number }[] | null;
 };

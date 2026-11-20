@@ -39,6 +39,19 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.4.0 – AutóMérleg: egy autó teljes mérlege
+
+Új oldal autónként (Gépkocsi készlet › az autó neve vagy „AutóMérleg”, illetve a kartonról), az ÁrSugó mintájára.
+
+| Terület | Funkció |
+|---|---|
+| Készleten (élő számok) | A mai könyvelt költségekből + EPR + tartási költségből számolt nullszaldó és cél ár; a nullszaldó naponta a napi tartási költség × 1,27-tel kúszik feljebb. Figyelmeztet, ha a tervezett / javasolt ár a cél alá csúszott, és megmondja, hány nap múlva éri el a nullszaldót. „Árazás az ÁrSugóban” gomb: az ÁrSugó az autó adataival előtöltve nyílik |
+| Eladva (lezárt elszámolás) | Fedezet I (nettó árbevétel − beszerzés), Fedezet II (− költségek − EPR), fedezet %, állásidő, napi fedezet |
+| Terv kontra tény | A Forecastban az autóhoz rögzített terv (költségek, ár, dátum) a ténnyel szemben, eltérés zöld / piros színnel, automatikus „Miért tér el?” magyarázattal |
+| Hasonló autók | Medián Fedezet II és állásidő: azonos márka + modell; 3 alatt a márka, ha az is kevés, az összes eladott autó |
+| Tartási költség | Állítható: lekötött pénz költsége (%/év, alap 8%) + fix napi költség (Ft/nap, alap 250); élőben számol, cégszintű alapértékként menthető. Becslés: a Fedezet II-t nem csökkenti |
+| Ársáv, összetétel | Az ÁrSugó színes ársávja a valós számokkal; „Miből áll az ár” sávdiagram; PDF / nyomtatás |
+
 ## v3.3.3 – TAO és HIPA: teljes számítás, települési HIPA-szabályok a Kincstártól
 
 | Terület | Funkció |
