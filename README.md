@@ -41,7 +41,7 @@ Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Air
 
 ## v3.8.1 – ÁNYK Export szűrő: ÁFA / Járulék
 
-- Az ÁNYK Export fülön szűrő: „ÁFA-bevallás (2565 / 2665)” vagy „Járulékbevallás (2608)”. Mindkettő ugyanonnan tölthető le: hónaponként XML és egy közös ZIP-végpont (`/filings/export/zip?kind=vat|payroll`).
+- Az ÁNYK Export fülön szűrő: „ÁFA-bevallás” vagy „Járulékbevallás” (a fül- és szűrőnevekben nincs nyomtatványszám). Mindkettő ugyanonnan tölthető le: hónaponként XML és egy közös ZIP-végpont (`/filings/export/zip?kind=vat|payroll`).
 - 2608 nézet: hónapok jogviszonnyal, határidő, állapot, TB / szocho / SZJA / befizetendő, „2608 XML”; a ZIP-ben a be nem küldött (hiányzó / esedékes) hónapok + összesítő CSV.
 
 ## v3.8.0 – 2608 járulékbevallás export

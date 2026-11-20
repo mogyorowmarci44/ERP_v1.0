@@ -57,7 +57,7 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
       <div className="topbar">
         <div>
           <h1>NAV-bevallások (ÁNYK)</h1>
-          <span className="muted">{company.name} · ÁFA (2565 / 2665) és járulék (2608) havonta · ÁNYK mentések betöltése, beküldött változatok, határidők</span>
+          <span className="muted">{company.name} · ÁFA- és járulékbevallás havonta · ÁNYK mentések betöltése, beküldött változatok, határidők</span>
         </div>
         <div className="row">
           <Link className="btn" href={`/c/${cid}/payroll`}>Bérszámfejtés</Link>
@@ -91,7 +91,7 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
       <div className="row" style={{ marginBottom: 12 }}>
         <div className="segmented" role="tablist" aria-label="Bevallás">
           <Link className={tab === "vat" ? "on" : undefined} href="?tab=vat">ÁFA-bevallás</Link>
-          <Link className={tab === "payroll" ? "on" : undefined} href="?tab=payroll">Járulék (2608)</Link>
+          <Link className={tab === "payroll" ? "on" : undefined} href="?tab=payroll">Járulékbevallás</Link>
           <Link href={tab === "payroll" ? "?tab=revise&kind=payroll" : "?tab=revise&kind=vat"}>ÁNYK Export</Link>
           <Link href="?tab=mcheck">M-lap ellenőrzés</Link>
         </div>
@@ -151,7 +151,7 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
                               bruttó {ft(pm.totals.gross)} · SZJA {ft(pm.totals.szja)} · TB {ft(pm.totals.tb + pm.totals.tbCompany)}{pm.totals.tbCompany ? ` (ebből a cég viseli ${ft(pm.totals.tbCompany)})` : ""} · szocho {ft(pm.totals.szocho)}
                             </div>
                             <div><b>Befizetendő: {ft(toNav)}</b> · {pm.runStatus === "posted" ? "könyvelve" : pm.runStatus === "external" ? "kézzel könyvelve" : <Link href={`/c/${cid}/payroll?period=${r.period}`}>nincs könyvelve</Link>}</div>
-                            {hasTemplate && (toNav > 0) && <div style={{ marginTop: 4 }}><a className="btn" href={`/c/${cid}/filings/payroll/${r.period}/xml`}><FileDown size={13} /> 2608 XML</a></div>}
+                            {hasTemplate && (toNav > 0) && <div style={{ marginTop: 4 }}><a className="btn" href={`/c/${cid}/filings/payroll/${r.period}/xml`}><FileDown size={13} /> XML</a></div>}
                           </> : <span className="muted">–</span>)}
                     </td>
                     <td>
@@ -238,8 +238,8 @@ function ExportKindFilter({ kind }: { kind: "vat" | "payroll" }) {
     <div className="row no-print" style={{ marginBottom: 12 }}>
       <span className="muted">Mit exportálsz?</span>
       <div className="segmented" role="tablist" aria-label="Export">
-      <Link className={kind === "vat" ? "on" : undefined} href="?tab=revise&kind=vat">ÁFA-bevallás (2565 / 2665)</Link>
-      <Link className={kind === "payroll" ? "on" : undefined} href="?tab=revise&kind=payroll">Járulékbevallás (2608)</Link>
+      <Link className={kind === "vat" ? "on" : undefined} href="?tab=revise&kind=vat">ÁFA-bevallás</Link>
+      <Link className={kind === "payroll" ? "on" : undefined} href="?tab=revise&kind=payroll">Járulékbevallás</Link>
       </div>
     </div>
   );
@@ -257,7 +257,7 @@ async function PayrollExportPage({ cid, companyName }: { cid: number; companyNam
           <h1>ÁNYK Export</h1>
           <span className="muted">{companyName} · 2608 havi járulékbevallás a Bérszámfejtésből, a betöltött ÁNYK-minta alapján</span>
         </div>
-        <div className="row"><Link className="btn" href="?tab=payroll">← Járulék (2608)</Link></div>
+        <div className="row"><Link className="btn" href="?tab=payroll">← Járulékbevallás</Link></div>
       </div>
       <ExportKindFilter kind="payroll" />
       <div className="grid cols-4 lp-kpi">
@@ -276,7 +276,7 @@ async function PayrollExportPage({ cid, companyName }: { cid: number; companyNam
       </p>
       <div className="row card no-print" style={{ marginBottom: 12 }}>
         {tpl && todo.length > 0
-          ? <a className="btn primary" href={`/c/${cid}/filings/export/zip?kind=payroll`}><FileDown size={14} /> Összes beküldendő 2608 (ZIP)</a>
+          ? <a className="btn primary" href={`/c/${cid}/filings/export/zip?kind=payroll`}><FileDown size={14} /> Összes beküldendő (ZIP)</a>
           : <span className="muted">{tpl ? "Nincs beküldendő hónap." : "A ZIP a minta betöltése után érhető el."}</span>}
       </div>
       <div className="card table-wrap">
@@ -296,7 +296,7 @@ async function PayrollExportPage({ cid, companyName }: { cid: number; companyNam
                   <td className="num">{r.pm ? fmtHuf(r.pm.totals.szja) : "–"}</td>
                   <td className="num"><b>{fmtHuf(r.toNav)}</b></td>
                   <td>{tpl && r.toNav > 0 && r.status !== "upcoming"
-                    ? <a className="btn" href={`/c/${cid}/filings/payroll/${r.period}/xml`}><FileDown size={13} /> 2608 XML</a>
+                    ? <a className="btn" href={`/c/${cid}/filings/payroll/${r.period}/xml`}><FileDown size={13} /> XML</a>
                     : <span className="muted">{r.status === "upcoming" ? "folyó hónap" : "–"}</span>}</td>
                 </tr>
               );
