@@ -114,6 +114,8 @@ export const TEMPLATE_VER: Record<string, string> = { "2565": "4.0", "2665": "2.
  * ÁNYK-mentés (.frm.enyk) – ugyanaz a formátum, amit az ÁNYK maga ment. Az abevjava „mentesek” mappájába másolva a
  * Nyomtatvány megnyitása listából nyitható, és (az importált XML-lel szemben) megjelölhető elektronikus beküldésre.
  * A mezőkódok itt az ÁNYK belső alakjában maradnak („0_…”, dinamikus lapnál „n_0BXXXX…”).
+ * calculated="true": betöltéskor az ÁNYK nem számolja újra a számított mezőket (pl. 105. sor b, „Partnerek száma M”) –
+ * a saját rejtett segédmezői nélkül 0-ra/üresre írná őket, a mi értékeink viszont helyesek.
  */
 export function buildAnykEnyk(b: BuildInput & { form: string; templateVer?: string; programVersion?: string }): string {
   const d8 = (iso: string) => iso.replace(/-/g, "");
@@ -130,7 +132,7 @@ export function buildAnykEnyk(b: BuildInput & { form: string; templateVer?: stri
     `  <head filetype="zn1810">`,
     `    <type>multi</type>`,
     `    <saved>${saved}</saved>`,
-    `    <docinfo name="${a(name)}" id="${a(b.form)}" count="${b.sheets.length}" note="" ver="${a(pv)}" org="NAV" templatever="${a(tv)}" tax_number="${tax}" from_date="${d8(b.from)}" to_date="${d8(b.to)}" person_name="${a(b.taxpayerName)}" account_name="" calculated="false" seq="${b.sheets.length}" avdh_cst="" />`,
+    `    <docinfo name="${a(name)}" id="${a(b.form)}" count="${b.sheets.length}" note="" ver="${a(pv)}" org="NAV" templatever="${a(tv)}" tax_number="${tax}" from_date="${d8(b.from)}" to_date="${d8(b.to)}" person_name="${a(b.taxpayerName)}" account_name="" calculated="true" seq="${b.sheets.length}" avdh_cst="" />`,
     `  </head>`,
     `  <nyomtatvanyok xmlns="${ANYK_NS}" template="NAV_${a(b.form)}_${tv.replace(".", "_")}" name="${a(name)}" id="${a(b.form)}">`,
     `    <abev>`,
