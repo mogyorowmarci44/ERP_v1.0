@@ -8,6 +8,7 @@ import { fmtDate, today } from "@/lib/dates";
 import { fmtHuf } from "@/lib/money";
 import { KIND_LABEL, type VatResult } from "@/lib/anyk";
 import { filingsOverview, type FilingVersion, type PeriodRow } from "@/lib/filings";
+import { template2608 } from "@/lib/payroll-2608-data";
 import { deleteFilingAction, fillPartnerTaxAction, markLatestAction, markSubmittedAction, uploadFilingsAction } from "./actions";
 import { isDate } from "@/lib/dates";
 import { vatPlan, type PlanRow } from "@/lib/vat-return-data";
@@ -44,6 +45,7 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
   if (tab === "revise") return <RevisePage cid={cid} sp={sp} companyName={company.name} canWrite={canWrite} />;
   if (sp.tab === "mcheck") return <MCheckPage cid={cid} sp={sp} companyName={company.name} />;
   const o = await filingsOverview(cid);
+  const hasTemplate = tab === "payroll" && !!(await template2608(cid));
   const t = today();
   const rows = tab === "vat" ? o.vat : o.payroll;
   const missing = rows.filter((r) => r.status === "missing" || r.status === "due").length;
@@ -149,6 +151,7 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
                               bruttó {ft(pm.totals.gross)} · SZJA {ft(pm.totals.szja)} · TB {ft(pm.totals.tb + pm.totals.tbCompany)}{pm.totals.tbCompany ? ` (ebből a cég viseli ${ft(pm.totals.tbCompany)})` : ""} · szocho {ft(pm.totals.szocho)}
                             </div>
                             <div><b>Befizetendő: {ft(toNav)}</b> · {pm.runStatus === "posted" ? "könyvelve" : pm.runStatus === "external" ? "kézzel könyvelve" : <Link href={`/c/${cid}/payroll?period=${r.period}`}>nincs könyvelve</Link>}</div>
+                            {hasTemplate && (toNav > 0) && <div style={{ marginTop: 4 }}><a className="btn" href={`/c/${cid}/filings/payroll/${r.period}/xml`}><FileDown size={13} /> 2608 XML</a></div>}
                           </> : <span className="muted">–</span>)}
                     </td>
                     <td>
@@ -169,8 +172,9 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
 
       {tab === "payroll" && (
         <p className="muted" style={{ marginTop: 10 }}>
-          A 2608 XML-exportjához a nyomtatvány mezőkódjai kellenek: tölts be egy már beadott 2608 <code>.frm.enyk</code>-t (bármelyik cégnél) –
-          abból készül a kitöltés. Addig a fenti összegek a Bérszámfejtés paraméterei szerint (társas vállalkozó: minimum járulékalap) számolódnak.
+          {hasTemplate
+            ? <>A 2608 XML a cég legutóbb betöltött 2608 bevallásának mintájára készül (személyes adatok, jogviszony-kód, FEOR onnan), az időszak és az összegek a Bérszámfejtésből. Új dolgozónál előbb töltsd ki egyszer az ÁNYK-ban, és töltsd be a <code>.frm.enyk</code>-t.</>
+            : <>A 2608 XML-exportjához tölts be egy, a cégnél az ÁNYK-ban kitöltött 2608 <code>.frm.enyk</code>-t – abból készül a többi hónap. Addig a fenti összegek a Bérszámfejtés paraméterei szerint (társas vállalkozó: minimum járulékalap) számolódnak.</>}
         </p>
       )}
       <p className="muted" style={{ marginTop: 10 }}>

@@ -108,7 +108,7 @@ export type BuildInput = {
 };
 
 /** Az ÁNYK aktuális sablonverziója nyomtatványcsaládonként (a mentett .frm.enyk-hoz). */
-export const TEMPLATE_VER: Record<string, string> = { "2565": "4.0", "2665": "2.0" };
+export const TEMPLATE_VER: Record<string, string> = { "2565": "4.0", "2665": "2.0", "2608": "6.0" };
 
 /**
  * ÁNYK-mentés (.frm.enyk) – ugyanaz a formátum, amit az ÁNYK maga ment. Az abevjava „mentesek” mappájába másolva a
@@ -172,6 +172,18 @@ export function buildAnykEnyk(b: BuildInput & { form: string; templateVer?: stri
 
 /** Alnyomtatvány (pl. 2665M) azonosítása: partner adószáma és neve – nélküle az ÁNYK nem rendeli a laphoz. */
 function albizonylat(s: BuildInput["sheets"][number]): string[] {
+  // 2608M (természetes személyenkénti összesítő): a magánszemély neve és adóazonosító jele
+  if (/^\d\d08M$/.test(s.id)) {
+    const taxId = s.fields["0_0A0001C007A"];
+    const name = [s.fields["0_0A0001C017A"], s.fields["0_0A0001C018A"]].filter(Boolean).join(" ");
+    if (!taxId && !name) return [];
+    return [
+      `      <munkavallalo>`,
+      `        <nev>${xmlEncode(String(name))}</nev>`,
+      `        <adoazonosito>${xmlEncode(String(taxId ?? ""))}</adoazonosito>`,
+      `      </munkavallalo>`,
+    ];
+  }
   if (!/M$/.test(s.id)) return [];
   const id = s.fields["0_0A0001C005A"], name = s.fields["0_0A0001C006A"];
   if (!id && !name) return [];

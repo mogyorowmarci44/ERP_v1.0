@@ -39,6 +39,12 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.8.0 – 2608 járulékbevallás export
+
+- A NAV-bevallások › Járulék (2608) fülön hónaponként „2608 XML” letöltés. A minta a cég legutóbb betöltött, ÁNYK-ban kitöltött 2608 bevallása (személyes adatok, jogviszony-kód, FEOR); az időszakot és az összegeket (TB-járulék 18,5%, szocho 13%, a 2026-os szabály szerint 112,5% nélkül) a Bérszámfejtés adja.
+- `build2608Sheets`: időszak-csere, összegek a 2608M (626/629/633., 385/386. sor) és a 2608A (28., 31., 103., 109., 160. sor) lapokon; a rejtett ÁNYK-segédmezők kimaradnak.
+- Import-XML: 2608M-nél `munkavallalo` (név + adóazonosító) blokk, sablonverzió 6.0.
+
 ## v3.7.7 – ÁNYK import-XML sablonverzióval
 
 - Útmutató a lapon: ÁNYK › Adatok › XML állomány ellenőrzése és átadása elektronikus beküldésre (Ctrl+D).
