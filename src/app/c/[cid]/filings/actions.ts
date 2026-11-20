@@ -74,3 +74,33 @@ export async function fillPartnerTaxAction(fd: FormData) {
     return ok(back(cid, tab), r.updated.length ? `${r.updated.length} partner adószáma pótolva az M-lapokról: ${r.updated.slice(0, 12).join("; ")}${r.updated.length > 12 ? " …" : ""}` : `Nem volt pótolható partner (az M-lapokon ${r.known} partner szerepel).`);
   });
 }
+
+/**
+ * ÁNYK Export: „Beküldve” – ha a hónapnak van betöltött változata, a legutolsót jelöli beküldöttnek; ha nincs, az ERP által
+ * előállított XML-t (amit az ÁNYK-ba betöltöttél) eltárolja változatként, és azt jelöli beküldöttnek.
+ */
+export async function markExportSubmittedAction(fd: FormData) {
+  const cid = Number(fd.get("cid")), period = str(fd, "period"), kind = str(fd, "kind") === "payroll" ? "payroll" : "vat";
+  const date = str(fd, "date"), place = str(fd, "place");
+  await requireCompany(cid, { write: true });
+  const url = `/c/${cid}/filings?tab=revise&kind=${kind}${date ? `&date=${date}` : ""}${place ? `&place=${encodeURIComponent(place)}` : ""}`;
+  await runOrRedirect(url, async () => {
+    if (!/^\d{4}-\d{2}$/.test(period)) throw new Error("Hibás időszak.");
+    const { filingsOverview } = await import("@/lib/filings");
+    const o = await filingsOverview(cid);
+    const row = (kind === "vat" ? o.vat : o.payroll).find((r) => r.period === period);
+    let id: number | undefined;
+    if (kind === "payroll" && row?.versions.length) id = row.versions.at(-1)!.id;
+    else {
+      const xml = kind === "payroll"
+        ? (await (await import("@/lib/payroll-2608-data")).payroll2608Xml(cid, period)).xml
+        : (await (await import("@/lib/vat-return-data")).vatXml(cid, period, date || undefined, place || null)).xml;
+      const r = await importFilings(cid, [{ name: `${kind === "payroll" ? "2608" : "AFA"}_${period}_ERP.xml`, data: new TextEncoder().encode(xml) }]);
+      id = r.ids[0];
+      if (!id) throw new Error(r.skipped[0]?.reason ?? "Nem sikerült eltárolni.");
+    }
+    await setSubmitted(cid, id, true);
+    revalidatePath(`/c/${cid}/filings`);
+    return ok(url, `${period}: beküldöttként jelölve.`);
+  });
+}

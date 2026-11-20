@@ -20,15 +20,17 @@ export type Filing = typeof s.taxFilings.$inferSelect;
 // --- betöltés ----------------------------------------------------------------------------------------
 
 export type ImportReport = {
-  added: Array<{ file: string; form: string; period: string; kind: FilingKind }>;
+  added: Array<{ file: string; form: string; period: string; kind: FilingKind; id: number }>;
   duplicates: string[];
+  /** a betöltött vagy már meglévő (azonos tartalmú) változatok azonosítói */
+  ids: number[];
   skipped: Array<{ file: string; reason: string }>;
 };
 
 /** Fájlok (ZIP-ek kibontva) → ÁNYK nyomtatványok. Csak a cég saját ÁFA- (xx65) és járulék- (xx08) bevallásai kerülnek be. */
 export async function importFilings(companyId: number, files: Array<{ name: string; data: Uint8Array }>): Promise<ImportReport> {
   const [company] = await db.select({ taxNumber: s.companies.taxNumber, name: s.companies.name }).from(s.companies).where(eq(s.companies.id, companyId));
-  const rep: ImportReport = { added: [], duplicates: [], skipped: [] };
+  const rep: ImportReport = { added: [], duplicates: [], skipped: [], ids: [] };
   const flat: Array<{ name: string; data: Uint8Array }> = [];
   for (const f of files) {
     if (/\.zip$/i.test(f.name)) {
@@ -54,8 +56,12 @@ export async function importFilings(companyId: number, files: Array<{ name: stri
       savedAt: form.savedAt ? new Date(`${form.savedAt}Z`) : null, signedAt: sum.signedAt, krFileName: form.krFileName?.slice(0, 255) ?? null,
       templateVer: form.templateVer?.slice(0, 16) ?? null, sheets: form.sheets, summary: { sheetCounts: sum.sheetCounts, vat: sum.vat }, sha256,
     }).onConflictDoNothing().returning({ id: s.taxFilings.id });
-    if (ins.length) rep.added.push({ file: name, form: form.form, period: periodOf(form.from), kind: sum.kind });
-    else rep.duplicates.push(name);
+    if (ins.length) { rep.added.push({ file: name, form: form.form, period: periodOf(form.from), kind: sum.kind, id: ins[0].id }); rep.ids.push(ins[0].id); }
+    else {
+      rep.duplicates.push(name);
+      const [ex] = await db.select({ id: s.taxFilings.id }).from(s.taxFilings).where(and(eq(s.taxFilings.companyId, companyId), eq(s.taxFilings.sha256, sha256)));
+      if (ex) rep.ids.push(ex.id);
+    }
   }
   return rep;
 }

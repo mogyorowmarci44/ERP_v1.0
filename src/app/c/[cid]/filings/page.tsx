@@ -9,7 +9,7 @@ import { fmtHuf } from "@/lib/money";
 import { KIND_LABEL, type VatResult } from "@/lib/anyk";
 import { filingsOverview, type FilingVersion, type PeriodRow } from "@/lib/filings";
 import { payrollExportRows, template2608 } from "@/lib/payroll-2608-data";
-import { deleteFilingAction, fillPartnerTaxAction, markLatestAction, markSubmittedAction, uploadFilingsAction } from "./actions";
+import { deleteFilingAction, fillPartnerTaxAction, markExportSubmittedAction, markLatestAction, markSubmittedAction, uploadFilingsAction } from "./actions";
 import { isDate } from "@/lib/dates";
 import { vatPlan, type PlanRow } from "@/lib/vat-return-data";
 import { mSheetCheck } from "@/lib/mlap-check";
@@ -232,6 +232,17 @@ const ROW_LABEL: Record<string, string> = {
   "82": "82 – előző időszakról áthozott", "83": "83 – különbözet", "84": "84 – befizetendő", "85": "85 – visszaigényelt", "86": "86 – átvihető",
 };
 
+/** „Beküldve” gomb az ÁNYK Export soraiban. */
+function SubmittedButton({ cid, kind, period, date, place }: { cid: number; kind: "vat" | "payroll"; period: string; date?: string; place?: string }) {
+  return (
+    <form action={markExportSubmittedAction} style={{ display: "inline" }}>
+      <input type="hidden" name="cid" value={cid} /><input type="hidden" name="kind" value={kind} /><input type="hidden" name="period" value={period} />
+      {date && <input type="hidden" name="date" value={date} />}{place && <input type="hidden" name="place" value={place} />}
+      <SubmitButton className="primary" pendingText="…">Beküldve</SubmitButton>
+    </form>
+  );
+}
+
 /** ÁNYK Export: szűrő (ÁFA-bevallás / Járulékbevallás), egy helyről letölthető XML-ek és ZIP. */
 function ExportKindFilter({ kind }: { kind: "vat" | "payroll" }) {
   return (
@@ -245,7 +256,7 @@ function ExportKindFilter({ kind }: { kind: "vat" | "payroll" }) {
   );
 }
 
-async function PayrollExportPage({ cid, companyName }: { cid: number; companyName: string }) {
+async function PayrollExportPage({ cid, companyName, canWrite }: { cid: number; companyName: string; canWrite: boolean }) {
   const [rows, tpl] = await Promise.all([payrollExportRows(cid), template2608(cid)]);
   const todo = rows.filter((r) => r.todo);
   const total = todo.reduce((a, r) => a + r.toNav, 0);
@@ -295,9 +306,15 @@ async function PayrollExportPage({ cid, companyName }: { cid: number; companyNam
                   <td className="num">{r.pm ? fmtHuf(r.pm.totals.szocho) : "–"}</td>
                   <td className="num">{r.pm ? fmtHuf(r.pm.totals.szja) : "–"}</td>
                   <td className="num"><b>{fmtHuf(r.toNav)}</b></td>
-                  <td>{tpl && r.toNav > 0 && r.status !== "upcoming"
-                    ? <a className="btn" href={`/c/${cid}/filings/payroll/${r.period}/xml`}><FileDown size={13} /> XML</a>
-                    : <span className="muted">{r.status === "upcoming" ? "folyó hónap" : "–"}</span>}</td>
+                  <td>
+                    {r.status === "ok" ? <span className="badge posted"><CircleCheck size={11} /> beküldve</span>
+                      : tpl && r.toNav > 0 && r.status !== "upcoming" ? (
+                        <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+                          <a className="btn" href={`/c/${cid}/filings/payroll/${r.period}/xml`}><FileDown size={13} /> XML</a>
+                          {canWrite && <SubmittedButton cid={cid} kind="payroll" period={r.period} />}
+                        </span>
+                      ) : <span className="muted">{r.status === "upcoming" ? "folyó hónap" : "–"}</span>}
+                  </td>
                 </tr>
               );
             })}
@@ -312,7 +329,7 @@ async function PayrollExportPage({ cid, companyName }: { cid: number; companyNam
 }
 
 async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp: Record<string, string>; companyName: string; canWrite: boolean }) {
-  if (sp.kind === "payroll") return <PayrollExportPage cid={cid} companyName={companyName} />;
+  if (sp.kind === "payroll") return <PayrollExportPage cid={cid} companyName={companyName} canWrite={canWrite} />;
   const date = isDate(sp.date) ? sp.date : today();
   const place = sp.place ?? "";
   const { rows } = await vatPlan(cid, date);
@@ -377,7 +394,10 @@ async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp:
                 <td>
                   {r.mode === "same" ? <span className="badge posted"><CircleCheck size={11} /> egyezik</span> : (
                     <>
-                      <a className="btn" href={`/c/${cid}/filings/vat/${r.period}/xml?${new URLSearchParams({ date, ...(place ? { place } : {}) })}`}><FileDown size={13} /> {r.mode === "original" ? "Eredeti XML" : "Önellenőrzés XML"}</a>
+                      <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+                        <a className="btn" href={`/c/${cid}/filings/vat/${r.period}/xml?${new URLSearchParams({ date, ...(place ? { place } : {}) })}`}><FileDown size={13} /> {r.mode === "original" ? "Eredeti XML" : "Önellenőrzés XML"}</a>
+                        {canWrite && <SubmittedButton cid={cid} kind="vat" period={r.period} date={date} place={place || undefined} />}
+                      </span>
                       <details style={{ marginTop: 4 }}>
                         <summary className="muted" style={{ fontSize: 12 }}>{r.diffRows.length} eltérő sor{r.computed.partners.length ? ` · ${r.computed.partners.length} M-lap` : ""}</summary>
                         <table style={{ fontSize: 12 }}>
