@@ -41,7 +41,8 @@ Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Air
 
 ## v3.7.4 – ÁNYK import: dinamikus lapok
 
-- Az ÁNYK-ba importálható XML-ben a dinamikus lapok (pl. M-lapok) mezőkódjában az `XXXX` helyére a lap sorszáma kerül (`0001`, `0002`…) – eddig az ÁNYK „Érvénytelen mezőkód” hibával elutasította.
+- Az ÁNYK-ba importálható XML-ben a mezőkód „n_” előtag nélkül szerepel, a dinamikus lapok (pl. M-lapok számlasorai) kódjában pedig az `XXXX` helyére a lap sorszáma kerül (`0B0001…`, `0B0002…`). Eddig az ÁNYK „Érvénytelen mezőkód”, majd „A sablon nem tartalmazza” hibával nem töltötte be.
+- Az M-lap alnyomtatványok `albizonylatazonositas` blokkot kapnak (partner adószáma és neve).
 - Az alapbevallásból a dinamikus lapokat nem másoljuk át (az M-lapokat újra előállítjuk).
 
 ## v3.7.3 – Fülnevek
