@@ -1031,3 +1031,8 @@ tbody tr.att-row:hover td { background: var(--surface-2); }
 .km-rank table { width: 100%; }
 .km-rank .pos { color: var(--pos); font-weight: 600; } .km-rank .neg { color: var(--neg); font-weight: 600; }
 @media print { .km-lane { break-inside: avoid; } }
+
+/* v3.5.0 – kezdőlap: AutóMérleg-választó */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.lp-automerleg { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.lp-automerleg select { min-width: 0; height: 40px; }

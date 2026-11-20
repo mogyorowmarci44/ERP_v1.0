@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, count, eq, inArray, max, sql } from "drizzle-orm";
 import {
-  Inbox, FileOutput, FileInput, FilePlus2, BookPlus, ChartNoAxesCombined, Percent, Clock, CarFront, Files, PiggyBank, Library, Database, Cog, ChevronRight, Tag,
+  Inbox, FileOutput, FileInput, FilePlus2, BookPlus, ChartNoAxesCombined, Percent, Clock, CarFront, Files, PiggyBank, Library, Database, Cog, ChevronRight, Tag, Scale, Gauge,
 } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
@@ -89,16 +89,16 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   const [vatOpen, accDue] = await Promise.all([unclosedVatPeriods(cid), dueAccruals(cid)]);
   if (vatOpen.length) todos.push({ icon: <Percent />, text: `${vatOpen.length} lejárt ÁFA-időszak nincs lezárva (466 / 467 → 468)`, href: `${b}/reports/vat/closing?year=${vatOpen[0].to.slice(0, 4)}`, tag: "ÁFA-zárás", warn: true });
   if (accDue.length) todos.push({ icon: <Clock />, text: `${accDue.length} időbeli elhatárolás feloldásra vár · ${eFt(accDue.reduce((s, a) => s + a.amount, 0))}`, href: `${b}/closing/accruals`, tag: "Elhatárolás", warn: true });
-  if (stale.length) todos.push({ icon: <CarFront />, text: `${stale.length} gépkocsi több mint ${STALE_DAYS} napja készleten`, href: `${b}/vehicles`, tag: "Figyelj", warn: true });
+  if (stale.length) todos.push({ icon: <CarFront />, text: `${stale.length} gépkocsi több mint ${STALE_DAYS} napja készleten`, href: `${b}/vehicles/merleg`, tag: "Figyelj", warn: true });
   // az ÁFA-határidő csak akkor számít teendőnek, ha 5 napon belül van
   const open = todos.length - (vatDays <= 5 ? 0 : 1);
 
   const tiles: { title: string; icon: React.ReactNode; badge?: string; links: [string, string][] }[] = [
     { title: "Bizonylatok", icon: <Files />, badge: inbox.n ? `${inbox.n} új` : undefined, links: [["Beérkező bizonylatok", `${b}/inbox`], ["Vevőszámlák", `${b}/invoices?dir=out`], ["Szállítói számlák", `${b}/invoices?dir=in`], ["Vegyes / bank tétel", `${b}/journal/new`]] },
     { title: "Pénzügy", icon: <PiggyBank />, links: [["Pénztár és bank", `${b}/money`], ["Tagi kölcsön", `${b}/member-loans`], ["Bérszámfejtés", `${b}/payroll`]] },
-    { title: "Kimutatások", icon: <ChartNoAxesCombined />, links: [["KPI-Dashboard", `${b}/reports/kpi`], ["P&L, cash-flow, mérleg", `${b}/reports/statements`], ["ÁFA", `${b}/reports/vat`], ["EPR összesítő", `${b}/vehicles/epr`], ["Nyitott tételek", `${b}/reports/open-items`]] },
+    { title: "Kimutatások", icon: <ChartNoAxesCombined />, links: [["KPI-Dashboard", `${b}/reports/kpi`], ["P&L, cash-flow, mérleg", `${b}/reports/statements`], ["ÁFA", `${b}/reports/vat`], ["KészletMérleg", `${b}/vehicles/merleg`], ["EPR összesítő", `${b}/vehicles/epr`], ["Nyitott tételek", `${b}/reports/open-items`]] },
     { title: "Főkönyv", icon: <Library />, links: [["Napló", `${b}/journal`], ["Számlakarton", `${b}/reports/ledger`], ["Tárgyi eszközök", `${b}/assets`], ["Évzárás", `${b}/closing`]] },
-    { title: "Törzsadatok", icon: <Database />, badge: `${inStock.length} autó`, links: [["Gépkocsi készlet", `${b}/vehicles`], ["Partnerek", `${b}/partners`], ["Számlatükör", `${b}/accounts`], ["Árfolyamok (MNB)", `${b}/fx`]] },
+    { title: "Törzsadatok", icon: <Database />, badge: `${inStock.length} autó`, links: [["Gépkocsi készlet", `${b}/vehicles`], ["KészletMérleg", `${b}/vehicles/merleg`], ["Partnerek", `${b}/partners`], ["Számlatükör", `${b}/accounts`], ["Árfolyamok (MNB)", `${b}/fx`]] },
     { title: "Tervezés és rendszer", icon: <Cog />, links: [["Forecast", `${b}/forecast`], ["ÁrSugó", `${b}/arsugo`], ["Megjelenés", `${b}/appearance`], ["Beállítások", `${b}/settings`], ["Adatimport / export", `${b}/import`]] },
   ];
 
@@ -125,7 +125,18 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
           <Link className="btn" href={`${b}/invoices/new?dir=in`}><FileInput />Új szállítói számla</Link>
           <Link className="btn" href={`${b}/journal/new`}><BookPlus />Vegyes / bank tétel</Link>
           <Link className="btn" href={`${b}/vehicles`}><CarFront />Gépkocsi készlet</Link>
+          <Link className="btn" href={`${b}/vehicles/merleg`}><Scale />KészletMérleg</Link>
           <Link className="btn" href={`${b}/arsugo`}><Tag />ÁrSugó</Link>
+          {inStock.length > 0 && (
+            <form action={`${b}/vehicles/automerleg`} className="lp-automerleg">
+              <label className="sr-only" htmlFor="lp-am-car">Autó</label>
+              <select id="lp-am-car" name="vehicle" defaultValue="">
+                <option value="" disabled>Autó kiválasztása…</option>
+                {inStock.map((v) => <option key={v.id} value={v.id}>{v.make} {v.model}{v.plate ? ` (${v.plate})` : ""}</option>)}
+              </select>
+              <button className="btn"><Gauge />AutóMérleg</button>
+            </form>
+          )}
         </div>
       </div>
 

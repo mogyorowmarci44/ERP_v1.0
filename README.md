@@ -48,6 +48,7 @@ Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Air
 | Készlet fül (sávok) | Lekötött pénz, napi tartási költség, várható nettó fedezet összesen; három oszlop: **Beavatkozni** (az ár a nullszaldó alatt, vagy N napon belül eléri – N állítható, alap 20), **Cél alatt**, **Rendben**. Kártyánként napok, ár (Forecast-terv, ennek híján az ÁrSugó javasolt ára), mini ársáv, napok a nullszaldóig; a piros kártyákon ÁrSugó (előtöltve) és AutóMérleg gomb |
 | Eladott fül (dashboard) | Időszak (elmúlt 12 hónap, idei, tavalyi, egyéni) és csoportosítás (márka / modell, import / belföld, hónap). KPI-k: darab, bruttó és nettó fedezet, fedezet %, medián nettó fedezet, medián napi fedezet; **„Hová folyt el a fedezet?”** vízesés (Forecast-terv → költségeltérés → áreltérés → tény); pontdiagram (állásidő × nettó fedezet, mediánvonalakkal); legjobb / leggyengébb 5 napi fedezet szerint; teljes táblázat a tervtől való eltéréssel |
 | Export | Excel (Készlet és Eladott munkalap, Mogyorosi Holding fejléccel), PDF / nyomtatás |
+| Kezdőlap | KészletMérleg gomb és AutóMérleg-választó (készleten lévő autók) a gyorsgombok között; KészletMérleg link a Kimutatások és a Törzsadatok csempén; a „régóta készleten” teendő is ide visz |
 
 ## v3.4.1 – Elnevezés: bruttó és nettó fedezet
 
