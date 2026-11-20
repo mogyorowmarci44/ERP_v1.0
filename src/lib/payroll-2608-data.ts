@@ -10,7 +10,8 @@ import { filingsOverview } from "./filings";
 /** A sablon: a legkésőbbi időszakú (azon belül a beküldött, majd a legutóbb mentett) betöltött 2608. */
 export async function template2608(companyId: number) {
   const all = (await db.select().from(s.taxFilings).where(eq(s.taxFilings.companyId, companyId)).orderBy(desc(s.taxFilings.periodFrom)))
-    .filter((f) => isPayrollForm(f.form) && f.sheets.some((x) => /08M$/.test(x.id)));
+    // az ERP által előállított (és „Beküldve” gombbal eltárolt) XML nem minta: abban a dinamikus lapok már sorszámozva vannak
+    .filter((f) => isPayrollForm(f.form) && f.sheets.some((x) => /08M$/.test(x.id)) && !/_ERP\.xml$/i.test(f.fileName ?? ""));
   return all.sort((a, b) => b.periodFrom.localeCompare(a.periodFrom) || Number(b.submitted) - Number(a.submitted) || +(b.savedAt ?? 0) - +(a.savedAt ?? 0))[0] ?? null;
 }
 

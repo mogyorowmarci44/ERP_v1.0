@@ -39,6 +39,11 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.8.2 – „Beküldve” gomb az ÁNYK Exportban
+
+- Az ÁNYK Export minden hónapjánál (ÁFA és járulék) „Beküldve” gomb: ha a hónapnak van betöltött változata, a legutolsót jelöli beküldöttnek; ha nincs (vagy ÁFA-önellenőrzés), az ERP által előállított XML-t eltárolja változatként (`…_ERP.xml`), és azt jelöli. Fájlt betölteni nem kell hozzá.
+- A 2608 minta nem lehet ERP által előállított XML.
+
 ## v3.8.1 – ÁNYK Export szűrő: ÁFA / Járulék
 
 - Az ÁNYK Export fülön szűrő: „ÁFA-bevallás” vagy „Járulékbevallás” (a fül- és szűrőnevekben nincs nyomtatványszám). Mindkettő ugyanonnan tölthető le: hónaponként XML és egy közös ZIP-végpont (`/filings/export/zip?kind=vat|payroll`).
