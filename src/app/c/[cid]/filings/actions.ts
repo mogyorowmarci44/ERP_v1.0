@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireCompany } from "@/lib/auth";
 import { runOrRedirect, str } from "@/lib/action-utils";
-import { deleteFiling, importFilings, setSubmitted } from "@/lib/filings";
+import { deleteFiling, fillPartnerTaxFromFilings, importFilings, markLatestSubmitted, setSubmitted } from "@/lib/filings";
 import { KIND_LABEL } from "@/lib/anyk";
 
 const back = (cid: number, tab?: string) => `/c/${cid}/filings${tab ? `?tab=${tab}` : ""}`;
@@ -52,5 +52,25 @@ export async function deleteFilingAction(fd: FormData) {
     await deleteFiling(cid, id);
     revalidatePath(`/c/${cid}/filings`);
     return ok(back(cid, tab), "Változat törölve.");
+  });
+}
+
+export async function markLatestAction(fd: FormData) {
+  const cid = Number(fd.get("cid")), tab = str(fd, "tab");
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(back(cid, tab), async () => {
+    const n = await markLatestSubmitted(cid, tab === "payroll" ? "payroll" : "vat");
+    revalidatePath(`/c/${cid}/filings`);
+    return ok(back(cid, tab), `${n} időszakban a legutolsó mentett változat jelölve beküldöttként.`);
+  });
+}
+
+export async function fillPartnerTaxAction(fd: FormData) {
+  const cid = Number(fd.get("cid")), tab = str(fd, "tab");
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(back(cid, tab), async () => {
+    const r = await fillPartnerTaxFromFilings(cid);
+    revalidatePath(`/c/${cid}`, "layout");
+    return ok(back(cid, tab), r.updated.length ? `${r.updated.length} partner adószáma pótolva az M-lapokról: ${r.updated.slice(0, 12).join("; ")}${r.updated.length > 12 ? " …" : ""}` : `Nem volt pótolható partner (az M-lapokon ${r.known} partner szerepel).`);
   });
 }

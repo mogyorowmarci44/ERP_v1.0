@@ -143,3 +143,49 @@ export async function filingsOverview(companyId: number) {
   }
   return { vat, chain, payroll, payrollMonths, count: filings.length };
 }
+
+/** Minden időszakban a legutolsó mentett változat a beküldött (a korábbi jelölések törlésével). */
+export async function markLatestSubmitted(companyId: number, type: "vat" | "payroll") {
+  const all = (await db.select().from(s.taxFilings).where(eq(s.taxFilings.companyId, companyId)))
+    .filter((f) => (type === "vat" ? isVatForm(f.form) : isPayrollForm(f.form)));
+  const byPeriod = new Map<string, Filing[]>();
+  for (const f of all) byPeriod.set(periodOf(f.periodFrom), [...(byPeriod.get(periodOf(f.periodFrom)) ?? []), f]);
+  let n = 0;
+  for (const list of byPeriod.values()) {
+    const latest = [...list].sort((a, b) => +(a.savedAt ?? 0) - +(b.savedAt ?? 0)).at(-1)!;
+    for (const f of list) {
+      const on = f.id === latest.id;
+      if (f.submitted !== on) await db.update(s.taxFilings).set({ submitted: on }).where(eq(s.taxFilings.id, f.id));
+    }
+    n++;
+  }
+  return n;
+}
+
+const normName = (x: string) => x.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\b(kft|zrt|bt|nyrt|kkt|ev|e\.v|korlatolt felelossegu tarsasag|zartkoruen mukodo reszvenytarsasag|beteti tarsasag)\b\.?/g, "").replace(/[^a-z0-9]/g, "");
+
+/**
+ * Partner-adószámok átvétele a beolvasott ÁFA-bevallások M-lapjairól (partner törzsszáma + neve), azoknál a partnereknél,
+ * akiknek még nincs adószáma. A név normalizálva (ékezet, cégforma, írásjelek nélkül) egyezzen. Csak a törzsszámot
+ * (8 jegy) ismerjük – a partnerhez „12345678” alakban kerül, a teljes adószám később pótolható.
+ */
+export async function fillPartnerTaxFromFilings(companyId: number) {
+  const filings = (await db.select().from(s.taxFilings).where(eq(s.taxFilings.companyId, companyId))).filter((f) => isVatForm(f.form));
+  const found = new Map<string, { tax8: string; name: string }>();
+  for (const f of filings) for (const sh of f.sheets) {
+    if (!sh.id.endsWith("M")) continue;
+    const tax8 = (sh.fields["0_0A0001C005A"] ?? "").replace(/\D/g, "");
+    const name = sh.fields["0_0A0001C006A"] || sh.fields["0_0BXXXXB005A"] || "";
+    if (tax8.length === 8 && name) found.set(normName(name), { tax8, name });
+  }
+  const partners = await db.select().from(s.partners).where(eq(s.partners.companyId, companyId));
+  const updated: string[] = [];
+  for (const p of partners) {
+    if (p.taxNumber) continue;
+    const hit = found.get(normName(p.name));
+    if (!hit) continue;
+    await db.update(s.partners).set({ taxNumber: hit.tax8 }).where(eq(s.partners.id, p.id));
+    updated.push(`${p.name} → ${hit.tax8}`);
+  }
+  return { updated, known: found.size };
+}
