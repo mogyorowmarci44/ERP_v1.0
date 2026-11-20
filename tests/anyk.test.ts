@@ -76,8 +76,9 @@ describe("ÁNYK XML előállítás", () => {
     const back = parseAnyk(xml);
     expect(back.form).toBe("2665");
     // az import-XML-ben a dinamikus lap XXXX helyett lapsorszámot kap
-    expect(back.sheets).toEqual(f.sheets.map((sh) => ({ ...sh, fields: Object.fromEntries(Object.entries(sh.fields).map(([k, v]) => [importEazon(k), v])) })));
+    expect(back.sheets).toEqual(f.sheets.map((sh) => ({ ...sh, fields: Object.fromEntries(Object.entries(sh.fields).map(([k, v]) => [importEazon(k).replace(/^(?=0[A-Z])/, "0_"), v])) })));
     expect(xml).not.toContain("XXXX");
+    expect(xml).not.toMatch(/eazon="\d+_0[A-Z]/);
     expect(back.from).toBe("2026-09-01");
   });
   it("üres mezők kimaradnak", () => {
@@ -129,9 +130,25 @@ describe("időszakok és határidők", () => {
 describe("importEazon", () => {
   it("dinamikus lap XXXX → lapsorszám", async () => {
     const { importEazon } = await import("@/lib/anyk");
-    expect(importEazon("0_0BXXXXC0001AA")).toBe("0_0B0001C0001AA");
-    expect(importEazon("2_0BXXXXC0037CA")).toBe("0_0B0003C0037CA");
-    expect(importEazon("0_0HXXXXB001A")).toBe("0_0H0001B001A");
-    expect(importEazon("0_0A0001C001A")).toBe("0_0A0001C001A");
+    expect(importEazon("0_0BXXXXC0001AA")).toBe("0B0001C0001AA");
+    expect(importEazon("2_0BXXXXC0037CA")).toBe("0B0003C0037CA");
+    expect(importEazon("0_0HXXXXB001A")).toBe("0H0001B001A");
+    expect(importEazon("0_0A0001C001A")).toBe("0A0001C001A");
+    expect(importEazon("0_26358")).toBe("0_26358");
+  });
+});
+
+describe("M-lap alnyomtatvány", () => {
+  it("albizonylatazonositas a partnerrel", () => {
+    const xml = buildAnykXml({ taxNumber: "12345678242", taxpayerName: "X", from: "2026-10-01", to: "2026-10-31", sheets: [
+      { id: "2665A", fields: { "0_0A0001C001A": "12345678242" } },
+      { id: "2665M", fields: { "0_0A0001C005A": "12229132", "0_0A0001C006A": "Bárdi Autó Zrt.", "0_0BXXXXC0001AA": "SZ-1", "1_0BXXXXC0001AA": "SZ-2" } },
+    ] });
+    expect(xml).toContain("<azonosito>12229132</azonosito>");
+    expect(xml).toContain("<megnevezes>Bárdi Autó Zrt.</megnevezes>");
+    expect(xml.match(/<albizonylatazonositas>/g)).toHaveLength(1);
+    expect(xml).toContain('<mezo eazon="0B0001C0001AA">SZ-1</mezo>');
+    expect(xml).toContain('<mezo eazon="0B0002C0001AA">SZ-2</mezo>');
+    expect(xml.indexOf("</albizonylatazonositas>")).toBeLessThan(xml.lastIndexOf("<idoszak>"));
   });
 });
