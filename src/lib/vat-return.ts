@@ -327,7 +327,8 @@ function mSheet(o: BuildOpts, p: MPartner, tax11: string): AnykSheet {
   f["0_0A0001E0004BA"] = String(p.invoices.length);
   f["0_0A0001E0004CA"] = String(K(tb));
   f["0_0A0001E0004DA"] = String(K(tv));
-  if (o.form === "2665") f["0_0A0001E0004GA"] = String(K(p.invoices.reduce((a, i) => a + i.deducted, 0)));
+  // 2665: levonásba helyezett adó (f3 → g oszlop) a 04. és az összesen (07.) sorban is
+  if (o.form === "2665") f["0_0A0001E0004GA"] = f["0_0A0001E0007GA"] = String(K(p.invoices.reduce((a, i) => a + i.deducted, 0)));
   f["0_0A0001E0007BA"] = String(p.invoices.length);
   f["0_0A0001E0007CA"] = String(K(tb));
   f["0_0A0001E0007DA"] = String(K(tv));
