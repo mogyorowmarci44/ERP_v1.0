@@ -18,6 +18,7 @@ export default async function MarginCardPage({ params }: { params: Promise<{ cid
         <h1>Különbözeti ÁFA karton</h1>
         <div className="row">
           <Link className="btn" href={`/c/${cid}/vehicles?all=1`}>← Gépkocsik</Link>
+          <Link className="btn" href={`/c/${cid}/vehicles/${p.id}/merleg`}>AutóMérleg</Link>
           <PrintButton />
         </div>
       </div>

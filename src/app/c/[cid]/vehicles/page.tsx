@@ -78,7 +78,7 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
         <tbody>
           {show.map((v) => (
             <tr key={v.id}>
-              <td>{v.make} {v.model} {v.year ?? ""}</td>
+              <td><Link href={`/c/${cid}/vehicles/${v.id}/merleg`} title="AutóMérleg">{v.make} {v.model} {v.year ?? ""}</Link></td>
               <td className="mono">{v.plate || <span className="muted" title="Nincs rendszám – az alvázszám az azonosító">(alvázszám)</span>}</td>
               <td className="mono">{v.vin}</td>
               <td>{v.vatTreatment === "margin" ? "különbözeti" : "normál"}</td>
@@ -92,6 +92,7 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
               <td className="num">{v.status === "sold" ? fmtHuf(v.revenue - v.totalCost) : ""}</td>
               <td className="nowrap">
                 <Link href={`/c/${cid}/vehicles?edit=${v.id}`}>szerk.</Link>
+                {" · "}<Link href={`/c/${cid}/vehicles/${v.id}/merleg`}>AutóMérleg</Link>
                 {v.vatTreatment === "margin" && <> · <Link href={`/c/${cid}/vehicles/${v.id}/karton`}>karton</Link></>}
                 {" · "}<Link href={`/c/${cid}/vehicles/${v.id}/epr`} title={v.eprCategory ? undefined : "EPR adatok hiányoznak"}>EPR{v.eprCategory && v.eprMassKg ? "" : " ⚠"}</Link>
               </td>
