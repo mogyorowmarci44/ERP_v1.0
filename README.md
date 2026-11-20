@@ -46,7 +46,7 @@ AutóMérleg › Tartási költség › **Javaslat a könyvelésből** (az elmú
 | Érték | Számítás |
 |---|---|
 | Fix napi költség (Ft/nap/autó) | 522 bérleti díjak + 524 hirdetés, reklám + 533 biztosítás (az autóhoz rendelt tételek nélkül) ÷ (átlagos készlet darabszám × napok) |
-| Lekötött pénz (%/év) | Pénz költsége: 872 kamatok évesítve ÷ átlagosan lekötött készletérték, de legalább 6,5% (alternatív hozam, jegybanki alapkamat közelítés) + árvesztés: a Forecast-tervvel eladott autók tervezett ártól való elmaradásának napi üteme évesítve (medián; 3 autó alatt 3% ráhagyás) |
+| Lekötött pénz (%/év) | Pénz költsége: 872 kamatok évesítve ÷ átlagosan lekötött készletérték, de legalább 5,5% (alternatív hozam: a jegybanki alapkamat, 2026. november) + árvesztés: a Forecast-tervvel eladott autók tervezett ártól való elmaradásának napi üteme évesítve (medián; 3 autó alatt 3% ráhagyás) |
 
 A „Javaslat átvétele” beírja a két mezőbe, a „Mentés a cég alapértékeként” menti.
 

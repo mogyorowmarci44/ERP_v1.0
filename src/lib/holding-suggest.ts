@@ -15,8 +15,8 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companyKpis } from "./kpi";
 
-/** A pénz alternatív hozama – a jegybanki alapkamat közelítése (legutóbb ellenőrizve: 6,50%, 2025. december). */
-export const OPPORTUNITY_PCT = 6.5;
+/** A pénz alternatív hozama – a jegybanki alapkamat (2026. november: 5,50%). */
+export const OPPORTUNITY_PCT = 5.5;
 export const SLIP_DEFAULT_PCT = 3;
 const FIXED_ACCOUNTS = [
   { code: "522", label: "Bérleti díjak (telephely)" },
