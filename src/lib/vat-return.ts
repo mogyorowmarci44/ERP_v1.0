@@ -29,7 +29,8 @@ export type RowKey = "05" | "06" | "07" | "09" | "12" | "13" | "14" | "36" | "50
 export type Cell = { b: number | null; c: number | null };
 export type Rows = Partial<Record<RowKey, Cell>>;
 
-export type MInvoice = { number: string; date: string; base: number; vat: number };
+/** M-lap számla: base / vat = a számla teljes (áfás) adóalapja és áthárított áfája; deducted = ebből ténylegesen levont áfa (f3). */
+export type MInvoice = { number: string; date: string; base: number; vat: number; deducted: number };
 export type MPartner = { tax8: string; name: string; invoices: MInvoice[] };
 
 export type Computed = {
@@ -59,6 +60,15 @@ export function computeVatReturn(lines: VatLine[], prevCarryK: number): Computed
   const byPartner = new Map<string, MPartner>();
   const noTax = new Set<string>();
   let marginB = 0, marginC = 0, normalOut = 0, deductible = 0, kbb = 0;
+  // A számla teljes áfás összege (levonható + nem levonható sorok) – az M-lapra a számlán áthárított teljes áfa kerül
+  const full = new Map<string, { base: number; vat: number }>();
+  for (const l of lines) {
+    if (l.direction !== "in" || (l.kind !== "normal" && l.kind !== "non_deductible") || !l.rate) continue;
+    const k = `${l.partnerName}\u0000${l.invoiceNumber}`;
+    const x = full.get(k) ?? { base: 0, vat: 0 };
+    x.base = r2(x.base + l.net); x.vat = r2(x.vat + l.vat);
+    full.set(k, x);
+  }
 
   for (const l of lines) {
     if (l.direction === "out") {
@@ -87,8 +97,11 @@ export function computeVatReturn(lines: VatLine[], prevCarryK: number): Computed
       if (tax8.length !== 8) { noTax.add(`${l.partnerName} (${l.invoiceNumber})`); continue; }
       const p = byPartner.get(tax8) ?? { tax8, name: l.partnerName, invoices: [] };
       const inv = p.invoices.find((i) => i.number === l.invoiceNumber);
-      if (inv) { inv.base = r2(inv.base + l.net); inv.vat = r2(inv.vat + l.vat); }
-      else p.invoices.push({ number: l.invoiceNumber, date: l.fulfillmentDate, base: r2(l.net), vat: r2(l.vat) });
+      if (inv) inv.deducted = r2(inv.deducted + l.vat);
+      else {
+        const t = full.get(`${l.partnerName}\u0000${l.invoiceNumber}`) ?? { base: l.net, vat: l.vat };
+        p.invoices.push({ number: l.invoiceNumber, date: l.fulfillmentDate, base: t.base, vat: t.vat, deducted: r2(l.vat) });
+      }
       byPartner.set(tax8, p);
       continue;
     }
@@ -298,6 +311,7 @@ function mSheet(o: BuildOpts, p: MPartner, tax11: string): AnykSheet {
   f["0_0A0001E0004BA"] = String(p.invoices.length);
   f["0_0A0001E0004CA"] = String(K(tb));
   f["0_0A0001E0004DA"] = String(K(tv));
+  if (o.form === "2665") f["0_0A0001E0004GA"] = String(K(p.invoices.reduce((a, i) => a + i.deducted, 0)));
   f["0_0A0001E0007BA"] = String(p.invoices.length);
   f["0_0A0001E0007CA"] = String(K(tb));
   f["0_0A0001E0007DA"] = String(K(tv));
@@ -314,10 +328,12 @@ function mSheet(o: BuildOpts, p: MPartner, tax11: string): AnykSheet {
       f[`${r}BA`] = d8(inv.date);
       f[`${r}CA`] = String(Math.round(inv.base));
       f[`${r}DA`] = String(Math.round(inv.vat));
+      if (o.form === "2665") f[`${r}HA`] = String(Math.round(inv.deducted));
     });
     if (pg === pages - 1) {
       f[`${pre}C0037CA`] = String(Math.round(tb));
       f[`${pre}C0037DA`] = String(Math.round(tv));
+      if (o.form === "2665") f[`${pre}C0037HA`] = String(Math.round(p.invoices.reduce((a, i) => a + i.deducted, 0)));
     }
   }
   return { id: `${o.form}M`, version: null, fields: f };

@@ -53,7 +53,7 @@ describe("bevallás sorai az ERP-ből", () => {
   it("M-lap partnerenként, számlánként forintban; 105. sor összesítő", () => {
     expect(Object.fromEntries(c.partners.map((p) => [p.tax8, p.invoices.length]))).toEqual({ "12229132": 2, "11111111": 1 });
     const b = c.partners.find((p) => p.tax8 === "12229132")!;
-    expect(b.invoices[0]).toEqual({ number: "6TM6-015690", date: "2026-09-10", base: 68067, vat: 18378 });
+    expect(b.invoices[0]).toEqual({ number: "6TM6-015690", date: "2026-09-10", base: 68067, vat: 18378, deducted: 18378 });
     expect(c.rows["105"]).toMatchObject({ b: 2, c: 3 });
   });
   it("adószám nélküli levonható számla → figyelmeztetés", () => {
@@ -134,5 +134,21 @@ describe("ÁNYK-lapok", () => {
     expect(f["0_0A0001F021A"]).toBe("2");
     const back = parseAnyk(buildAnykXml({ taxNumber: "32811902207", taxpayerName: "Teszt Kft.", from: "2026-09-01", to: "2026-09-30", sheets }));
     expect(back.sheets.map((s) => s.id)).toEqual(["2665A", "2665M", "2665M"]);
+  });
+});
+
+describe("részben levonható számla az M-lapon", () => {
+  it("a számla teljes áfája megy az M-lapra, a levont rész az f3 oszlopba", () => {
+    const c = computeVatReturn([
+      L({ net: 25179, vat: 6798, invoiceNumber: "SZF000371/2026", partnerName: "Filep István E.V", partnerTax: "46178718" }),
+      L({ kind: "non_deductible", net: 25179, vat: 6799, invoiceNumber: "SZF000371/2026", partnerName: "Filep István E.V", partnerTax: "46178718" }),
+    ], 0);
+    expect(c.partners[0].invoices[0]).toEqual({ number: "SZF000371/2026", date: "2026-09-10", base: 50358, vat: 13597, deducted: 6798 });
+    expect(c.rows["66"]).toEqual({ b: 25, c: 7 });
+    const sh = buildVatSheets({ form: "2665", from: "2026-10-01", to: "2026-10-31", taxNumber: "32811902207", taxpayerName: "X", baseFields: null, computed: c, selfRevision: null, signDate: "2026-11-20" });
+    const m = sh[1].fields;
+    expect(m["0_0BXXXXC0001DA"]).toBe("13597");
+    expect(m["0_0BXXXXC0001HA"]).toBe("6798");
+    expect(m["0_0A0001E0004GA"]).toBe("7");
   });
 });

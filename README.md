@@ -39,13 +39,21 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.7.3 – Fülnevek
+
+NAV-bevallások: „ÁFA (2565 / 2665)” → **ÁFA-bevallás**, „ÁFA az ERP-ből (önellenőrzés)” → **ÁNYK Export**.
+
+## v3.7.2 – M-lap: a számla teljes áfája
+
+Részben levonható számlánál (levonható + nem levonható sor ugyanazon a számlán) az M-lapra a számla teljes adóalapja és áthárított áfája kerül, a ténylegesen levont rész a 27%-os „f3” oszlopba (2665), összesítve a főlap „e3” oszlopába – a NAV útmutatója szerint.
+
 ## v3.7.1 – M-lap ellenőrzés
 
 NAV-bevallások › **M-lap ellenőrzés**: a beadott M-lapok számlái az ERP könyvelésével összevetve – (1) levonható áfa adószám nélküli partnertől, (2) számlaszám-eltérés (írásmód, ill. partner + összeg alapján párosítva, link a számlára), (3) korábban levonva, az ERP-ben nem levonható / TAH, (4) a beadott M-lapon szerepel, az ERP-ben nincs meg.
 
 ## v3.7.0 – ÁFA-bevallás és önellenőrzés az ERP-ből (2565 / 2665)
 
-NAV-bevallások › **ÁFA az ERP-ből (önellenőrzés)**. A NAV kitöltési útmutatója és mezőazonosító-táblázata alapján.
+NAV-bevallások › **ÁNYK Export** (korábban „ÁFA az ERP-ből”). A NAV kitöltési útmutatója és mezőazonosító-táblázata alapján.
 
 | Terület | Funkció |
 |---|---|
