@@ -175,7 +175,7 @@ export default async function FilingsPage({ params, searchParams }: { params: Pr
       )}
       <p className="muted" style={{ marginTop: 10 }}>
         „Beküldött” = ez a változat ment be a NAV-hoz (az ÁNYK elküldött KR-állományai vagy a NAV érkeztetési igazolása alapján). Időszakonként a legutolsó
-        beküldött változat a mérvadó – ehhez képest számol az önellenőrzés. Az XML az ÁNYK-ban az Adatok › Import menüvel tölthető be.
+        beküldött változat a mérvadó – ehhez képest számol az önellenőrzés. Az XML az ÁNYK-ban a Szerviz › Egyedi importálás menüvel tölthető be, beküldésre az Adatok › XML állomány ellenőrzése és átadása elektronikus beküldésre (Ctrl+D) jelöli meg.
       </p>
     </>
   );
@@ -256,7 +256,7 @@ async function RevisePage({ cid, sp, companyName, canWrite }: { cid: number; sp:
       </div>
 
       <p className="muted no-print" style={{ margin: "0 0 8px" }}>
-        A letöltött XML-t az ÁNYK-ban az Adatok › Import menüvel töltsd be, mentsd el, majd Ellenőrzés. A „Számított mezők újraszámítása” nem kell.
+        Beküldés: ÁNYK › Adatok › XML állomány ellenőrzése és átadása elektronikus beküldésre (Ctrl+D), majd a szokásos közvetlen beküldés. Szerkesztéshez: Szerviz › Egyedi importálás. A „Számított mezők újraszámítása” nem kell.
       </p>
       <form className="row card no-print" style={{ marginBottom: 12, alignItems: "flex-end" }}>
         <input type="hidden" name="tab" value="revise" />
