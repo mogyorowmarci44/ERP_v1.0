@@ -39,6 +39,17 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.5.1 – Tartási költség javaslat a könyvelésből
+
+AutóMérleg › Tartási költség › **Javaslat a könyvelésből** (az elmúlt 12 hónap, ill. a működés kezdete óta):
+
+| Érték | Számítás |
+|---|---|
+| Fix napi költség (Ft/nap/autó) | 522 bérleti díjak + 524 hirdetés, reklám + 533 biztosítás (az autóhoz rendelt tételek nélkül) ÷ (átlagos készlet darabszám × napok) |
+| Lekötött pénz (%/év) | Pénz költsége: 872 kamatok évesítve ÷ átlagosan lekötött készletérték, de legalább 6,5% (alternatív hozam, jegybanki alapkamat közelítés) + árvesztés: a Forecast-tervvel eladott autók tervezett ártól való elmaradásának napi üteme évesítve (medián; 3 autó alatt 3% ráhagyás) |
+
+A „Javaslat átvétele” beírja a két mezőbe, a „Mentés a cég alapértékeként” menti.
+
 ## v3.5.0 – KészletMérleg: az összes AutóMérleg egy helyen
 
 Új oldal: Járművek › **KészletMérleg** (menü, illetve gomb a Gépkocsi készletnél). Ugyanazzal a számolóval fut végig minden autón, mint az AutóMérleg, így a számok egyeznek az autók lapjával.

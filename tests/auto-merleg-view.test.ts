@@ -13,6 +13,14 @@ const input: MerlegInput = {
 const meta = { vehicleId: 7, title: "Suzuki Swift", year: 2019, plate: "ABC-123", vin: "TSMX", status: "in_stock", seller: "Kiss Péter", vatTreatment: "margin" as const, purchaseDate: "2026-09-02", saleDate: null, buyer: null, hasMarginCard: true, eprNote: null, checks: [], origin: null };
 
 describe("AutóMérleg nézet", () => {
+  it("tartási költség javaslat a könyvelésből", () => {
+    const suggestion = { from: "2025-11-20", to: "2026-11-20", days: 366, avgStock: 8, parts: [{ code: "522", label: "Bérleti díjak (telephely)", amount: 2_400_000 }, { code: "524", label: "Hirdetés, reklám", amount: 600_000 }, { code: "533", label: "Biztosítási díjak", amount: 300_000 }],
+      fixedTotal: 3_300_000, fixPerDay: 1130, interest: 0, avgCapital: 25_000_000, financingPct: null, opportunityPct: 6.5, moneyPct: 6.5, slipPct: 3, slipCars: 1, slipFromData: false, ratePct: 9.5 };
+    const h = renderToStaticMarkup(createElement(AutoMerlegView, { input, meta, cid: 1, canWrite: true, saveHolding: async () => {}, suggestion }));
+    expect(h).toContain("Javaslat a könyvelésből");
+    expect(h).toContain("9,5 %/év");
+    expect(h).toContain("Javaslat átvétele");
+  });
   it("készleten és eladva is renderelődik", () => {
     const a = renderToStaticMarkup(createElement(AutoMerlegView, { input, meta, cid: 1, canWrite: true, saveHolding: async () => {} }));
     expect(a).toContain("Várható nettó fedezet");
