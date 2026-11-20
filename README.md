@@ -39,6 +39,20 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.7.0 – ÁFA-bevallás és önellenőrzés az ERP-ből (2565 / 2665)
+
+NAV-bevallások › **ÁFA az ERP-ből (önellenőrzés)**. A NAV kitöltési útmutatója és mezőazonosító-táblázata alapján.
+
+| Terület | Funkció |
+|---|---|
+| Sorok a könyvelésből | Különbözeti adózás (használt cikk) a **09. sorba**, kiemelve az **50. sorban** (adóalap = bruttó eladási ár − beszerzési ár, adó nélkül; negatív árrés 0); 27/18/5% értékesítés 05–07.; levonható 64–66.; Közösségen belüli beszerzés 12–14. és 69.; 36., 76., 82–86. sor; ezer forintra kerekítve |
+| M-lapok | Partnerenként (törzsszám) a levonásba helyezett számlák forintban, lapnként 36 sor; 105./108. sor összesítő; adószám nélküli partnernél figyelmeztetés. „Partner-adószámok az M-lapokról”: a beadott bevallások M-lapjairól pótolja a hiányzó adószámokat (név szerint) |
+| Lánc | Időrendben: az előző hónap (helyes) 86. sora a következő 82. sorába |
+| Önellenőrzés | A mérvadó beadott változathoz képest: jelleg O, 82–86. sor b = beadott, c = helyes; 04. lap: pótlékalap (útmutató szerinti esetek, göngyölítésnél 05-ös ok), pótlék, kötelezettség növekedés / csökkenés, ismételt önellenőrzésnél X; fejadatok (ügyintéző, bankszámla, gyakoriság) a beadott bevallásból |
+| Önellenőrzési pótlék | Naponta a jegybanki alapkamat 365-öd része (ismételtnél ×1,5), a határidőt követő naptól a benyújtás napjáig, a kamatváltozások szerint szakaszolva |
+| Letöltés | Időszakonként XML (önellenőrzés, vagy eredeti, ha még nincs beadva), illetve egy ZIP időrendben + összesítő CSV |
+| Jelölés | „Mindenhol a legutolsó ment be” – egy gombbal |
+
 ## v3.6.0 – NAV-bevallások (ÁNYK): nyilvántartás, határidők, átviteli lánc
 
 Új oldal: Pénzügy › **NAV-bevallások (ÁNYK)**.
