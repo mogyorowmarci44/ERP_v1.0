@@ -977,3 +977,62 @@ tbody tr.att-row:hover td { background: var(--surface-2); }
 .am-foot { text-align: center; font-size: 12px; }
 @media (max-width: 640px) { .am-band-card { padding-left: 24px; padding-right: 24px; } .am-wrow { grid-template-columns: 110px minmax(0, 1fr) 100px; } }
 @media print { .am .card { break-inside: avoid; } .am-hold-form button { display: none; } }
+
+/* ---------- KészletMérleg (v3.5.0) ---------- */
+.km .segmented a { text-decoration: none; }
+.km-status-count { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 18px; font-weight: 600; margin-top: 4px; }
+.km-status-count .r { color: color-mix(in srgb, var(--neg) 55%, #ffffff); }
+.km-status-count .y { color: #f2cf5b; }
+.km-status-count .g { color: color-mix(in srgb, var(--pos) 45%, #ffffff); }
+.km-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.km-lane { border-radius: var(--r-lg, 14px); padding: 12px; display: grid; gap: 10px; }
+.km-lane.red { background: color-mix(in srgb, var(--neg) 12%, var(--surface)); }
+.km-lane.yellow { background: color-mix(in srgb, #e3b008 16%, var(--surface)); }
+.km-lane.green { background: color-mix(in srgb, var(--pos) 13%, var(--surface)); }
+.km-lane > header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 2px 4px; font-size: 12px; color: var(--muted); }
+.km-lane > header b { font-size: 14px; color: var(--ink); }
+.km-lane.red > header b { color: var(--neg); } .km-lane.green > header b { color: var(--pos); }
+.km-card { background: var(--surface); border-radius: var(--r-md); padding: 12px 14px; display: grid; gap: 8px; box-shadow: 0 1px 2px rgba(23, 32, 43, 0.08); }
+.km-card-top { display: flex; justify-content: space-between; gap: 8px; }
+.km-card-top a { color: var(--ink); }
+.km-card-line { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.km-card-line.muted { font-size: 12px; }
+.km-card-line .pos { color: var(--pos); } .km-card-line .neg { color: var(--neg); } .km-card-line .warn { color: var(--warn); }
+.km-card-actions { display: flex; gap: 8px; }
+.km-card-actions .btn { flex: 1; justify-content: center; text-align: center; }
+.km-band { position: relative; height: 10px; border-radius: 999px; }
+.km-band i { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--pos); }
+.km-band span { position: absolute; top: -4px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: var(--surface); border: 3px solid var(--accent); box-sizing: border-box; }
+.km-empty { margin: 6px 4px; font-size: 13px; }
+.km-foot-form { align-items: center; gap: 8px; font-size: 12.5px; }
+.km-filters { align-items: flex-end; gap: 10px; }
+.km-filters label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.km-leak { flex: 1 1 420px; display: grid; gap: 10px; }
+.km-leak .neg { color: var(--neg); } .km-leak .pos { color: var(--pos); }
+.km-wf { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; height: 220px; border-bottom: 1px solid var(--line); }
+.km-wf > div { position: relative; }
+.km-wf-bar { position: absolute; left: 12%; right: 12%; border-radius: 4px 4px 0 0; }
+.km-wf-bar.plan { background: color-mix(in srgb, var(--accent) 35%, var(--surface)); }
+.km-wf-bar.actual { background: var(--pos); }
+.km-wf-bar.neg { background: color-mix(in srgb, var(--neg) 60%, var(--surface)); }
+.km-wf-bar.pos { background: color-mix(in srgb, var(--pos) 55%, var(--surface)); }
+.km-wf-labels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; text-align: center; font-size: 12.5px; }
+.km-wf-labels span { display: block; color: var(--muted); }
+.km-scatter { flex: 1 1 420px; display: grid; gap: 10px; }
+.km-plot { position: relative; height: 230px; margin: 0 8px 18px 8px; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.km-zero { position: absolute; left: 0; right: 0; border-top: 1px solid var(--muted); opacity: 0.5; }
+.km-med-x { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--line); }
+.km-med-y { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); }
+.km-dot { position: absolute; width: 14px; height: 14px; margin: 0 0 -7px -7px; border-radius: 50%; border: 2px solid var(--surface); }
+.km-dot.pos { background: var(--pos); } .km-dot.warn { background: var(--warn); } .km-dot.neg { background: var(--neg); }
+.km-ax { position: absolute; font-size: 11px; color: var(--muted); }
+.km-ax-y { left: 4px; top: 0; } .km-ax-x { right: 0; bottom: -18px; }
+.km-rank { flex: 1 1 420px; }
+.km-rank table { width: 100%; }
+.km-rank .pos { color: var(--pos); font-weight: 600; } .km-rank .neg { color: var(--neg); font-weight: 600; }
+@media print { .km-lane { break-inside: avoid; } }
+
+/* v3.5.0 – kezdőlap: AutóMérleg-választó */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.lp-automerleg { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.lp-automerleg select { min-width: 0; height: 40px; }

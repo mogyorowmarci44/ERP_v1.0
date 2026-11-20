@@ -23,6 +23,7 @@ import {
   HandCoins,
   TrendingUp,
   Tag,
+  Scale,
   Inbox,
   Landmark,
   NotebookTabs,
@@ -133,6 +134,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
 
           <div className="group">Törzsadatok</div>
           <NavLink href={`${b}/vehicles`} exact><CarFront />Gépkocsi készlet</NavLink>
+          <NavLink href={`${b}/vehicles/merleg`}><Scale />KészletMérleg</NavLink>
           <NavLink href={`${b}/partners`}><Users />Partnerek</NavLink>
           <NavLink href={`${b}/accounts`}><ListTree />Számlatükör</NavLink>
           <NavLink href={`${b}/fx`}><Coins />Árfolyamok (MNB)</NavLink>

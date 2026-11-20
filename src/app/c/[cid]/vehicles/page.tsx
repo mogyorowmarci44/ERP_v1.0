@@ -23,6 +23,7 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
       <div className="topbar">
         <h1>Gépkocsi készlet</h1>
         <div className="row">
+          <Link className="btn primary" href={`/c/${cid}/vehicles/merleg`}>KészletMérleg</Link>
           <Link className="btn" href={`/c/${cid}/arsugo`}>ÁrSugó</Link>
           <Link className="btn" href={`/c/${cid}/vehicles/kartonok`}>Különbözeti ÁFA kartonok (időszak)</Link>
           <Link className="btn" href={`/c/${cid}/vehicles/epr`}>EPR összesítő (negyedév)</Link>
