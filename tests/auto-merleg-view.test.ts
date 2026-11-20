@@ -10,7 +10,7 @@ const input: MerlegInput = {
   plan: { price: 3_699_000, date: "2026-10-15", costs: [{ label: "Fényezés", date: null, amount: 200_000 }] },
   holding: { ratePct: 8, fixPerDay: 250 }, target: 300_000, peers: { label: "Suzuki Swift", count: 5, medF2: 260_000, medDays: 41 },
 };
-const meta = { vehicleId: 7, title: "Suzuki Swift", year: 2019, plate: "ABC-123", vin: "TSMX", status: "in_stock", seller: "Kiss Péter", vatTreatment: "margin" as const, purchaseDate: "2026-09-02", saleDate: null, buyer: null, hasMarginCard: true, eprNote: null, checks: [] };
+const meta = { vehicleId: 7, title: "Suzuki Swift", year: 2019, plate: "ABC-123", vin: "TSMX", status: "in_stock", seller: "Kiss Péter", vatTreatment: "margin" as const, purchaseDate: "2026-09-02", saleDate: null, buyer: null, hasMarginCard: true, eprNote: null, checks: [], origin: null };
 
 describe("AutóMérleg nézet", () => {
   it("készleten és eladva is renderelődik", () => {

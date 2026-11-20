@@ -268,6 +268,8 @@ export type CompanySettings = {
   /** v3.4.0 – AutóMérleg tartási költség: a lekötött pénz költsége (%/év) és a fix napi költség (Ft/nap). */
   holdingRatePct?: number | null;
   holdingFixPerDay?: number | null;
+  /** v3.5.0 – KészletMérleg: ennyi napon belül elért nullszaldó már „beavatkozni” (piros). */
+  merlegRedDays?: number | null;
   /** v3.3.3 – Az ERP előtti évek elhatárolt vesztesége (keletkezés éve, összeg). */
   openingLosses?: { year: string; amount: number }[] | null;
 };

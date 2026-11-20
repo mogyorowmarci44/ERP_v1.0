@@ -29,8 +29,10 @@ const groupKey = (make: string, model: string) => {
 };
 const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 
-/** Hasonló eladott autók: azonos márka + modell; ha 3-nál kevesebb, azonos márka; ha az is kevés, a cég összes eladott autója. */
-async function peersFor(companyId: number, vehicleId: number, make: string, model: string): Promise<MerlegInput["peers"]> {
+export type PeerCar = { id: number; group: string; make: string; f2: number; days: number | null };
+
+/** A cég összes eladott autója (nettó fedezet, állásidő) – a „hasonló autók” mediánjához, egyszer betöltve. */
+export async function soldPeerCars(companyId: number): Promise<PeerCar[]> {
   const rows = (await db.execute(sql`
     with sale as (
       select il.vehicle_id, max(i.fulfillment_date) d, sum(il.net_huf) net
@@ -43,8 +45,13 @@ async function peersFor(companyId: number, vehicleId: number, make: string, mode
       where jl.company_id = ${companyId} and jl.vehicle_id is not null group by jl.vehicle_id)
     select v.id, v.make, v.model, coalesce(v.purchase_date, g.first_in)::text pd, s.d::text sd, s.net::float8 net, coalesce(nullif(g.cogs, 0), g.cost_in, 0)::float8 cost
     from vehicles v join sale s on s.vehicle_id = v.id left join gl g on g.vehicle_id = v.id
-    where v.company_id = ${companyId} and v.status = 'sold' and v.id <> ${vehicleId}`)) as unknown as Array<{ id: number; make: string; model: string; pd: string | null; sd: string; net: number; cost: number }>;
-  const cars = rows.map((r) => ({ group: groupKey(r.make, r.model), make: r.make, f2: Number(r.net) - Number(r.cost), days: r.pd ? days(r.pd, r.sd) : null }));
+    where v.company_id = ${companyId} and v.status = 'sold'`)) as unknown as Array<{ id: number; make: string; model: string; pd: string | null; sd: string; net: number; cost: number }>;
+  return rows.map((r) => ({ id: Number(r.id), group: groupKey(r.make, r.model), make: r.make, f2: Number(r.net) - Number(r.cost), days: r.pd ? days(r.pd, r.sd) : null }));
+}
+
+/** Hasonló eladott autók: azonos márka + modell; ha 3-nál kevesebb, azonos márka; ha az is kevés, a cég összes eladott autója. */
+export function pickPeers(all: PeerCar[], vehicleId: number, make: string, model: string): MerlegInput["peers"] {
+  const cars = all.filter((c) => c.id !== vehicleId);
   const key = groupKey(make, model);
   let set = cars.filter((c) => c.group === key), label = key;
   if (set.length < 3) { set = cars.filter((c) => c.make === make); label = `${make} (minden modell)`; }
@@ -52,17 +59,33 @@ async function peersFor(companyId: number, vehicleId: number, make: string, mode
   return { label, count: set.length, medF2: median(set.map((c) => c.f2)), medDays: median(set.map((c) => c.days).filter((d): d is number => d != null)) };
 }
 
+/** Az egész cégre egyszer kiszámolt közös adatok (célfedezet, tartási költség, eladott autók). */
+export type MerlegContext = { today: string; target: number | null; holding: MerlegInput["holding"]; peers: PeerCar[] };
+export async function merlegContext(companyId: number): Promise<MerlegContext> {
+  const [k, peers, [company]] = await Promise.all([
+    companyKpis(companyId).catch(() => null), soldPeerCars(companyId),
+    db.select({ settings: schema.companies.settings }).from(schema.companies).where(eq(schema.companies.id, companyId)),
+  ]);
+  const s = company?.settings ?? {};
+  return {
+    today: today(), target: k?.margin.soldCount ? k.margin.medF2 : null, peers,
+    holding: { ratePct: s.holdingRatePct ?? HOLDING_DEFAULT.ratePct, fixPerDay: s.holdingFixPerDay ?? HOLDING_DEFAULT.fixPerDay },
+  };
+}
+
 export type MerlegMeta = {
   vehicleId: number; title: string; year: number | null; plate: string | null; vin: string | null; status: string;
   seller: string | null; vatTreatment: "margin" | "normal"; purchaseDate: string | null; saleDate: string | null; buyer: string | null;
   hasMarginCard: boolean; eprNote: string | null; checks: Array<{ ok: boolean; text: string }>;
+  /** EPR szerinti származás (import / belföld) – a KészletMérleg csoportosításához. */
+  origin: "import" | "domestic" | null;
 };
 
-export async function loadAutoMerleg(companyId: number, vehicleId: number): Promise<{ input: MerlegInput; meta: MerlegMeta } | null> {
-  const [card, epr] = await Promise.all([marginCard(companyId, vehicleId), eprCard(companyId, vehicleId)]);
+export async function loadAutoMerleg(companyId: number, vehicleId: number, ctx?: MerlegContext): Promise<{ input: MerlegInput; meta: MerlegMeta } | null> {
+  const [card, epr, c] = await Promise.all([marginCard(companyId, vehicleId), eprCard(companyId, vehicleId), ctx ?? merlegContext(companyId)]);
   if (!card) return null;
   const v = card.vehicle;
-  const t = today();
+  const t = c.today;
   const normal = v.vatTreatment === "normal";
 
   // költségek: a gépkocsihoz rendelt, nem különbözeti beszerzési sorok és a 261-re aktivált kézi tételek (nettó)
@@ -92,8 +115,6 @@ export async function loadAutoMerleg(companyId: number, vehicleId: number): Prom
   const [plan] = await db.select().from(forecastPlans).where(and(eq(forecastPlans.companyId, companyId), eq(forecastPlans.vehicleId, vehicleId)));
   const planCosts = plan ? await db.select().from(forecastPlanCosts).where(eq(forecastPlanCosts.planId, plan.id)) : [];
 
-  const [k, peers] = await Promise.all([companyKpis(companyId).catch(() => null), peersFor(companyId, vehicleId, v.make, v.model)]);
-  const s = card.company.settings;
   const sale = card.sale && card.sales.length ? { date: card.sales[card.sales.length - 1].date, gross: card.sale.gross, vat: card.sale.vatBooked } : null;
   const purchaseDate = v.purchaseDate ?? card.purchases[0]?.date ?? card.otherCosts[0]?.date ?? null;
 
@@ -102,14 +123,13 @@ export async function loadAutoMerleg(companyId: number, vehicleId: number): Prom
       today: t, buyMode: normal ? "normal" : "margin", sellMode: normal ? "normal" : "margin", buy, purchaseDate, costs,
       epr: eprFeeVal, sale,
       plan: plan ? { price: plan.salePrice != null ? Number(plan.salePrice) : null, date: plan.saleDate, costs: planCosts.map((c) => ({ label: c.description, date: c.date, amount: Number(c.net) })) } : null,
-      holding: { ratePct: s.holdingRatePct ?? HOLDING_DEFAULT.ratePct, fixPerDay: s.holdingFixPerDay ?? HOLDING_DEFAULT.fixPerDay },
-      target: k?.margin.soldCount ? k.margin.medF2 : null,
-      peers,
+      holding: c.holding, target: c.target, peers: pickPeers(c.peers, vehicleId, v.make, v.model),
     },
     meta: {
       vehicleId, title: `${v.make} ${v.model}`.trim(), year: v.year, plate: v.plate, vin: v.vin, status: v.status,
       seller: card.purchases[0]?.partner ?? null, vatTreatment: v.vatTreatment, purchaseDate, saleDate: sale?.date ?? null,
       buyer: card.sales[0]?.partner ?? null, hasMarginCard: !normal, eprNote, checks: card.checks,
+      origin: (epr?.origin as "import" | "domestic" | null) ?? null,
     },
   };
 }

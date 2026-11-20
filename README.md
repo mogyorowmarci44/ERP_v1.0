@@ -39,6 +39,16 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.5.0 – KészletMérleg: az összes AutóMérleg egy helyen
+
+Új oldal: Járművek › **KészletMérleg** (menü, illetve gomb a Gépkocsi készletnél). Ugyanazzal a számolóval fut végig minden autón, mint az AutóMérleg, így a számok egyeznek az autók lapjával.
+
+| Terület | Funkció |
+|---|---|
+| Készlet fül (sávok) | Lekötött pénz, napi tartási költség, várható nettó fedezet összesen; három oszlop: **Beavatkozni** (az ár a nullszaldó alatt, vagy N napon belül eléri – N állítható, alap 20), **Cél alatt**, **Rendben**. Kártyánként napok, ár (Forecast-terv, ennek híján az ÁrSugó javasolt ára), mini ársáv, napok a nullszaldóig; a piros kártyákon ÁrSugó (előtöltve) és AutóMérleg gomb |
+| Eladott fül (dashboard) | Időszak (elmúlt 12 hónap, idei, tavalyi, egyéni) és csoportosítás (márka / modell, import / belföld, hónap). KPI-k: darab, bruttó és nettó fedezet, fedezet %, medián nettó fedezet, medián napi fedezet; **„Hová folyt el a fedezet?”** vízesés (Forecast-terv → költségeltérés → áreltérés → tény); pontdiagram (állásidő × nettó fedezet, mediánvonalakkal); legjobb / leggyengébb 5 napi fedezet szerint; teljes táblázat a tervtől való eltéréssel |
+| Export | Excel (Készlet és Eladott munkalap, Mogyorosi Holding fejléccel), PDF / nyomtatás |
+
 ## v3.4.1 – Elnevezés: bruttó és nettó fedezet
 
 Mindenhol: **Fedezet I → Bruttó fedezet** (nettó árbevétel − vételár), **Fedezet II → Nettó fedezet** (nettó árbevétel − teljes bekerülési érték). Érinti: KPI-Dashboard, AutóMérleg, ÁrSugó, Forecast, Gépkocsi készlet.

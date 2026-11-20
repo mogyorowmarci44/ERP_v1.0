@@ -38,7 +38,7 @@ export function AutoMerlegView({ input, meta, cid, canWrite, saveHolding }: {
     <div className="am">
       <div className="topbar am-head">
         <div>
-          <div className="muted" style={{ fontSize: 12 }}>Járművek › AutóMérleg</div>
+          <div className="muted" style={{ fontSize: 12 }}>Járművek › <Link href={`/c/${cid}/vehicles/merleg`}>KészletMérleg</Link> › AutóMérleg</div>
           <h1>{meta.title}{meta.year ? ` · ${meta.year}` : ""}</h1>
           <div className="am-sub">
             <span className={`am-pill ${sold ? "sold" : "stock"}`}>{status}</span>
@@ -47,7 +47,7 @@ export function AutoMerlegView({ input, meta, cid, canWrite, saveHolding }: {
           </div>
         </div>
         <div className="row no-print">
-          <Link className="btn" href={`/c/${cid}/vehicles?all=1`}>← Gépkocsik</Link>
+          <Link className="btn" href={`/c/${cid}/vehicles/merleg`}>← KészletMérleg</Link>
           {meta.hasMarginCard && <Link className="btn" href={`/c/${cid}/vehicles/${meta.vehicleId}/karton`}>Karton</Link>}
           <Link className="btn" href={`/c/${cid}/vehicles/${meta.vehicleId}/epr`}>EPR</Link>
           <button type="button" className="btn" onClick={() => window.print()}>PDF / Nyomtatás</button>
