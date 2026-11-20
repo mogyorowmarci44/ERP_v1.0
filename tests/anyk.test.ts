@@ -152,3 +152,24 @@ describe("M-lap alnyomtatvány", () => {
     expect(xml.indexOf("</albizonylatazonositas>")).toBeLessThan(xml.lastIndexOf("<idoszak>"));
   });
 });
+
+describe("ÁNYK-mentés (.frm.enyk)", () => {
+  it("az ÁNYK saját mentésének formája, visszaolvasható", async () => {
+    const { buildAnykEnyk } = await import("@/lib/anyk");
+    const sheets = [
+      { id: "2665A", fields: { "0_0A0001C001A": "12345678242", "0_0HXXXXB001A": "1" } },
+      { id: "2665M", fields: { "0_0A0001C005A": "12229132", "0_0A0001C006A": "Bárdi Autó Zrt.", "0_0BXXXXC0001AA": "SZ-1", "1_0BXXXXC0001AA": "SZ-2" } },
+    ];
+    const e = buildAnykEnyk({ form: "2665", taxNumber: "12345678-2-42", taxpayerName: "Teszt Kft.", from: "2026-10-01", to: "2026-10-31", sheets });
+    expect(e).toContain('<head filetype="zn1810">');
+    expect(e).toContain('templatever="2.0"');
+    expect(e).toContain('template="NAV_2665_2_0"');
+    expect(e).toContain('count="2"');
+    expect(e).toContain('<nyomtatvany sn="1">');
+    expect(e).toContain("<azonosito>12229132</azonosito>");
+    expect(e).toContain('eazon="1_0BXXXXC0001AA"');
+    const back = parseAnyk(e);
+    expect(back.form).toBe("2665");
+    expect(back.sheets.map((x) => x.fields)).toEqual(sheets.map((x) => x.fields));
+  });
+});

@@ -39,6 +39,12 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.7.7 – ÁNYK import-XML sablonverzióval
+
+- Útmutató a lapon: ÁNYK › Adatok › XML állomány ellenőrzése és átadása elektronikus beküldésre (Ctrl+D).
+- Az import-XML sablonverziót kap (2565: 4.0, 2665: 2.0), így az ÁNYK nem kérdez rá a verzióra. Kísérleti ÁNYK-mentés (`.frm.enyk`) `?format=enyk`-kel; az M-lapok rejtett számított mezői nélkül az ÁNYK üresnek látja őket, ezért alapból maradt az XML.
+
+
 ## v3.7.6 – 108. sor h oszlop
 
 - A 108. sor h oszlopa (levonásba helyezett adó) az M-főlapok 07. sorának g oszlopából kitöltve (ÁNYK R177).
