@@ -201,7 +201,8 @@ export function buildAnykXml(b: BuildInput): string {
       `  <nyomtatvany>`,
       `    <nyomtatvanyinformacio>`,
       `      <nyomtatvanyazonosito>${xmlEncode(s.id)}</nyomtatvanyazonosito>`,
-      ...(s.version ? [`      <nyomtatvanyverzio>${xmlEncode(s.version)}</nyomtatvanyverzio>`] : []),
+      // sablonverzió nélkül az ÁNYK „nincs meg az eredeti verziójú sablon” kérdéssel nyitja meg
+      ...((s.version ?? TEMPLATE_VER[s.id.replace(/[A-Z]$/, "")]) ? [`      <nyomtatvanyverzio>${xmlEncode(s.version ?? TEMPLATE_VER[s.id.replace(/[A-Z]$/, "")])}</nyomtatvanyverzio>`] : []),
       `      <adozo>`,
       `        <nev>${xmlEncode(b.taxpayerName)}</nev>`,
       `        <adoszam>${tax}</adoszam>`,
