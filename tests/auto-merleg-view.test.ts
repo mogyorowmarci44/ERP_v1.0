@@ -15,7 +15,7 @@ const meta = { vehicleId: 7, title: "Suzuki Swift", year: 2019, plate: "ABC-123"
 describe("AutóMérleg nézet", () => {
   it("készleten és eladva is renderelődik", () => {
     const a = renderToStaticMarkup(createElement(AutoMerlegView, { input, meta, cid: 1, canWrite: true, saveHolding: async () => {} }));
-    expect(a).toContain("Várható fedezet II");
+    expect(a).toContain("Várható nettó fedezet");
     expect(a).toContain("Árazás az ÁrSugóban");
     expect(a).toContain("Terv kontra tény");
     const b = renderToStaticMarkup(createElement(AutoMerlegView, { input: { ...input, sale: { date: "2026-10-28", gross: 3_690_000, vat: 167_953 } }, meta: { ...meta, status: "sold", saleDate: "2026-10-28" }, cid: 1, canWrite: false, saveHolding: async () => {} }));

@@ -1,6 +1,6 @@
 /**
  * v3.4.0 – AutóMérleg: egy autó adatai a számolóhoz – különbözeti karton (beszerzés, költségek, eladás),
- * EPR-lap (díj), Forecast-terv (tervezett költségek, ár, dátum), hasonló eladott autók (medián fedezet, állásidő).
+ * EPR-lap (díj), Forecast-terv (tervezett költségek, ár, dátum), hasonló eladott autók (medián nettó fedezet, állásidő).
  */
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";

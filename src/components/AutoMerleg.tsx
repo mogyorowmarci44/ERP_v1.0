@@ -56,11 +56,11 @@ export function AutoMerlegView({ input, meta, cid, canWrite, saveHolding }: {
       </div>
 
       <div className="am-kpis">
-        <div className="card stat"><div className="label">{sold ? "Fedezet II" : "Várható fedezet II"}</div><div className={`value ${r.f2 >= 0 ? "pos" : "neg"}`}>{fmtHuf(Math.round(r.f2))}<small>Ft</small></div><div className="muted am-kpi-sub">{priceLabel} {ft(r.price)}</div></div>
-        <div className="card stat"><div className="label">Fedezet %</div><div className="value">{pct(r.f2Pct)}</div><div className="muted am-kpi-sub">Fedezet I: {ft(r.f1)}</div></div>
+        <div className="card stat"><div className="label">{sold ? "Nettó fedezet" : "Várható nettó fedezet"}</div><div className={`value ${r.f2 >= 0 ? "pos" : "neg"}`}>{fmtHuf(Math.round(r.f2))}<small>Ft</small></div><div className="muted am-kpi-sub">{priceLabel} {ft(r.price)}</div></div>
+        <div className="card stat"><div className="label">Fedezet %</div><div className="value">{pct(r.f2Pct)}</div><div className="muted am-kpi-sub">Bruttó fedezet: {ft(r.f1)}</div></div>
         <div className="card stat"><div className="label">{sold ? "Állásidő" : "Áll eddig"}</div><div className="value">{r.days ?? "–"}<small>nap</small></div>
           <div className={`am-kpi-sub ${r.vsPeersDays == null ? "muted" : r.vsPeersDays > 0 ? "neg" : "pos"}`}>{r.vsPeersDays == null ? "nincs medián" : `${r.vsPeersDays > 0 ? "+" : ""}${r.vsPeersDays} nap a mediánhoz (${input.peers.medDays} nap)`}</div></div>
-        <div className="card stat primary"><div className="label">{sold ? "Napi fedezet" : "Napi fedezet eddig"}</div><div className="value">{r.perDayMargin == null ? "–" : fmtHuf(Math.round(r.perDayMargin))}<small>Ft/nap</small></div><div className="am-kpi-sub">fedezet II ÷ állásnapok</div></div>
+        <div className="card stat primary"><div className="label">{sold ? "Napi fedezet" : "Napi fedezet eddig"}</div><div className="value">{r.perDayMargin == null ? "–" : fmtHuf(Math.round(r.perDayMargin))}<small>Ft/nap</small></div><div className="am-kpi-sub">nettó fedezet ÷ állásnapok</div></div>
       </div>
 
       {r.warn && <div className="am-warn">{priceLabel} ({ft(r.price)}) a mai cél ár ({ft(r.goal)}) alatt van. A nullszaldót (ma {ft(r.floor)}) {r.daysToFloor === 0 ? "már elérte." : `kb. ${r.daysToFloor} nap múlva éri el.`}</div>}
@@ -98,7 +98,7 @@ export function AutoMerlegView({ input, meta, cid, canWrite, saveHolding }: {
           <div className="card">
             <h2>Hasonló autók</h2>
             <div className="muted" style={{ fontSize: 12.5 }}>{input.peers.label} · {input.peers.count} eladott autó</div>
-            <div className="am-kv"><span>Medián fedezet II</span><span><b>{input.peers.medF2 == null ? "–" : ft(input.peers.medF2)}</b>{r.vsPeersMargin != null && <> · ez <b className={r.vsPeersMargin >= 0 ? "pos" : "neg"}>{sft(r.vsPeersMargin)}</b></>}</span></div>
+            <div className="am-kv"><span>Medián nettó fedezet</span><span><b>{input.peers.medF2 == null ? "–" : ft(input.peers.medF2)}</b>{r.vsPeersMargin != null && <> · ez <b className={r.vsPeersMargin >= 0 ? "pos" : "neg"}>{sft(r.vsPeersMargin)}</b></>}</span></div>
             <div className="am-kv"><span>Medián állásidő</span><span><b>{input.peers.medDays == null ? "–" : `${Math.round(input.peers.medDays)} nap`}</b>{r.vsPeersDays != null && <> · ez <b className={r.vsPeersDays > 0 ? "neg" : "pos"}>{r.vsPeersDays > 0 ? "+" : ""}{Math.round(r.vsPeersDays)} nap</b></>}</span></div>
           </div>
         </div>
@@ -127,7 +127,7 @@ export function AutoMerlegView({ input, meta, cid, canWrite, saveHolding }: {
               {!sold && <div><span>A nullszaldó naponta emelkedik</span><b>{ft(r.creep)}</b></div>}
             </div>
             {canWrite && changed && <button className="primary no-print">Mentés a cég alapértékeként</button>}
-            <p className="muted am-note">A tartási költség becslés, nem könyvelt költség: a Fedezet II-t nem csökkenti, csak a nullszaldót, a figyelmeztetést és ezt a sort. Cégenként egy beállítás.</p>
+            <p className="muted am-note">A tartási költség becslés, nem könyvelt költség: a nettó fedezetet nem csökkenti, csak a nullszaldót, a figyelmeztetést és ezt a sort. Cégenként egy beállítás.</p>
           </form>
         </div>
       </div>

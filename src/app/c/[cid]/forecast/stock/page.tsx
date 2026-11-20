@@ -94,7 +94,7 @@ export default async function ForecastStockPage({ params, searchParams }: { para
       <div className="table-wrap">
         <table className="fc-plan">
           <thead>
-            <tr><th>Gépkocsi</th><th className="num">Könyv szerinti érték</th><th className="num">ÁFA-alap</th><th>Eladási terv (bruttó ár, dátum, fizetés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Fedezet</th></tr>
+            <tr><th>Gépkocsi</th><th className="num">Könyv szerinti érték</th><th className="num">ÁFA-alap</th><th>Eladási terv (bruttó ár, dátum, fizetés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Nettó fedezet</th></tr>
           </thead>
           <tbody>
             {stock.map((s) => {
@@ -155,7 +155,7 @@ export default async function ForecastStockPage({ params, searchParams }: { para
       </div>
       <div className="table-wrap">
         <table className="fc-plan">
-          <thead><tr><th>Megnevezés</th><th>Beszerzés (bruttó ár = ÁFA-alap, dátum, fizetés)</th><th>Eladás (bruttó ár, dátum, fizetés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Fedezet</th><th /></tr></thead>
+          <thead><tr><th>Megnevezés</th><th>Beszerzés (bruttó ár = ÁFA-alap, dátum, fizetés)</th><th>Eladás (bruttó ár, dátum, fizetés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Nettó fedezet</th><th /></tr></thead>
           <tbody>
             {planned.map((p) => {
               const costs = p.costs.map((c) => ({ ...c, net: Number(c.net) }));

@@ -4,8 +4,8 @@
  * Készleten lévő autó (élő számok): a mai költségekből + a tartási költségből (lekötött pénz %/év + fix Ft/nap)
  *   számolt nullszaldó és cél ár – a nullszaldó naponta a tartási költség × 1,27-tel kúszik feljebb (különbözeti ÁFA);
  *   figyelmeztet, ha a hirdetési / tervezett ár a cél alá csúszott, és megmondja, hány nap múlva éri el a nullszaldót.
- * Eladott autó (lezárt elszámolás): Fedezet I = nettó árbevétel − beszerzés; Fedezet II = Fedezet I − költségek − EPR;
- *   napi fedezet = Fedezet II ÷ állásnapok. A tartási költség becslés (nem könyvelt): a Fedezet II-t nem csökkenti.
+ * Eladott autó (lezárt elszámolás): Bruttó fedezet = nettó árbevétel − beszerzés; Nettó fedezet = bruttó fedezet − költségek − EPR;
+ *   napi fedezet = Nettó fedezet ÷ állásnapok. A tartási költség becslés (nem könyvelt): a nettó fedezetet nem csökkenti.
  * Az árak az ÁrSugó számolójával (különbözeti / normál ÁFA, 49/99 ezres kerekítés).
  */
 import { arsugo, pricePoint, type VatMode } from "./arsugo";
@@ -24,7 +24,7 @@ export type MerlegInput = {
   sale: { date: string; gross: number; vat: number } | null;
   plan: { price: number | null; date: string | null; costs: MerlegCost[] } | null;
   holding: { ratePct: number; fixPerDay: number };
-  /** Célfedezet (az eladott autók medián Fedezet II-je; null → az ÁrSugó 10%-os tartaléka). */
+  /** Célfedezet (az eladott autók medián nettó fedezete; null → az ÁrSugó 10%-os tartaléka). */
   target: number | null;
   peers: { label: string; count: number; medF2: number | null; medDays: number | null };
 };
@@ -72,7 +72,7 @@ export function autoMerleg(i: MerlegInput) {
     { label: ar.sellMode === "margin" ? "Különbözeti ÁFA" : "ÁFA", amount: vat, kind: "vat" },
   ];
   const rest = sold ? f2 : f3;
-  water.push({ label: rest >= 0 ? (sold ? "Fedezet II" : "Várható fedezet") : "Veszteség", amount: Math.abs(rest), kind: rest >= 0 ? "margin" : "loss" });
+  water.push({ label: rest >= 0 ? (sold ? "Nettó fedezet" : "Várható fedezet") : "Veszteség", amount: Math.abs(rest), kind: rest >= 0 ? "margin" : "loss" });
 
   // terv kontra tény
   const plan = i.plan;
@@ -90,7 +90,7 @@ export function autoMerleg(i: MerlegInput) {
     ...(epr ? [row("EPR díj", epr, epr, true)] : []),
     row(sold ? "Eladási ár" : priceSource === "plan" ? "Tervezett eladási ár" : "Javasolt hirdetési ár (ÁrSugó)", planPrice, price, false),
     row(ar.sellMode === "margin" ? "Különbözeti ÁFA" : "ÁFA", planPP?.vat ?? null, vat, true),
-    row(sold ? "Fedezet II" : "Várható fedezet II", planPP?.margin ?? null, f2, false),
+    row(sold ? "Nettó fedezet" : "Várható nettó fedezet", planPP?.margin ?? null, f2, false),
   ];
   const daysRow = days != null ? row(plan?.date ? "Állásidő (terv: tervezett eladás napja)" : "Állásidő (terv: hasonló autók mediánja)", planDays ?? null, days, true, "nap") : null;
 

@@ -12,16 +12,16 @@ const base: MerlegInput = {
 
 describe("AutóMérleg – eladott autó (lezárt elszámolás)", () => {
   const r = autoMerleg({ ...base, sale: { date: "2026-10-28", gross: 3_690_000, vat: 167_953 } });
-  it("Fedezet I, II, napi fedezet", () => {
+  it("Bruttó és nettó fedezet, napi fedezet", () => {
     expect(r.days).toBe(56);
     expect(r.f1).toBe(3_690_000 - 167_953 - 2_900_000);
     expect(r.f2).toBe(r.f1 - 365_000 - 36_720);
     expect(r.perDayMargin).toBeCloseTo(r.f2 / 56, 6);
   });
-  it("a tartási költség becslés: a Fedezet II-t nem csökkenti", () => {
+  it("a tartási költség becslés: a nettó fedezetet nem csökkenti", () => {
     expect(r.holding).toBe(holdingPerDay(2_900_000 + 365_000 + 36_720, base.holding) * 56);
     expect(r.f3).toBe(r.f2 - r.holding);
-    expect(r.water.at(-1)).toMatchObject({ label: "Fedezet II", amount: r.f2 });
+    expect(r.water.at(-1)).toMatchObject({ label: "Nettó fedezet", amount: r.f2 });
   });
   it("terv kontra tény és magyarázat", () => {
     const costs = r.rows.find((x) => x.label === "Költségek")!;

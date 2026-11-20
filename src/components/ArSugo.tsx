@@ -163,7 +163,7 @@ export function ArSugo({ medianMargin, soldCount, epr, initial, cid }: { medianM
             <div className="as-hero">
               <div className="muted">Javasolt hirdetési ár</div>
               <div className="as-big">{ft(r.ask.price)}</div>
-              <div className="muted">Fedezet {ft(r.ask.margin)} ({pctTxt(r.ask.marginPct)}) · ÁFA {ft(r.ask.vat)}</div>
+              <div className="muted">Nettó fedezet {ft(r.ask.margin)} ({pctTxt(r.ask.marginPct)}) · ÁFA {ft(r.ask.vat)}</div>
             </div>
 
             <div className="as-scale">
@@ -193,7 +193,7 @@ export function ArSugo({ medianMargin, soldCount, epr, initial, cid }: { medianM
 
             <div className="as-trial">
               <div><span>Próbaár</span><strong>{ft(tp)}</strong></div>
-              <div><span>Fedezet</span><strong className={zone}>{ft(t.margin)}</strong></div>
+              <div><span>Nettó fedezet</span><strong className={zone}>{ft(t.margin)}</strong></div>
               <div><span>Fedezet %</span><strong>{pctTxt(t.marginPct)}</strong></div>
               <div><span>ÁFA</span><strong>{ft(t.vat)}</strong></div>
               <div className="as-zone"><strong className={zone}>{zoneTxt}</strong><button type="button" onClick={reset} disabled={trial == null}>Vissza a javasolthoz</button></div>
@@ -203,7 +203,7 @@ export function ArSugo({ medianMargin, soldCount, epr, initial, cid }: { medianM
         <p className="muted as-foot">
           Bekerülés: beszerzés {ft(r.buyBase)} + költségek {ft(costTotal)}{r.fixed ? ` + EPR ${ft(r.fixed)}` : ""} = <b>{ft(r.totalCost)}</b> · Célfedezet: <b>{ft(r.target)}</b>{" "}
           {r.targetFromHistory
-            ? `– az elmúlt 12 hónapban eladott ${soldCount} autó medián fedezete (nettó árbevétel − teljes bekerülés).`
+            ? `– az elmúlt 12 hónapban eladott ${soldCount} autó medián nettó fedezete (nettó árbevétel − teljes bekerülés).`
             : "– még nincs eladott autó, ezért a bekerülés 10%-a."}
           {" "}Nullszaldó: 0 fedezet · Cél: célfedezettel · Hirdetési: cél + {Math.round(HAGGLE * 100)}% alkuráhagyás, a legközelebbi …49 000 / …99 000 árra kerekítve ·{" "}
           {r.sellMode === "margin" ? "ÁFA = (eladási ár − beszerzési ár) × 27/127" : "ÁFA = eladási ár × 27/127"}
