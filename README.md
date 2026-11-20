@@ -39,6 +39,11 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.8.1 – ÁNYK Export szűrő: ÁFA / Járulék
+
+- Az ÁNYK Export fülön szűrő: „ÁFA-bevallás (2565 / 2665)” vagy „Járulékbevallás (2608)”. Mindkettő ugyanonnan tölthető le: hónaponként XML és egy közös ZIP-végpont (`/filings/export/zip?kind=vat|payroll`).
+- 2608 nézet: hónapok jogviszonnyal, határidő, állapot, TB / szocho / SZJA / befizetendő, „2608 XML”; a ZIP-ben a be nem küldött (hiányzó / esedékes) hónapok + összesítő CSV.
+
 ## v3.8.0 – 2608 járulékbevallás export
 
 - A NAV-bevallások › Járulék (2608) fülön hónaponként „2608 XML” letöltés. A minta a cég legutóbb betöltött, ÁNYK-ban kitöltött 2608 bevallása (személyes adatok, jogviszony-kód, FEOR); az időszakot és az összegeket (TB-járulék 18,5%, szocho 13%, a 2026-os szabály szerint 112,5% nélkül) a Bérszámfejtés adja.
