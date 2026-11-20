@@ -74,7 +74,7 @@ export default async function VehiclesPage({ params, searchParams }: { params: P
       </form>
       <p className="muted">A bekerülési érték a 261-es számlára, a gépkocsihoz rendelve könyvelt tételekből (beszerzés, fényezés, javítás) adódik. Eladáskor automatikusan kivezetődik (T 814 / K 261).</p>
       <table>
-        <thead><tr><th>Gépkocsi</th><th>Rendszám</th><th>VIN</th><th>Adózás</th><th>Beszerzés</th><th>Eladás</th><th className="num">Napok</th><th>Státusz</th><th className="num">Összes bekerülés</th><th className="num">Könyv szerinti érték</th><th className="num">Nettó árbevétel</th><th className="num">Fedezet</th><th></th></tr></thead>
+        <thead><tr><th>Gépkocsi</th><th>Rendszám</th><th>VIN</th><th>Adózás</th><th>Beszerzés</th><th>Eladás</th><th className="num">Napok</th><th>Státusz</th><th className="num">Összes bekerülés</th><th className="num">Könyv szerinti érték</th><th className="num">Nettó árbevétel</th><th className="num">Nettó fedezet</th><th></th></tr></thead>
         <tbody>
           {show.map((v) => (
             <tr key={v.id}>

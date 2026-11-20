@@ -39,6 +39,10 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.4.1 – Elnevezés: bruttó és nettó fedezet
+
+Mindenhol: **Fedezet I → Bruttó fedezet** (nettó árbevétel − vételár), **Fedezet II → Nettó fedezet** (nettó árbevétel − teljes bekerülési érték). Érinti: KPI-Dashboard, AutóMérleg, ÁrSugó, Forecast, Gépkocsi készlet.
+
 ## v3.4.0 – AutóMérleg: egy autó teljes mérlege
 
 Új oldal autónként (Gépkocsi készlet › az autó neve vagy „AutóMérleg”, illetve a kartonról), az ÁrSugó mintájára.
@@ -46,10 +50,10 @@ Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Air
 | Terület | Funkció |
 |---|---|
 | Készleten (élő számok) | A mai könyvelt költségekből + EPR + tartási költségből számolt nullszaldó és cél ár; a nullszaldó naponta a napi tartási költség × 1,27-tel kúszik feljebb. Figyelmeztet, ha a tervezett / javasolt ár a cél alá csúszott, és megmondja, hány nap múlva éri el a nullszaldót. „Árazás az ÁrSugóban” gomb: az ÁrSugó az autó adataival előtöltve nyílik |
-| Eladva (lezárt elszámolás) | Fedezet I (nettó árbevétel − beszerzés), Fedezet II (− költségek − EPR), fedezet %, állásidő, napi fedezet |
+| Eladva (lezárt elszámolás) | Bruttó fedezet (nettó árbevétel − beszerzés), Nettó fedezet (− költségek − EPR), fedezet %, állásidő, napi fedezet |
 | Terv kontra tény | A Forecastban az autóhoz rögzített terv (költségek, ár, dátum) a ténnyel szemben, eltérés zöld / piros színnel, automatikus „Miért tér el?” magyarázattal |
-| Hasonló autók | Medián Fedezet II és állásidő: azonos márka + modell; 3 alatt a márka, ha az is kevés, az összes eladott autó |
-| Tartási költség | Állítható: lekötött pénz költsége (%/év, alap 8%) + fix napi költség (Ft/nap, alap 250); élőben számol, cégszintű alapértékként menthető. Becslés: a Fedezet II-t nem csökkenti |
+| Hasonló autók | Medián nettó fedezet és állásidő: azonos márka + modell; 3 alatt a márka, ha az is kevés, az összes eladott autó |
+| Tartási költség | Állítható: lekötött pénz költsége (%/év, alap 8%) + fix napi költség (Ft/nap, alap 250); élőben számol, cégszintű alapértékként menthető. Becslés: a nettó fedezetet nem csökkenti |
 | Ársáv, összetétel | Az ÁrSugó színes ársávja a valós számokkal; „Miből áll az ár” sávdiagram; PDF / nyomtatás |
 
 ## v3.3.3 – TAO és HIPA: teljes számítás, települési HIPA-szabályok a Kincstártól
@@ -96,7 +100,7 @@ Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Air
 | Terület | Funkció |
 |---|---|
 | Árak | **Padló** (0 fedezet), **cél** (célfedezettel), **hirdetési** (cél + 5% alkuráhagyás, a legközelebbi …49 000-re vagy …99 000-re végződő árra kerekítve, lefelé vagy felfelé – pl. 4 083 450 → 4 099 000, 3 600 450 → 3 599 000; a padló alá sosem) |
-| Célfedezet | Az elmúlt 12 hónapban eladott autók medián „Fedezet II”-je (nettó árbevétel − teljes bekerülés), mint a KPI-Dashboardon; eladás nélkül a bekerülés 10%-a |
+| Célfedezet | Az elmúlt 12 hónapban eladott autók medián nettó fedezete (nettó árbevétel − teljes bekerülés), mint a KPI-Dashboardon; eladás nélkül a bekerülés 10%-a |
 | ÁFA | Alapértelmezés mindkét oldalon a különbözeti: ÁFA = (eladási ár − beszerzési ár) × 27/127, negatív különbözetnél 0. Vételnél és eladásnál is választható a normál ÁFA (vételnél a bruttó árból levonható ÁFA, eladásnál ár × 27/127). Levont ÁFÁ-jú vétel után különbözeti eladás nem lehetséges – figyelmeztet és normál ÁFÁ-val számol |
 | Felület | „Ársáv” elrendezés: nagy javasolt ár, színes sáv: piros a beszerzési ár alatt, sárga a nullszaldóig (költségek + ÁFA), zöld fölötte (profit), jelölővel a beszerzésre, nullszaldóra, célra és hirdetési árra, próbaár csúszka élő fedezettel és ÁFÁ-val |
 

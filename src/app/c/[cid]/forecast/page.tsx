@@ -219,7 +219,7 @@ export default async function ForecastPage({ params, searchParams }: { params: P
           <h2>Eladások a tervben</h2>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Gépkocsi</th><th>Eladás</th><th className="num">Bruttó ár</th><th className="num">ÁFA-alap (beszerzés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Nettó árbevétel</th><th className="num">ELÁBÉ</th><th className="num">Fedezet</th></tr></thead>
+              <thead><tr><th>Gépkocsi</th><th>Eladás</th><th className="num">Bruttó ár</th><th className="num">ÁFA-alap (beszerzés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Nettó árbevétel</th><th className="num">ELÁBÉ</th><th className="num">Nettó fedezet</th></tr></thead>
               <tbody>
                 {[...r.sales].sort((a, b) => (a.saleDate < b.saleDate ? -1 : 1)).map((s) => (
                   <tr key={s.planId} className={s.inHorizon ? undefined : "muted"}>

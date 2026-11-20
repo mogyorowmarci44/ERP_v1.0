@@ -11,7 +11,7 @@
  *
  * A költségek nettóban értendők (az ÁFÁ-juk levonható). Az EPR-díj fix, ÁFA nélküli költség: a bekerülést növeli,
  * az ÁFÁ-t nem csökkenti (különbözeti eladásnál az ÁFA alapja csak eladási ár − beszerzési ár). A fedezet = nettó árbevétel − teljes bekerülés
- * (ugyanaz, mint a KPI-Dashboard „Fedezet II”-je).
+ * (ugyanaz, mint a KPI-Dashboard nettó fedezete).
  */
 
 export type VatMode = "margin" | "normal";

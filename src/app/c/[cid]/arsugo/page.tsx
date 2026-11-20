@@ -12,7 +12,7 @@ export default async function ArSugoPage({ params, searchParams }: { params: Pro
   const cid = Number((await params).cid);
   const sp = await searchParams;
   const { company } = await requireCompany(cid);
-  // célfedezet: az eladott autók medián „Fedezet II”-je, ugyanúgy, mint a KPI-Dashboardon
+  // célfedezet: az eladott autók medián nettó fedezete, ugyanúgy, mint a KPI-Dashboardon
   const k = await companyKpis(cid).catch(() => null);
   const medianMargin = k?.margin.soldCount ? k.margin.medF2 : null;
   // EPR: a mai díjtábla kategóriánként és hajtásonként (a cég beállítása szerint díjátalánnyal vagy anélkül)
