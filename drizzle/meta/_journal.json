@@ -176,6 +176,13 @@
       "when": 1795077482414,
       "tag": "0024_v3_1_paper_filing",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795176650731,
+      "tag": "0025_v3_6_tax_filings",
+      "breakpoints": true
     }
   ]
 }

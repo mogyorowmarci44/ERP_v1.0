@@ -1047,3 +1047,43 @@ export const annualReports = pgTable(
   },
   (t) => [uniqueIndex("annual_reports_company_year").on(t.companyId, t.year)],
 );
+
+// ---------------------------------------------------------------------------
+// v3.6.0 – NAV-bevallások (ÁNYK): beolvasott és előállított nyomtatványok nyilvántartása
+// ---------------------------------------------------------------------------
+
+/**
+ * Egy bevallás egy változata (eredeti / önellenőrzés / helyesbítés). Forrás: az ÁNYK mentett nyomtatványa (.frm.enyk)
+ * vagy XML-je, illetve az ERP által előállított XML. A „submitted” jelöli, hogy ez a változat ment be a NAV-hoz –
+ * időszakonként ez az önellenőrzés összevetési alapja.
+ */
+export const taxFilings = pgTable(
+  "tax_filings",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    /** nyomtatvány-család: 2565, 2665, 2608 … */
+    form: varchar("form", { length: 12 }).notNull(),
+    periodFrom: date("period_from").notNull(),
+    periodTo: date("period_to").notNull(),
+    /** original | self_revision | correction */
+    kind: varchar("kind", { length: 16 }).notNull().default("original"),
+    /** import | generated */
+    source: varchar("source", { length: 12 }).notNull().default("import"),
+    fileName: varchar("file_name", { length: 255 }),
+    savedAt: timestamp("saved_at", { withTimezone: false }),
+    signedAt: date("signed_at"),
+    krFileName: varchar("kr_file_name", { length: 255 }),
+    templateVer: varchar("template_ver", { length: 16 }),
+    /** az összes lap (főlap + pótlapok) mezői: [{ id, version, fields }] */
+    sheets: jsonb("sheets").$type<Array<{ id: string; version: string | null; fields: Record<string, string> }>>().notNull(),
+    /** rövid összefoglaló (lapok száma, ÁFA eredménysorok) */
+    summary: jsonb("summary").$type<Record<string, unknown>>().notNull().default({}),
+    submitted: boolean("submitted").notNull().default(false),
+    receiptNo: varchar("receipt_no", { length: 40 }),
+    note: text("note"),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("tax_filings_hash").on(t.companyId, t.sha256), index("tax_filings_period").on(t.companyId, t.form, t.periodFrom)],
+);
