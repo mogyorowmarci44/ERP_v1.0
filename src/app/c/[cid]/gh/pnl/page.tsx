@@ -6,7 +6,8 @@ import { loadGuesthouse } from "@/lib/guesthouse";
 import { groupBy, kpis, periodLabel, periodRange, sumRange, type Gran, type Kpis } from "@/lib/gh-calc";
 import { accommodationStart, availableDays, fmtNum, fmtPct, parseGran, tableScope } from "@/lib/gh-view";
 import { fmtHuf } from "@/lib/money";
-import { IncludeToggle, ScopeNav, Seg, StatementTable, type StRow } from "@/components/gh/GhUi";
+import { IncludeToggle, Seg, StatementTable, type StRow } from "@/components/gh/GhUi";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 export default async function PnlPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
@@ -74,7 +75,7 @@ export default async function PnlPage({ params, searchParams }: { params: Promis
         <h1>Eredménykimutatás (P&amp;L)</h1>
         <div className="toolbar">
           <Seg items={(["week", "month", "year"] as Gran[]).map((x) => ({ href: href(x), label: x === "week" ? "Heti" : x === "month" ? "Havi" : "Éves", on: g === x }))} />
-          {g !== "year" ? <ScopeNav prev={sc.prev ? href(g, sc.prev) : null} next={sc.next ? href(g, sc.next) : null} label={sc.label} /> : null}
+          {g !== "year" ? <PeriodPicker unit={g === "week" ? "quarter" : "year"} single={{ param: "s" }} from={periodRange(sc.scope, g === "week" ? "quarter" : "year").from} to={periodRange(sc.scope, g === "week" ? "quarter" : "year").to} min={d.first} max={d.asOf} display={sc.label} today={d.asOf} /> : null}
         </div>
       </div>
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>

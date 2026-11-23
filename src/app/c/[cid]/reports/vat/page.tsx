@@ -5,6 +5,7 @@ import { vatAnalytics } from "@/lib/reports";
 import { noInputVatDeduction } from "@/lib/entity";
 import { fmtHuf } from "@/lib/money";
 import { isDate, monthStart, monthEnd, today, fmtDate } from "@/lib/dates";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 const kindHu: Record<string, string> = {
   normal: "normál", margin: "különbözeti", exempt: "adómentes", out_of_scope: "hatályon kívül", reverse_charge: "fordított", eu_acquisition: "KBB", eu_supply: "KBE", export: "export", non_deductible: "nem levonható",
@@ -26,8 +27,7 @@ export default async function VatPage({ params, searchParams }: { params: Promis
       </div>
       <VatTabs cid={cid} active="vat" />
       <form className="row card no-print" style={{ marginBottom: 12 }}>
-        <label>Teljesítés-tól<input type="date" name="from" defaultValue={from} /></label>
-        <label>-ig<input type="date" name="to" defaultValue={to} /></label>
+        <PeriodPicker unit="month" label="Teljesítés" from={from} to={to} today={today()} />
         <button style={{ alignSelf: "end" }}>Lekérdezés</button>
       </form>
       <div className="grid cols-3">

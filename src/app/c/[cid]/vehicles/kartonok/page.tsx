@@ -6,6 +6,7 @@ import { MarginCardSheet } from "@/components/MarginCard";
 import { PrintButton } from "@/components/PrintButton";
 import { isDate, monthStart, monthEnd, today } from "@/lib/dates";
 import { fmtHuf } from "@/lib/money";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 /** Egy időszakban eladott gépkocsik különbözeti ÁFA kartonjai egyben (oldaltöréssel) – a bevallás mellé. */
 export default async function MarginCardsPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -29,8 +30,7 @@ export default async function MarginCardsPage({ params, searchParams }: { params
       </div>
       <VatTabs cid={cid} active="margin" />
       <form className="row card no-print" style={{ marginBottom: 12 }}>
-        <label>Eladás teljesítése -tól<input type="date" name="from" defaultValue={from} /></label>
-        <label>-ig<input type="date" name="to" defaultValue={to} /></label>
+        <PeriodPicker unit="day" label="Eladás teljesítése" from={from} to={to} today={today()} />
         <button style={{ alignSelf: "end" }}>Szűrés</button>
         <span className="muted" style={{ alignSelf: "end" }}>{cards.length} eladott gépkocsi · különbözeti ÁFA összesen {fmtHuf(totVat)} Ft</span>
       </form>

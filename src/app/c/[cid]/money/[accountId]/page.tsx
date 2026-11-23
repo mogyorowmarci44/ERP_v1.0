@@ -8,6 +8,7 @@ import { fmtHuf, round2 } from "@/lib/money";
 import { MoneyDays, type MoneyDay } from "@/components/MoneyDays";
 import { PrintButton } from "@/components/PrintButton";
 import { fmtDate, isDate, monthStart, today } from "@/lib/dates";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 /** Napi pénztár- / bankjelentés: naponta nyitó, bevétel, kiadás, záró; a napra kattintva lenyílnak a tételek. */
 export default async function MoneyAccountPage({ params, searchParams }: { params: Promise<{ cid: string; accountId: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -52,8 +53,7 @@ export default async function MoneyAccountPage({ params, searchParams }: { param
         </div>
       </div>
       <form className="row no-print" style={{ marginBottom: 16 }}>
-        <label>Kezdő dátum<input type="date" name="from" defaultValue={from} /></label>
-        <label>Záró dátum<input type="date" name="to" defaultValue={to} /></label>
+        <PeriodPicker unit="day" label="Időszak" from={from} to={to} today={today()} />
         <button style={{ alignSelf: "end" }}>Frissítés</button>
       </form>
       <div className="grid cols-4" style={{ marginBottom: 16 }}>

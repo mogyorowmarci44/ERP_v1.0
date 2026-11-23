@@ -7,6 +7,7 @@ import { canEditMeta } from "@/lib/journal-edit";
 import { Flash } from "@/components/Flash";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate, isDate, monthStart, monthEnd, today } from "@/lib/dates";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 export default async function JournalPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
@@ -24,8 +25,7 @@ export default async function JournalPage({ params, searchParams }: { params: Pr
       </div>
       <Flash error={sp.error} ok={sp.ok} />
       <form className="row card" style={{ marginBottom: 12 }}>
-        <label>Dátum-tól<input type="date" name="from" defaultValue={from} /></label>
-        <label>-ig<input type="date" name="to" defaultValue={to} /></label>
+        <PeriodPicker unit="day" label="Dátum" from={from} to={to} today={today()} />
         <label>Napló
           <select name="j" defaultValue={j}>
             <option value="">mind</option><option value="VE">VE vevő</option><option value="SZ">SZ szállító</option><option value="BA">BA bank</option><option value="PE">PE pénztár</option><option value="VN">VN vegyes</option>

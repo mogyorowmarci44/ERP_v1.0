@@ -5,6 +5,7 @@ import { requireCompany } from "@/lib/auth";
 import { accountLedger } from "@/lib/reports";
 import { fmtHuf, fmtMoney } from "@/lib/money";
 import { isDate, yearStart, monthEnd, today, fmtDate } from "@/lib/dates";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 export default async function LedgerPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
@@ -26,8 +27,7 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
             {accs.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
           </select>
         </label>
-        <label>Dátum-tól<input type="date" name="from" defaultValue={from} /></label>
-        <label>-ig<input type="date" name="to" defaultValue={to} /></label>
+        <PeriodPicker unit="day" label="Dátum" from={from} to={to} today={today()} />
         <button style={{ alignSelf: "end" }}>Lekérdezés</button>
       </form>
       {data && (
