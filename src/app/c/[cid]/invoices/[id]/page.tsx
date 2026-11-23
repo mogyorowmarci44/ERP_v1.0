@@ -5,7 +5,7 @@ import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { invoiceOpenAmount } from "@/lib/ledger";
 import { invoicePayments } from "@/lib/reports";
-import { postInvoiceAction, cancelInvoiceAction, renameInvoiceLineAction, reopenInvoiceAction, editPaymentAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction, linkEntryAction, offsetInvoiceAction } from "../../actions";
+import { postInvoiceAction, cancelInvoiceAction, voidInvoiceAction, renameInvoiceLineAction, reopenInvoiceAction, editPaymentAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction, linkEntryAction, offsetInvoiceAction } from "../../actions";
 import { matchCandidates, offsetCandidates } from "@/lib/matching";
 import { invoiceAudit } from "@/lib/invoice-audit";
 import { vehicleIdent, vehicleTitle } from "@/lib/vehicle-id";
@@ -83,7 +83,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
   return (
     <>
       <div className="topbar">
-        <h1>{inv.direction === "out" ? "Vevőszámla" : "Szállítói számla"} {inv.invoiceNumber} <span className={`badge ${inv.status}`}>{statusHu[inv.status]}</span></h1>
+        <h1>{inv.direction === "out" ? "Vevőszámla" : "Szállítói számla"} {inv.invoiceNumber} {inv.voidedAt ? <span className="badge cancelled">rontott</span> : <span className={`badge ${inv.status}`}>{statusHu[inv.status]}</span>}</h1>
         <div className="row no-print">
           <Link className="btn" href={`/c/${cid}/invoices?dir=${inv.direction}`}>← Lista</Link>
           {[...new Set(lines.filter((x) => x.vat.kind === "margin" && x.veh).map((x) => x.veh!.id))].map((vid) => (
@@ -94,8 +94,10 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
           )}
           {canWrite && inv.status === "draft" && (
             <>
-              <Link className="btn" href={`/c/${cid}/invoices/${id}/edit`}>Szerkesztés</Link>
-              <form action={postInvoiceAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} /><button className="primary">Könyvelés</button></form>
+              {!inv.voidedAt && <Link className="btn" href={`/c/${cid}/invoices/${id}/edit`}>Szerkesztés</Link>}
+              {!inv.voidedAt && <form action={postInvoiceAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} /><button className="primary">Könyvelés</button></form>}
+              <form action={voidInvoiceAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} /><input type="hidden" name="on" value={inv.voidedAt ? "0" : "1"} />
+                <button title="Elrontott papírszámla: a sorszám miatt megmarad, de nem könyvelendő és nem teendő">{inv.voidedAt ? "Rontott jelölés visszavonása" : "Rontottnak jelölés"}</button></form>
               <form action={cancelInvoiceAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} /><button className="danger">Piszkozat törlése</button></form>
             </>
           )}

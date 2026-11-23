@@ -39,6 +39,14 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.9.4 – Napilap stílusú napi összefoglaló, rontott számla
+
+- **Új dizájn** („napilap”): a cég neve a fejlécben, természetes magyar szövegek (Összefoglaló, Eredmény, Teendők, Határidők, Autók, Tegnapi egyéb történések). A holding e-mail ugyanebben a stílusban („Mogyorosi Holding”, tulajdonosi összefoglaló).
+- **Ügyvezetői összefoglaló új adatai:** Pénztár (Ft), összes pénz napi (MNB) értéken, eredmény ebben a hónapban / negyedévben / idén eddig + várható éves eredmény a Forecast alapján (és hány százaléka van már meg), a következő ÁFA- és járulékbevallás határideje (munkaszüneti nap esetén a következő munkanap).
+- **Kihagyott autók:** a cég Napi összefoglaló oldalán bejelölhető, mely autók ne szerepeljenek (a szándékosan készleten tartott Jaguar a migrációval bekerül). Az időbeli elhatárolások nem szerepelnek az összefoglalóban.
+- **Rontott számla:** piszkozat „Rontottnak jelölés” gombbal – nem könyvelhető, nem teendő, a listában „rontott” címkével marad (sorszám-folytonosság). A meglévő rontott papírszámla (megjegyzés alapján) a migrációval automatikusan rontott lesz.
+- **Javítás:** a piszkozat-teendő a megfelelő irányú (vevő / szállítói) számlalistára visz, és a szövege megmondja, melyik fajta.
+
 ## v3.9.3 – Napi összefoglaló be / ki kapcsolása
 
 - **Fő kapcsoló** (Admin › Napi összefoglaló): kikapcsolva semmilyen összefoglaló nem megy ki – sem az ütemezett, sem a „Küldés most”; a címzettek és beállítások megmaradnak.

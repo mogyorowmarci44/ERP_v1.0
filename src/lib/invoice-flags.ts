@@ -54,7 +54,8 @@ export function fingerprintOf(a: Pick<AuditInvoice, "inv" | "lines" | "payments"
 export function flagsFor(a: AuditInvoice, t: string): Flag[] {
   const f: Flag[] = [];
   const { inv } = a;
-  if (inv.status === "draft") f.push({ code: "draft", level: "warn", text: "Piszkozat – nincs lekönyvelve" });
+  if (inv.status === "draft" && inv.voidedAt) f.push({ code: "voided", level: "info", text: "Rontott (érvénytelenített) számla – a sorszám miatt rögzítve, nem könyvelendő" });
+  else if (inv.status === "draft") f.push({ code: "draft", level: "warn", text: "Piszkozat – nincs lekönyvelve" });
   if (inv.status === "cancelled") f.push({ code: "cancelled", level: "info", text: "Sztornózott" });
   if (inv.status === "posted") {
     const due = inv.dueDate ?? inv.issueDate;

@@ -72,3 +72,16 @@ export async function toggleCompanySummaryAction(fd: FormData) {
     return okTo(cid, on ? "A cég napi összefoglalója bekapcsolva." : "A cég napi összefoglalója kikapcsolva – a címzettek megmaradnak.");
   });
 }
+
+/** v3.9.4 – A napi összefoglalóból kihagyott gépkocsik (pl. szándékosan készleten tartott autó). */
+export async function saveSummaryExcludeAction(fd: FormData) {
+  const cid = Number(fd.get("cid"));
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(back(cid), async () => {
+    const ids = fd.getAll("exclude").map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    const [c] = await db.select({ s: schema.companies.settings }).from(schema.companies).where(eq(schema.companies.id, cid));
+    await db.update(schema.companies).set({ settings: { ...c.s, summaryExcludeVehicles: ids } }).where(eq(schema.companies.id, cid));
+    revalidatePath(back(cid));
+    return okTo(cid, ids.length ? `${ids.length} autó kihagyva az összefoglalóból.` : "Minden készleten lévő autó szerepel az összefoglalóban.");
+  });
+}

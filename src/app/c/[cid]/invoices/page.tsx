@@ -78,7 +78,7 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
               <td className="num">{fmtHuf(i.netHuf)}</td>
               <td className="num">{fmtHuf(i.vatHuf)}</td>
               <td className="num">{fmtMoney(i.grossFx, i.currency)}</td>
-              <td><span className={`badge ${i.status}`}>{statusHu[i.status]}</span></td>
+              <td>{i.voidedAt ? <span className="badge cancelled" title="Rontott – nem könyvelendő">rontott</span> : <span className={`badge ${i.status}`}>{statusHu[i.status]}</span>}</td>
               <td>{warns.length > 0 ? <span className="badge soon" title={warns.map((f) => f.text).join("\n")}>⚠ {warns.length}</span> : a?.check.docUrl ? <a href={a.check.docUrl} target="_blank" rel="noreferrer">bizonylat</a> : ""}</td>
               <td className="no-print">
                 {i.status !== "cancelled" && (canWrite ? (

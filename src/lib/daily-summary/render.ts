@@ -1,267 +1,275 @@
 /**
- * v3.9.2 – Napi összefoglaló e-mail HTML (táblázatos, inline stílusú – Gmail, Outlook, telefon).
- * Cégszintű változatok blokkjai: A fejléc + számok · C teendők · D autókészlet · E pénzügyi napló.
+ * v3.9.2 / v3.9.4 – Napi összefoglaló e-mail, „napilap” stílusban (a cég neve a fejlécben).
+ * Cégszintű változatok: ügyvezető (számok, eredmény, határidők, teendők, autók), pénzügyes (… + tegnapi egyéb történések, CSV),
+ * teljes (mind). A holding e-mail ugyanebben a stílusban, minden cég egyben.
+ * E-mail-biztos: táblázatos elrendezés, inline stílusok, kép és JS nélkül.
  */
-import type { CompanySnapshot, HoldingSnapshot, Level, Todo } from "./data";
-import { APP_VERSION } from "@/lib/version";
+import type { CompanySnapshot, HoldingSnapshot, Level } from "./data";
 import { money } from "./format";
+import { APP_VERSION } from "@/lib/version";
 
 export { money };
-
 export type Variant = "ceo" | "cfo" | "full";
 export const VARIANT_LABEL: Record<Variant, string> = {
-  ceo: "Ügyvezető – számok, teendők, autókészlet",
-  cfo: "Pénzügyes – számok, teendők, pénzügyi napló",
-  full: "Teljes – mind a négy blokk",
+  ceo: "Ügyvezető – számok, eredmény, határidők, teendők, autók",
+  cfo: "Pénzügyes – számok, eredmény, határidők, teendők, tegnapi történések",
+  full: "Teljes – minden blokk",
 };
-const BLOCKS: Record<Variant, { cars: boolean; finance: boolean }> = {
-  ceo: { cars: true, finance: false },
-  cfo: { cars: false, finance: true },
-  full: { cars: true, finance: true },
-};
-
 export type Mail = { subject: string; html: string; text: string };
 
-// --- formázás -----------------------------------------------------------------
-const nf = (d = 0) => new Intl.NumberFormat("hu-HU", { maximumFractionDigits: d, minimumFractionDigits: d, useGrouping: "always" });
-const HU_MONTH_SHORT = ["jan.", "febr.", "márc.", "ápr.", "máj.", "jún.", "júl.", "aug.", "szept.", "okt.", "nov.", "dec."];
 const HU_DAY = ["vasárnap", "hétfő", "kedd", "szerda", "csütörtök", "péntek", "szombat"];
 export const dayLabel = (d: string, withDow = true) =>
-  `${d.slice(0, 4)}. ${HU_MONTH_SHORT[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}.${withDow ? `, ${HU_DAY[new Date(d + "T00:00:00Z").getUTCDay()]}` : ""}`;
-const short = (d: string) => `${HU_MONTH_SHORT[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}.`;
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
+  `${d.slice(0, 4)}. ${HU_M[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}.${withDow ? `, ${HU_DAY[new Date(d + "T00:00:00Z").getUTCDay()]}` : ""}`;
 export function appUrl(): string {
   return (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || "").replace(/\/$/, "");
 }
 
-// --- színek (e-mailben nincs CSS-változó) -------------------------------------
-const C = {
-  ink: "#1d2430", muted: "#5b6878", faint: "#8a96a5", line: "#e3e8ee", tile: "#f3f5f8", accent: "#1f4fb8",
-  red: "#c0362c", redBg: "#fbe9e7", yellow: "#946200", yellowBg: "#fdf3d7", green: "#1e7a46", greenBg: "#e5f4ea",
+const BLOCKS: Record<Variant, { cars: boolean; finance: boolean }> = { ceo: { cars: true, finance: false }, cfo: { cars: false, finance: true }, full: { cars: true, finance: true } };
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const HU_M = ["jan.", "febr.", "márc.", "ápr.", "máj.", "jún.", "júl.", "aug.", "szept.", "okt.", "nov.", "dec."];
+const shortD = (d: string) => `${HU_M[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}.`;
+const qLabel = (d: string) => `${["I.", "II.", "III.", "IV."][Math.floor((Number(d.slice(5, 7)) - 1) / 3)]} negyedév`;
+const pct = (a: number, b: number | null) => (b && b > 0 ? Math.max(0, Math.min(100, Math.round((a / b) * 100))) : null);
+const href = (path: string) => (appUrl() ? appUrl() + path : "");
+const A = (path: string, inner: string, color: string) => {
+  const h = href(path);
+  return h ? `<a href="${esc(h)}" style="color:${color};text-decoration:none">${inner}</a>` : inner;
 };
-const LV: Record<Level, { fg: string; bg: string; hu: string }> = {
-  red: { fg: C.red, bg: C.redBg, hu: "piros" }, yellow: { fg: C.yellow, bg: C.yellowBg, hu: "sárga" }, green: { fg: C.green, bg: C.greenBg, hu: "zöld" },
-};
-const F = "font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;";
+const SANS = "font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
+const SERIF = "font-family:Georgia,'Times New Roman',Times,serif;";
+const MONO = "font-family:'SF Mono',Menlo,Consolas,'Courier New',monospace;";
 
-// --- építőkockák --------------------------------------------------------------
-const link = (path: string, label: string) => {
-  const base = appUrl();
-  return base ? `<a href="${esc(base + path)}" style="color:${C.accent};text-decoration:none">${esc(label)}</a>` : esc(label);
+function shell(bg: string, preheader: string, inner: string) {
+  return `<!DOCTYPE html><html lang="hu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><title>${esc(preheader)}</title></head>
+<body style="margin:0;padding:0;background:${bg}"><div style="display:none;max-height:0;overflow:hidden">${esc(preheader)}</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${bg}"><tr><td align="center" style="padding:20px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px">${inner}</table>
+</td></tr></table></body></html>`;
+}
+const subject = (s: CompanySnapshot) => {
+  const open = s.todos.filter((t) => t.level !== "green").length;
+  return `${s.name} – napi összefoglaló, ${shortD(s.date)}${open ? ` · ${open} teendő` : " · minden rendben"}`;
 };
-const section = (title: string, tag = "") =>
-  `<tr><td style="padding:18px 0 6px;border-top:1px solid ${C.line}"><table role="presentation" width="100%"><tr>
-  <td style="${F}font-size:12px;font-weight:600;color:${C.muted};text-transform:uppercase;letter-spacing:.04em">${esc(title)}</td>
-  <td align="right" style="${F}font-size:11px;color:${C.faint}">${esc(tag)}</td></tr></table></td></tr>`;
-function tiles(items: Array<[string, string, string?]>): string {
-  const w = Math.floor(100 / items.length);
-  return `<tr><td style="padding:10px 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${items
-    .map(([label, value, sub], i) => `<td width="${w}%" valign="top" style="padding:${i ? "0 0 0 6px" : "0"}">
-      <div style="background:${C.tile};border-radius:8px;padding:9px 10px">
-      <div style="${F}font-size:11px;color:${C.muted}">${esc(label)}</div>
-      <div style="${F}font-size:17px;font-weight:600;color:${C.ink};white-space:nowrap">${esc(value)}</div>
-      ${sub ? `<div style="${F}font-size:11px;color:${C.muted}">${sub}</div>` : ""}</div></td>`)
-    .join("")}</tr></table></td></tr>`;
-}
-const dot = (l: Level) => `<span style="display:inline-block;width:9px;height:9px;border-radius:5px;background:${LV[l].fg};margin-right:8px"></span>`;
-const pill = (l: Level, text = LV[l].hu) =>
-  `<span style="${F}display:inline-block;font-size:11px;padding:1px 8px;border-radius:9px;background:${LV[l].bg};color:${LV[l].fg};white-space:nowrap">${esc(text)}</span>`;
-function todoList(todos: Array<Todo & { company?: string }>): string {
-  if (!todos.some((t) => t.level !== "green")) {
-    return `<tr><td style="${F}font-size:14px;color:${C.green};padding:4px 0">${dot("green")}Minden rendben – nincs teendő.</td></tr>${todos
-      .map((t) => `<tr><td style="${F}font-size:13px;color:${C.muted};padding:3px 0">${dot("green")}${link(t.path, t.text)}</td></tr>`).join("")}`;
-  }
-  return todos
-    .map((t) => `<tr><td style="${F}font-size:13.5px;color:${t.level === "green" ? C.muted : C.ink};padding:4px 0;line-height:1.45">${dot(t.level)}${t.company ? `<b>${esc(t.company)}</b> · ` : ""}${link(t.path, t.text)}</td></tr>`)
-    .join("");
-}
-function table(head: string[], rows: string[][], widths: string[], boldLast = false): string {
-  const cell = (v: string, i: number, th: boolean, bold: boolean) =>
-    `<${th ? "th" : "td"} align="${i ? "right" : "left"}" width="${widths[i] ?? ""}" style="${F}font-size:12.5px;padding:5px 6px;border-bottom:1px solid ${C.line};color:${th ? C.muted : C.ink};font-weight:${th || bold ? 600 : 400};white-space:${i ? "nowrap" : "normal"}">${v}</${th ? "th" : "td"}>`;
-  return `<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
-    ${head.some(Boolean) ? `<tr>${head.map((h, i) => cell(esc(h), i, true, false)).join("")}</tr>` : ""}
-    ${rows.map((r, ri) => `<tr>${r.map((v, i) => cell(v, i, false, boldLast && ri === rows.length - 1)).join("")}</tr>`).join("")}
-  </table></td></tr>`;
-}
-const bar = (pct: number, l: Level) =>
-  `<div style="height:6px;border-radius:3px;background:${C.tile};margin-top:4px"><div style="height:6px;border-radius:3px;width:${Math.max(3, Math.min(100, Math.round(pct)))}%;background:${LV[l].fg}"></div></div>`;
-function spark(series: number[]): string {
-  if (series.length < 2) return "";
-  const max = Math.max(...series, 1), min = Math.min(...series, 0);
-  const h = (v: number) => Math.max(2, Math.round(((v - min) / (max - min || 1)) * 40));
-  return `<table role="presentation" cellspacing="0" cellpadding="0" width="100%"><tr valign="bottom" style="height:42px">${series
-    .map((v, i) => `<td style="padding:0 1px" valign="bottom"><div style="height:${h(v)}px;background:${i === series.length - 1 ? C.accent : "#9db4e4"};border-radius:1px"></div></td>`)
-    .join("")}</tr></table>`;
-}
-function frame(preheader: string, body: string, footer: string): string {
-  return `<!DOCTYPE html><html lang="hu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(preheader)}</title></head>
-<body style="margin:0;padding:0;background:#eef1f5">
-<div style="display:none;max-height:0;overflow:hidden">${esc(preheader)}</div>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef1f5"><tr><td align="center" style="padding:18px 10px">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid ${C.line};border-radius:12px">
-<tr><td style="padding:18px 22px 20px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-${body}
-<tr><td style="${F}padding:18px 0 0;border-top:1px solid ${C.line};font-size:11.5px;color:${C.faint}">${footer}</td></tr>
-</table></td></tr></table></td></tr></table></body></html>`;
-}
-const brandRow = (label: string) =>
-  `<tr><td style="${F}font-size:12px;color:${C.faint};padding:0 0 6px"><span style="color:${C.accent};font-weight:700">mogyorosi.erp</span> · ${esc(label)}</td></tr>`;
-const headlineRow = (s: string) => `<tr><td style="${F}font-size:17px;font-weight:600;color:${C.ink};line-height:1.35;padding:2px 0 2px">${esc(s)}</td></tr>`;
-const footerText = (company: string) => `Mogyorosi Holding™ · ${new Date().getFullYear()} · ${esc(company)} · v${APP_VERSION}`;
+const openTodos = (s: CompanySnapshot) => s.todos.filter((t) => t.level !== "green");
+
 
 // --- cégszintű e-mail ---------------------------------------------------------
-export function renderCompanyMail(s: CompanySnapshot, variant: Variant): Mail {
-  const b = BLOCKS[variant];
-  const p = `/c/${s.companyId}`;
-  const parts: string[] = [];
-  parts.push(brandRow(`${s.name} · napi jelentés · ${dayLabel(s.date)}`));
-  parts.push(headlineRow(s.headline));
-  parts.push(tiles([
-    ["Pénz összesen", money(s.kpi.cash)],
-    [`Bevétel (${short(s.day)})`, money(s.kpi.revenueDay)],
-    s.kpi.stock != null ? ["Készleten", `${s.kpi.stock} autó`] : ["Hó eddig eredmény", money(s.finance.mtdResult, true)],
-    ["Lejárt vevő", s.kpi.lateReceivableCount ? money(s.kpi.lateReceivable) : "0 Ft"],
-  ]));
+// --- napilap stílus: színek és építőkockák ------------------------------------
+const K = { bg: "#efe9dd", paper: "#fbf8f1", ink: "#1b1a17", mute: "#6b655a", rule: "#1b1a17", hair: "#d9d1c1", accent: "#0f5a43", red: "#a3261c", yellow: "#9a6a00", green: "#0f5a43" };
+const LV: Record<Level, string> = { red: K.red, yellow: K.yellow, green: K.green };
+const kick = (t: string) => `<div style="${SANS}font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:${K.accent};font-weight:700">${esc(t)}</div>`;
+const head = (t: string, right = "") => `<tr><td style="padding:26px 0 10px;border-top:3px double ${K.rule}"><table role="presentation" width="100%"><tr><td style="${SERIF}font-size:22px;font-style:italic;color:${K.ink}">${esc(t)}</td><td align="right" style="${SANS}font-size:11px;color:${K.mute}">${right}</td></tr></table></td></tr>`;
+const figure = (lbl: string, val: string, note = "", color = K.ink) => `<div style="${SANS}font-size:11px;color:${K.mute};text-transform:uppercase;letter-spacing:.08em">${esc(lbl)}</div>
+  <div style="${SERIF}font-size:26px;color:${color};line-height:1.15;padding-top:4px;white-space:nowrap">${val}</div>${note ? `<div style="${SANS}font-size:11.5px;color:${K.mute};padding-top:2px">${note}</div>` : ""}`;
+const vrule = (cells: string[]) => `<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${cells.map((c, i) => `<td valign="top" width="${Math.floor(100 / cells.length)}%" style="padding:0 ${i < cells.length - 1 ? 14 : 0}px 0 ${i ? 14 : 0}px;${i ? `border-left:1px solid ${K.hair};` : ""}">${c}</td>`).join("")}</tr></table>`;
+const sign = (n: number) => (n >= 0 ? K.ink : K.red);
 
-  parts.push(section("Teendők"));
-  parts.push(todoList(s.todos));
+function companyHtml(s: CompanySnapshot, v: Variant): string {
+  const b = BLOCKS[v];
+  const rows: string[] = [];
 
+  // impresszum / fejléc
+  rows.push(`<tr><td style="padding:0 0 6px;border-bottom:1px solid ${K.rule}"><table role="presentation" width="100%"><tr>
+    <td style="${SANS}font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:${K.mute}">${esc(dayLabel(s.date))}</td>
+    <td align="right" style="${SANS}font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:${K.mute}">${v === "ceo" ? "Ügyvezetői" : v === "cfo" ? "Pénzügyi" : "Teljes"} összefoglaló</td></tr></table></td></tr>`);
+  rows.push(`<tr><td align="center" style="padding:14px 0 4px;${SERIF}font-size:${s.name.length > 18 ? 36 : 44}px;font-weight:700;color:${K.ink};letter-spacing:-.01em;line-height:1.05">${esc(s.name)}</td></tr>`);
+  rows.push(`<tr><td align="center" style="padding:2px 0 12px;border-bottom:3px double ${K.rule};${SANS}font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:${K.accent}">Napi összefoglaló · mogyorosi.erp</td></tr>`);
+  // vezércikk
+  rows.push(`<tr><td style="padding:22px 0 18px">${kick("Összefoglaló")}
+    <div style="${SERIF}font-size:27px;line-height:1.25;color:${K.ink};padding-top:8px">${esc(s.headline)}</div></td></tr>`);
+  rows.push(`<tr><td style="padding:16px 0;border-top:1px solid ${K.hair};border-bottom:1px solid ${K.hair}">${vrule([
+    figure("Pénztár (Ft)", money(s.kpi.cashHuf), "forintpénztár egyenlege"),
+    figure("Összes pénz", money(s.kpi.liquidity), "pénztár + bank, mai árfolyamon"),
+    figure("Tegnapi bevétel", money(s.kpi.revenueDay), shortD(s.day)),
+  ])}</td></tr>`);
+  rows.push(`<tr><td style="padding:10px 0 0;${SANS}font-size:12.5px;color:${K.mute}">Eladó autó: <b style="color:${K.ink}">${s.kpi.stock ?? "–"} db</b> &nbsp;·&nbsp; Lejárt vevői tartozás: <b style="color:${s.kpi.lateReceivableCount ? K.red : K.ink}">${s.kpi.lateReceivableCount ? money(s.kpi.lateReceivable) : "nincs"}</b></td></tr>`);
+
+  // eredmény-rovat
+  const r = s.results;
+  const p = pct(r.year, r.yearForecast);
+  rows.push(head("Eredmény", "adózás előtt"));
+  const line = (t: string, n: number | null, strong = false, note = "") => `<tr>
+    <td style="${SERIF}font-size:${strong ? 19 : 16}px;color:${K.ink};padding:9px 0;border-bottom:1px dotted ${K.hair};${strong ? "font-weight:700;" : ""}">${esc(t)}${note ? `<span style="${SANS}font-size:11.5px;color:${K.mute};font-weight:400"> · ${note}</span>` : ""}</td>
+    <td align="right" style="${SERIF}font-size:${strong ? 21 : 17}px;color:${n == null ? K.mute : strong ? K.accent : sign(n)};padding:9px 0;border-bottom:1px dotted ${K.hair};white-space:nowrap;${strong ? "font-weight:700;" : ""}">${n == null ? "nincs Forecast" : money(n, true)}</td></tr>`;
+  rows.push(`<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+    ${line("Ebben a hónapban", r.month)}
+    ${line("Ebben a negyedévben", r.quarter)}
+    ${line("Idén eddig", r.year)}
+    ${line(`Várható éves eredmény (${s.date.slice(0, 4)})`, r.yearForecast, true, "Forecast szerint")}
+  </table>
+  ${p != null ? `<div style="${SANS}font-size:12px;color:${K.mute};padding-top:10px">Az idei várt eredmény <b style="color:${K.ink}">${p}%-a</b> már megvan${r.yearForecastAfterTax != null ? `, adózás után várhatóan ${money(r.yearForecastAfterTax, true)} marad` : ""}.</div>
+    <div style="height:4px;background:${K.hair};margin-top:8px"><div style="height:4px;width:${p}%;background:${K.accent}"></div></div>` : ""}</td></tr>`);
+
+  // két hasáb: teendők | naptár
+  const td = openTodos(s);
+  const todoCol = `${kick("Teendők")}<div style="${SERIF}font-size:19px;font-style:italic;color:${K.ink};padding:6px 0 4px">${td.length ? `${td.length === 1 ? "Egy" : td.length === 2 ? "Két" : td.length} dolog vár rád` : "Nincs teendő"}</div>
+    ${td.length ? td.map((t) => `<div style="${SANS}font-size:13.5px;line-height:1.45;color:${K.ink};padding:7px 0;border-top:1px solid ${K.hair}"><span style="color:${LV[t.level]};font-weight:700">${t.level === "red" ? "■" : "□"}</span>&nbsp; ${A(t.path, esc(t.text), K.ink)}</div>`).join("")
+      : `<div style="${SANS}font-size:13.5px;color:${K.green}">Minden rendben, ma nincs mit intézni.</div>`}`;
+  const cal = (t: string, d: { date: string; days: number } | null) => `<div style="border:1px solid ${K.ink};margin-top:10px">
+    <div style="background:${K.ink};${SANS}font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:${K.paper};padding:4px 8px">${esc(t)}</div>
+    ${d ? `<table role="presentation" width="100%"><tr><td style="${SERIF}font-size:34px;font-weight:700;color:${d.days <= 5 ? K.red : K.ink};padding:6px 10px;line-height:1">${Number(d.date.slice(8, 10))}</td>
+      <td style="${SANS}font-size:11.5px;color:${K.mute};padding:6px 10px 6px 0" align="right">${HU_M[Number(d.date.slice(5, 7)) - 1]}<br><b style="color:${d.days <= 5 ? K.red : K.ink}">${d.days === 0 ? "ma" : d.days === 1 ? "holnap" : `${d.days} nap múlva`}</b></td></tr></table>`
+      : `<div style="${SANS}font-size:12px;color:${K.mute};padding:8px 10px">nem kell beadni</div>`}</div>`;
+  const calCol = `${kick("Határidők")}${cal("ÁFA-bevallás", s.deadlines.vat)}${cal("Járulékbevallás", s.deadlines.payroll)}`;
+  rows.push(`<tr><td style="padding:26px 0 0;border-top:3px double ${K.rule}"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+    <td valign="top" width="64%" style="padding-right:16px">${todoCol}</td><td valign="top" width="36%" style="padding-left:16px;border-left:1px solid ${K.hair}">${calCol}</td></tr></table></td></tr>`);
+
+  // autók
   if (b.cars && s.cars) {
     const c = s.cars;
-    parts.push(section("Autókészlet", "KészletMérleg"));
-    parts.push(tiles([
-      ["Utolsó eladás óta", c.daysSinceSale != null ? `${c.daysSinceSale} nap` : "–"],
-      ["Lekötött tőke", money(c.capital)],
-      ["Átl. napok készleten", c.avgDays != null ? String(c.avgDays) : "–"],
-    ]));
-    if (c.soldDay.length) {
-      parts.push(`<tr><td style="${F}font-size:13px;color:${C.ink};padding:2px 0 6px">Tegnap eladva: ${c.soldDay.map((x) => `<b>${esc(x.title)}</b> (${money(x.f2, true)} nettó fedezet)`).join(", ")}</td></tr>`);
-    }
-    const maxDays = Math.max(1, ...c.top.map((x) => x.days ?? 0));
-    for (const x of c.top) {
-      const l: Level = x.status === "red" ? "red" : "yellow";
-      parts.push(`<tr><td style="padding:5px 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
-        <td width="62" valign="top">${pill(l)}</td>
-        <td style="${F}font-size:13px;color:${C.ink}">${esc(x.title)} · ${x.days ?? "–"} nap · tartási ktg. ${money(x.holding)}${x.note ? ` · <span style="color:${C.muted}">${esc(x.note)}</span>` : ""}${bar(((x.days ?? 0) / maxDays) * 100, l)}</td></tr></table></td></tr>`);
-    }
-    parts.push(`<tr><td style="padding:5px 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td width="62">${pill("green")}</td>
-      <td style="${F}font-size:13px;color:${C.muted}">${c.greenCount} autó rendben (a cél ár fölött)</td></tr></table></td></tr>`);
-    parts.push(`<tr><td style="${F}font-size:12px;padding:4px 0">${link(`${p}/vehicles/merleg`, "KészletMérleg megnyitása →")}</td></tr>`);
+    rows.push(head("Autók", "KészletMérleg szerint"));
+    rows.push(`<tr><td style="padding-bottom:6px">${vrule([
+      figure("Legutóbbi eladás", c.daysSinceSale != null ? (c.daysSinceSale === 0 ? "ma" : c.daysSinceSale === 1 ? "tegnap" : `${c.daysSinceSale} napja`) : "–"),
+      figure("Autókban álló pénz", money(c.capital)),
+      figure("Átlagosan áll", c.avgDays != null ? `${c.avgDays} napja` : "–"),
+    ])}</td></tr>`);
+    if (c.soldDay.length) rows.push(`<tr><td style="${SERIF}font-size:15px;font-style:italic;color:${K.accent};padding:10px 0">Tegnap eladtuk: ${c.soldDay.map((x) => `${esc(x.title)}, ${money(x.f2, true)} nettó fedezettel`).join("; ")}.</td></tr>`);
+    rows.push(`<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0">${c.top.map((x) => `<tr>
+      <td style="${SERIF}font-size:15.5px;color:${K.ink};padding:9px 0;border-top:1px solid ${K.hair}">${esc(x.title)}<div style="${SANS}font-size:12px;color:${x.status === "red" ? K.red : K.yellow}">${esc(x.note)}</div></td>
+      <td align="right" style="${SANS}font-size:12.5px;color:${K.mute};padding:9px 0;border-top:1px solid ${K.hair};white-space:nowrap">${x.days ?? "–"} napja áll<br>${money(x.holding)} tartási költség</td></tr>`).join("")}
+      <tr><td colspan="2" style="${SANS}font-size:12.5px;color:${K.green};padding:9px 0;border-top:1px solid ${K.hair}">${c.top.length ? `A többi ${c.greenCount} autó rendben van, a célár fölött.` : `Mind a ${c.greenCount} autó rendben van, a célár fölött.`}</td></tr></table></td></tr>`);
   }
 
   if (b.finance) {
     const f = s.finance;
-    parts.push(section("Pénzügyi napló", `${short(s.day)} · ${f.entryCount} tétel`));
-    if (f.entries.length) {
-      parts.push(table(["Könyvelés", "Összeg", "T / K"], f.entries.slice(0, 8).map((e) => [esc(e.label), money(e.amount), esc(`${e.debit} / ${e.credit}`)]), ["56%", "20%", "24%"]));
-      if (f.entryCount > 8) parts.push(`<tr><td style="${F}font-size:12px;color:${C.muted};padding:4px 0">…és még ${f.entryCount - 8} tétel · ${link(`${p}/journal?from=${s.day}&to=${s.day}`, "Napló")}</td></tr>`);
-    } else {
-      parts.push(`<tr><td style="${F}font-size:13px;color:${C.muted};padding:4px 0">Tegnap nem volt könyvelés.</td></tr>`);
-    }
-    const diff = f.mtdResult - f.prevMtdResult;
-    parts.push(tiles([
-      ["Hó eddig eredmény", money(f.mtdResult, true), `<span style="color:${diff >= 0 ? C.green : C.red}">${diff >= 0 ? "▲" : "▼"} előző hó: ${money(f.prevMtdResult, true)}</span>`],
-      ["Havi ÁFA-pozíció", money(-f.vatBalance, true), Math.abs(f.vatBalance) < 1 ? "nincs ÁFA-tétel" : f.vatBalance > 0 ? "fizetendő" : "visszaigényelhető"],
-      ...(f.cashIn30 != null ? ([["30 nap múlva pénz", money(f.cashIn30), "Forecast, alap"]] as Array<[string, string, string]>) : []),
-    ]));
+    rows.push(head("Tegnapi egyéb történések", `${shortD(s.day)} · ${f.entryCount} tétel`));
+    rows.push(`<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0">${f.entries.length ? f.entries.slice(0, 8).map((e) => `<tr>
+      <td style="${SANS}font-size:13px;color:${K.ink};padding:7px 0;border-bottom:1px dotted ${K.hair}">${esc(e.label)}</td>
+      <td style="${MONO}font-size:11.5px;color:${K.mute};padding:7px 8px;border-bottom:1px dotted ${K.hair}" align="right">${esc(`${e.debit} / ${e.credit}`)}</td>
+      <td align="right" style="${SERIF}font-size:14.5px;color:${K.ink};padding:7px 0;border-bottom:1px dotted ${K.hair};white-space:nowrap">${money(e.amount)}</td></tr>`).join("")
+      : `<tr><td style="${SANS}font-size:13px;color:${K.mute}">Tegnap nem volt könyvelés.</td></tr>`}</table>
+      <div style="${SANS}font-size:12.5px;color:${K.mute};padding-top:10px">Ebben a hónapban eddig ${f.vatBalance > 0 ? "fizetendő" : "visszajáró"} ÁFA: <b style="color:${K.ink}">${money(Math.abs(f.vatBalance))}</b> · Várható pénz 30 nap múlva: <b style="color:${K.ink}">${f.cashIn30 != null ? money(f.cashIn30) : "–"}</b></div></td></tr>`);
   }
 
-  const open = s.todos.filter((t) => t.level !== "green").length;
-  const subject = `${s.name} – napi jelentés, ${short(s.date)}${open ? ` · ${open} teendő` : " · minden rendben"}`;
-  const footer = `${footerText(s.name)}${appUrl() ? ` · ${link(p, "Megnyitás az ERP-ben →")}` : ""}`;
-  return { subject, html: frame(s.headline, parts.join("\n"), footer), text: companyText(s, b) };
+  rows.push(`<tr><td align="center" style="padding:28px 0 0;border-top:1px solid ${K.rule};${SANS}font-size:11px;letter-spacing:.06em;color:${K.mute}">Mogyorosi Holding™ · ${s.date.slice(0, 4)} · v${APP_VERSION}${href(`/c/${s.companyId}`) ? ` · ${A(`/c/${s.companyId}`, "Megnyitás az ERP-ben →", K.accent)}` : ""}</td></tr>`);
+  return shell(K.bg, s.headline, `<tr><td style="background:${K.paper};padding:26px 30px 26px;border:1px solid ${K.hair}"><table role="presentation" width="100%" cellspacing="0" cellpadding="0">${rows.join("\n")}</table></td></tr>`);
 }
 
-function companyText(s: CompanySnapshot, b: { cars: boolean; finance: boolean }): string {
-  const L: string[] = [`${s.name} – napi jelentés, ${dayLabel(s.date)}`, "", s.headline, "",
-    `Pénz összesen: ${money(s.kpi.cash)} · Tegnapi bevétel: ${money(s.kpi.revenueDay)}${s.kpi.stock != null ? ` · Készleten: ${s.kpi.stock} autó` : ""}`, "", "TEENDŐK"];
-  for (const t of s.todos) L.push(`[${LV[t.level].hu}] ${t.text}`);
-  if (b.cars && s.cars) {
-    L.push("", "AUTÓKÉSZLET", `Utolsó eladás óta: ${s.cars.daysSinceSale ?? "–"} nap · Lekötött tőke: ${money(s.cars.capital)}`);
-    for (const x of s.cars.top) L.push(`[${LV[x.status === "red" ? "red" : "yellow"].hu}] ${x.title} · ${x.days ?? "–"} nap ${x.note}`);
-  }
-  if (b.finance) {
-    L.push("", "PÉNZÜGYI NAPLÓ");
-    for (const e of s.finance.entries.slice(0, 8)) L.push(`${e.label} · ${money(e.amount)} · ${e.debit} / ${e.credit}`);
-    L.push(`Hó eddig eredmény: ${money(s.finance.mtdResult, true)} (előző hó: ${money(s.finance.prevMtdResult, true)})`);
-  }
-  L.push("", footerText(s.name).replace("&amp;", "&"));
-  return L.join("\n");
-}
+const paper = (rows: string[], pre: string) =>
+  shell(K.bg, pre, `<tr><td style="background:${K.paper};padding:26px 30px 26px;border:1px solid ${K.hair}"><table role="presentation" width="100%" cellspacing="0" cellpadding="0">${rows.join("\n")}</table></td></tr>`);
+const td = (inner: string, opts = "") => `<td style="${SANS}font-size:13px;color:${K.ink};padding:8px 6px;border-bottom:1px dotted ${K.hair};${opts}">${inner}</td>`;
+const tdr = (inner: string, opts = "") => td(inner, `text-align:right;white-space:nowrap;${opts}`);
+const plain = (html: string) => html.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
 
 // --- holding e-mail -----------------------------------------------------------
-export function renderHoldingMail(h: HoldingSnapshot): Mail {
+function holdingHtml(h: HoldingSnapshot): string {
   const T = h.totals;
-  const parts: string[] = [];
-  parts.push(brandRow(`Mogyorosi Holding™ · holding napi jelentés · ${dayLabel(h.date)}`));
-  parts.push(headlineRow(h.headline));
-  const pct = Math.abs(T.prevMtdResult) > 1 ? Math.round(((T.mtdResult - T.prevMtdResult) / Math.abs(T.prevMtdResult)) * 100) : null;
-  parts.push(tiles([
-    ["Pénz összesen", money(T.cash)],
-    ["Hó eddig eredmény", money(T.mtdResult, true), pct != null ? `<span style="color:${pct >= 0 ? C.green : C.red}">${pct >= 0 ? "▲" : "▼"} ${Math.abs(pct)}% az előző hóhoz</span>` : ""],
-    ["Év eddig eredmény", money(T.ytdResult, true)],
-    ["Lekötött tőke (autók)", money(T.capital)],
-  ]));
+  const C = h.companies;
+  const S = (f: (c: CompanySnapshot) => number) => C.reduce((a, c) => a + f(c), 0);
+  const liquidity = S((c) => c.kpi.liquidity);
+  const fcAll = C.filter((c) => !c.private);
+  // várható év végi eredmény: a kereskedő cégeknél a Forecast (ha nincs, a tény), a magánszemélynél a tény
+  const yearFc = fcAll.some((c) => c.results.yearForecast != null) ? S((c) => (c.private ? c.results.year : c.results.yearForecast ?? c.results.year)) : null;
+  const rows: string[] = [];
 
-  parts.push(section("Cégenként"));
-  const sig = (c: (typeof h.companies)[number]) => {
-    const r = c.todos.filter((t) => t.level === "red").length, y = c.todos.filter((t) => t.level === "yellow").length;
-    return r ? pill("red", String(r + y)) : y ? pill("yellow", String(y)) : pill("green", "0");
+  rows.push(`<tr><td style="padding:0 0 6px;border-bottom:1px solid ${K.rule}"><table role="presentation" width="100%"><tr>
+    <td style="${SANS}font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:${K.mute}">${esc(dayLabel(h.date))}</td>
+    <td align="right" style="${SANS}font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:${K.mute}">Tulajdonosi összefoglaló</td></tr></table></td></tr>`);
+  rows.push(`<tr><td align="center" style="padding:14px 0 4px;${SERIF}font-size:40px;font-weight:700;color:${K.ink};letter-spacing:-.01em;line-height:1.05">Mogyorosi Holding</td></tr>`);
+  rows.push(`<tr><td align="center" style="padding:2px 0 12px;border-bottom:3px double ${K.rule};${SANS}font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:${K.accent}">Napi összefoglaló · ${C.length} cég egyben</td></tr>`);
+  rows.push(`<tr><td style="padding:22px 0 18px">${kick("Összefoglaló")}<div style="${SERIF}font-size:25px;line-height:1.28;color:${K.ink};padding-top:8px">${esc(h.headline)}</div></td></tr>`);
+  const diff = T.mtdResult - T.prevMtdResult;
+  rows.push(`<tr><td style="padding:16px 0;border-top:1px solid ${K.hair};border-bottom:1px solid ${K.hair}">${vrule([
+    figure("Összes pénz", money(liquidity), "minden cég, mai árfolyamon"),
+    figure("Ebben a hónapban", money(T.mtdResult, true), `${diff >= 0 ? "▲" : "▼"} az előző hónap ugyanekkor: ${money(T.prevMtdResult, true)}`, sign(T.mtdResult)),
+    figure("Idén eddig", money(T.ytdResult, true), yearFc != null ? `várható év végére: ${money(yearFc, true)}` : "", sign(T.ytdResult)),
+  ])}</td></tr>`);
+
+  // cégenként
+  rows.push(head("Cégenként"));
+  const sig = (c: CompanySnapshot) => {
+    const o = c.todos.filter((t) => t.level !== "green"), r = o.filter((t) => t.level === "red").length;
+    return o.length ? `<span style="color:${r ? K.red : K.yellow};font-weight:700">${o.length}${r ? " (sürgős)" : ""}</span>` : `<span style="color:${K.green}">–</span>`;
   };
-  parts.push(table(
-    ["Cég", "Pénz", `Bevétel ${short(h.day)}`, "Hó eddig", "Készlet", "Jelzés"],
-    [
-      ...h.companies.map((c) => [link(`/c/${c.companyId}`, c.name), money(c.kpi.cash), money(c.kpi.revenueDay), money(c.finance.mtdResult, true), c.kpi.stock != null ? String(c.kpi.stock) : "–", sig(c)]),
-      ["Összesen", money(T.cash), money(T.revenueDay), money(T.mtdResult, true), String(T.stock), ""],
-    ],
-    ["30%", "15%", "15%", "15%", "11%", "14%"],
-    true,
-  ));
+  rows.push(`<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+    <tr>${["Cég", "Pénz", "Tegnapi bevétel", "E havi eredmény", "Eladó autó", "Teendő"].map((x, i) => `<td style="${SANS}font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:${K.mute};padding:6px;border-bottom:1px solid ${K.rule};${i ? "text-align:right" : ""}">${x}</td>`).join("")}</tr>
+    ${C.map((c) => `<tr>${td(A(`/c/${c.companyId}`, `<span style="${SERIF}font-size:15px;color:${K.ink}">${esc(c.name)}</span>`, K.ink))}${tdr(money(c.kpi.liquidity))}${tdr(money(c.kpi.revenueDay))}${tdr(money(c.finance.mtdResult, true), `color:${sign(c.finance.mtdResult)}`)}${tdr(c.kpi.stock != null ? `${c.kpi.stock} db` : "–")}${tdr(sig(c))}</tr>`).join("")}
+    <tr>${td(`<b>Összesen</b>`)}${tdr(`<b>${money(liquidity)}</b>`)}${tdr(`<b>${money(T.revenueDay)}</b>`)}${tdr(`<b>${money(T.mtdResult, true)}</b>`)}${tdr(`<b>${T.stock} db</b>`)}${tdr("")}</tr>
+  </table></td></tr>`);
 
-  parts.push(section("Pénz és kötelezettségek", "14 nap"));
-  const coverLevel: Level = T.cover == null || T.cover >= 2 ? "green" : T.cover >= 1 ? "yellow" : "red";
-  parts.push(`<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
-    <td width="55%" valign="bottom" style="padding-right:12px"><div style="${F}font-size:11px;color:${C.muted};padding-bottom:4px">Holding pénzeszköz, elmúlt 30 nap</div>${spark(h.cashSeries)}</td>
-    <td width="45%" valign="bottom"><table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-      <tr><td style="${F}font-size:12.5px;color:${C.ink};padding:3px 0">Adók, járulékok (46x)</td><td align="right" style="${F}font-size:12.5px">${money(-sumOf(h, (c) => c.extra.taxLiability), true)}</td></tr>
-      <tr><td style="${F}font-size:12.5px;color:${C.ink};padding:3px 0">Szállítók 14 napon belül</td><td align="right" style="${F}font-size:12.5px">${money(-sumOf(h, (c) => c.extra.payablesDue14), true)}</td></tr>
-      <tr><td style="${F}font-size:12.5px;font-weight:600;padding:3px 0;border-top:1px solid ${C.line}">Fedezettség</td><td align="right" style="${F}font-size:12.5px;font-weight:600;color:${LV[coverLevel].fg};border-top:1px solid ${C.line}">${T.cover == null ? "nincs teher" : `${nf(1).format(T.cover)}×`}</td></tr>
-    </table></td></tr></table></td></tr>`);
+  // pénz és kötelezettségek
+  rows.push(head("Pénz és kötelezettségek", "következő 14 nap"));
+  const ser = h.cashSeries, mx = Math.max(1, ...ser), mn = Math.min(0, ...ser);
+  const spark = ser.length > 1 ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr valign="bottom" style="height:44px">${ser.map((x, i) => `<td valign="bottom" style="padding:0 1px"><div style="height:${Math.max(2, Math.round(((x - mn) / (mx - mn || 1)) * 42))}px;background:${i === ser.length - 1 ? K.accent : "#9fbfb2"}"></div></td>`).join("")}</tr></table>` : "";
+  const coverTxt = T.cover == null ? "nincs fizetendő" : `${T.cover.toFixed(1).replace(".", ",")}×`;
+  const coverCol = T.cover == null || T.cover >= 2 ? K.green : T.cover >= 1 ? K.yellow : K.red;
+  rows.push(`<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+    <td valign="bottom" width="54%" style="padding-right:16px"><div style="${SANS}font-size:11px;color:${K.mute};padding-bottom:6px">A cégcsoport pénze az elmúlt 30 napban</div>${spark}</td>
+    <td valign="bottom" width="46%" style="padding-left:16px;border-left:1px solid ${K.hair}">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+        <tr>${td("Adó, járulék (fizetendő)")}${tdr(money(S((c) => c.extra.taxLiability)))}</tr>
+        <tr>${td("Szállítók 14 napon belül")}${tdr(money(S((c) => c.extra.payablesDue14)))}</tr>
+        <tr>${td(`<b>Ennyiszer fedezi a pénz</b>`, "border-bottom:0")}${tdr(`<b style="${SERIF}font-size:18px;color:${coverCol}">${coverTxt}</b>`, "border-bottom:0")}</tr>
+      </table></td></tr></table></td></tr>`);
 
-  parts.push(section("Összes teendő"));
-  parts.push(todoList(h.companies.flatMap((c) => c.todos.filter((t) => t.level !== "green").map((t) => ({ ...t, company: c.name }))).sort((a, b) => "ry".indexOf(a.level[0]) - "ry".indexOf(b.level[0]))));
+  // teendők + határidők
+  const todos = C.flatMap((c) => c.todos.filter((t) => t.level !== "green").map((t) => ({ ...t, company: c.name })))
+    .sort((a, b) => (a.level === b.level ? 0 : a.level === "red" ? -1 : 1));
+  const todoCol = `${kick("Teendők")}<div style="${SERIF}font-size:19px;font-style:italic;color:${K.ink};padding:6px 0 4px">${todos.length ? `${todos.length === 1 ? "Egy" : todos.length === 2 ? "Két" : todos.length} dolog vár rád` : "Nincs teendő"}</div>
+    ${todos.length ? todos.map((t) => `<div style="${SANS}font-size:13px;line-height:1.45;color:${K.ink};padding:7px 0;border-top:1px solid ${K.hair}"><span style="color:${LV[t.level]};font-weight:700">${t.level === "red" ? "■" : "□"}</span>&nbsp; <b>${esc(t.company)}</b> · ${A(t.path, esc(t.text), K.ink)}</div>`).join("")
+      : `<div style="${SANS}font-size:13.5px;color:${K.green}">Minden rendben, ma nincs mit intézni.</div>`}`;
+  // határidők: azonos nap + bevallás egy sorban, a cégek felsorolva
+  const dlMap = new Map<string, { t: string; d: { date: string; days: number }; cs: string[] }>();
+  for (const c of C) for (const [t, d] of [["ÁFA-bevallás", c.deadlines.vat], ["Járulékbevallás", c.deadlines.payroll]] as const) {
+    if (!d) continue;
+    const k = `${d.date}|${t}`;
+    dlMap.set(k, { t, d, cs: [...(dlMap.get(k)?.cs ?? []), c.name] });
+  }
+  const dl = [...dlMap.values()].sort((a, b) => a.d.date.localeCompare(b.d.date));
+  const calCol = `${kick("Határidők")}${dl.map((x) => `<div style="${SANS}font-size:12.5px;color:${K.ink};padding:7px 0;border-top:1px solid ${K.hair}"><b style="color:${x.d.days <= 5 ? K.red : K.ink}">${shortD(x.d.date)} · ${x.t}</b> <span style="color:${K.mute}">(${x.d.days === 0 ? "ma" : x.d.days === 1 ? "holnap" : `${x.d.days} nap múlva`})</span><br>${x.cs.map(esc).join(", ")}</div>`).join("") || `<div style="${SANS}font-size:12.5px;color:${K.mute};padding-top:6px">nincs</div>`}`;
+  rows.push(`<tr><td style="padding:26px 0 0;border-top:3px double ${K.rule}"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+    <td valign="top" width="64%" style="padding-right:16px">${todoCol}</td><td valign="top" width="36%" style="padding-left:16px;border-left:1px solid ${K.hair}">${calCol}</td></tr></table></td></tr>`);
 
+  // autók
   if (T.stock) {
-    parts.push(section("Autók holding szinten"));
     const L = h.lanes;
-    parts.push(table(["Sáv", "Autó", "Lekötött tőke", "Tartási ktg."], (["green", "yellow", "red"] as const).map((k) => [
-      `${pill(k)} ${k === "green" ? "cél ár fölött" : k === "yellow" ? "cél alatt" : "beavatkozni"}`, String(L[k].count), money(L[k].capital), money(L[k].holding),
-    ]), ["46%", "12%", "22%", "20%"]));
-    const gaps = h.companies.filter((c) => c.cars).map((c) => `${esc(c.name)} ${c.cars!.daysSinceSale ?? "–"} nap`).join(", ");
-    parts.push(`<tr><td style="${F}font-size:12px;color:${C.muted};padding:6px 0 0">${h.bestSale ? `Hó legjobb eladása: <b style="color:${C.ink}">${esc(h.bestSale.title)}</b> (${esc(h.bestSale.company)}), ${money(h.bestSale.f2)} nettó fedezet · ` : ""}Utolsó eladás óta: ${gaps}</td></tr>`);
+    rows.push(head("Autók", "minden cég, KészletMérleg szerint"));
+    const lane = (lbl: string, k: keyof typeof L, col: string) => `<tr>${td(`<span style="color:${col};font-weight:700">■</span>&nbsp; ${lbl}`)}${tdr(`${L[k].count} db`)}${tdr(money(L[k].capital))}${tdr(money(L[k].holding))}</tr>`;
+    rows.push(`<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+      <tr>${["", "Autó", "Autókban álló pénz", "Tartási költség"].map((x, i) => `<td style="${SANS}font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:${K.mute};padding:6px;border-bottom:1px solid ${K.rule};${i ? "text-align:right" : ""}">${x}</td>`).join("")}</tr>
+      ${lane("Rendben, a célár fölött", "green", K.green)}${lane("A célár alatt", "yellow", K.yellow)}${lane("Beavatkozni kell", "red", K.red)}
+    </table>
+    <div style="${SERIF}font-size:15px;font-style:italic;color:${K.accent};padding-top:12px">${h.bestSale ? `A hónap legjobb eladása: ${esc(h.bestSale.title)} (${esc(h.bestSale.company)}), ${money(h.bestSale.f2, true)} nettó fedezettel. ` : ""}Legutóbbi eladás: ${C.filter((c) => c.cars).map((c) => `${esc(c.name)} ${c.cars!.daysSinceSale == null ? "–" : c.cars!.daysSinceSale === 0 ? "ma" : c.cars!.daysSinceSale === 1 ? "tegnap" : `${c.cars!.daysSinceSale} napja`}`).join(", ")}.</div></td></tr>`);
   }
 
-  const gh = h.companies.filter((c) => c.extra.guesthouse);
+  // tagi kölcsön, vendégház
+  const gh = C.filter((c) => c.extra.guesthouse);
   if (T.memberLoans > 0.5 || gh.length) {
-    parts.push(section("Tagi kölcsönök és vendégház"));
-    const rows: string[][] = [];
-    for (const c of h.companies) if (c.extra.memberLoans > 0.5) rows.push([`Tagi kölcsön egyenlege · ${esc(c.name)}`, money(c.extra.memberLoans)]);
+    rows.push(head("Tagi kölcsön és vendégház"));
+    const r2: string[] = [];
+    for (const c of C) if (c.extra.memberLoans > 0.5) r2.push(`<tr>${td(`Tagi kölcsön egyenlege · ${esc(c.name)}`)}${tdr(money(c.extra.memberLoans))}</tr>`);
     for (const c of gh) {
       const g = c.extra.guesthouse!;
-      rows.push([`${esc(c.name)} · hó eddigi kihasználtság / következő érkezés`, `${g.occupancy != null ? `${Math.round(g.occupancy * 100)}%` : "–"} · ${g.nextStay ? short(g.nextStay) : "nincs foglalás"}`]);
+      r2.push(`<tr>${td(`${esc(c.name)} · kihasználtság ebben a hónapban`)}${tdr(g.occupancy != null ? `${Math.round(g.occupancy * 100)}%` : "–")}</tr>`);
+      r2.push(`<tr>${td(`${esc(c.name)} · következő vendég érkezik`)}${tdr(g.nextStay ? shortD(g.nextStay) : "nincs foglalás")}</tr>`);
     }
-    parts.push(table(["", ""], rows, ["64%", "36%"]));
+    rows.push(`<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0">${r2.join("")}</table></td></tr>`);
   }
 
-  const open = h.companies.reduce((s, c) => s + c.todos.filter((t) => t.level !== "green").length, 0);
-  const subject = `Holding napi jelentés, ${short(h.date)}${open ? ` · ${open} teendő` : " · minden rendben"}`;
-  const footer = `${footerText("Holding")}${appUrl() ? ` · ${link("/", "Cégeim megnyitása →")}` : ""}`;
-  const text = [`Holding napi jelentés – ${dayLabel(h.date)}`, "", h.headline, "",
-    ...h.companies.map((c) => `${c.name}: pénz ${money(c.kpi.cash)}, hó eddig ${money(c.finance.mtdResult, true)}`),
-    "", ...h.companies.flatMap((c) => c.todos.filter((t) => t.level !== "green").map((t) => `[${LV[t.level].hu}] ${c.name} · ${t.text}`)),
-    "", footerText("Holding")].join("\n");
-  return { subject, html: frame(h.headline, parts.join("\n"), footer), text };
+  rows.push(`<tr><td align="center" style="padding:28px 0 0;border-top:1px solid ${K.rule};${SANS}font-size:11px;letter-spacing:.06em;color:${K.mute}">Mogyorosi Holding™ · ${h.date.slice(0, 4)} · v${APP_VERSION}${href("/") ? ` · ${A("/", "Cégeim megnyitása →", K.accent)}` : ""}</td></tr>`);
+  return paper(rows, h.headline);
 }
 
-const sumOf = (h: HoldingSnapshot, f: (c: HoldingSnapshot["companies"][number]) => number) => h.companies.reduce((s, c) => s + f(c), 0);
+// --- kifelé ---------------------------------------------------------------------
+export function renderCompanyMail(s: CompanySnapshot, v: Variant): Mail {
+  const html = companyHtml(s, v);
+  const b = BLOCKS[v];
+  const L: string[] = [`${s.name} – napi összefoglaló, ${dayLabel(s.date)}`, "", s.headline, "",
+    `Pénztár (Ft): ${money(s.kpi.cashHuf)} · Összes pénz: ${money(s.kpi.liquidity)} · Tegnapi bevétel: ${money(s.kpi.revenueDay)}`,
+    `Eredmény – ebben a hónapban: ${money(s.results.month, true)}, ebben a negyedévben: ${money(s.results.quarter, true)}, idén eddig: ${money(s.results.year, true)}${s.results.yearForecast != null ? `, várható éves: ${money(s.results.yearForecast, true)}` : ""}`,
+    `Határidők – ÁFA: ${s.deadlines.vat ? shortD(s.deadlines.vat.date) : "–"}, járulék: ${s.deadlines.payroll ? shortD(s.deadlines.payroll.date) : "–"}`, "", "TEENDŐK"];
+  for (const t of openTodos(s)) L.push(`- ${t.text}`);
+  if (!openTodos(s).length) L.push("Minden rendben.");
+  if (b.cars && s.cars) { L.push("", "AUTÓK"); for (const x of s.cars.top) L.push(`- ${x.title}: ${x.days ?? "–"} napja áll, ${x.note}`); }
+  if (b.finance) { L.push("", "TEGNAPI EGYÉB TÖRTÉNÉSEK"); for (const e of s.finance.entries.slice(0, 8)) L.push(`- ${e.label}: ${money(e.amount)}`); }
+  L.push("", `Mogyorosi Holding™ · v${APP_VERSION}`);
+  return { subject: subject(s), html, text: plain(L.join("\n")) };
+}
+
+export function renderHoldingMail(h: HoldingSnapshot): Mail {
+  const open = h.companies.reduce((a, c) => a + c.todos.filter((t) => t.level !== "green").length, 0);
+  const text = [`Mogyorosi Holding – napi összefoglaló, ${dayLabel(h.date)}`, "", h.headline, "",
+    ...h.companies.map((c) => `${c.name}: pénz ${money(c.kpi.liquidity)}, e havi eredmény ${money(c.finance.mtdResult, true)}`), "",
+    ...h.companies.flatMap((c) => openTodos(c).map((t) => `- ${c.name}: ${t.text}`)), "", `Mogyorosi Holding™ · v${APP_VERSION}`].join("\n");
+  return { subject: `Mogyorosi Holding – napi összefoglaló, ${shortD(h.date)}${open ? ` · ${open} teendő` : " · minden rendben"}`, html: holdingHtml(h), text };
+}

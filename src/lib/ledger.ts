@@ -512,6 +512,7 @@ export async function postInvoice(companyId: number, invoiceId: number, userId?:
     await tx.execute(sql`select id from invoices where id = ${invoiceId} for update`);
     const { inv, input } = await loadInvoiceInput(tx, companyId, invoiceId);
     if (inv.status !== "draft") throw new Error("A számla már könyvelve vagy sztornózva van.");
+    if (inv.voidedAt) throw new Error("Rontott (érvénytelenített) számla nem könyvelhető – előbb vond vissza a rontott jelölést.");
     const { posting, lines, ctx, rateInfo } = await buildFromInput(tx, companyId, input, true);
 
     if (inv.direction === "out" && !inv.correctsInvoiceId) {
