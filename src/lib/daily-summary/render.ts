@@ -5,7 +5,7 @@
  * E-mail-biztos: táblázatos elrendezés, inline stílusok, kép és JS nélkül.
  */
 import type { CompanySnapshot, HoldingSnapshot, Level } from "./data";
-import { money } from "./format";
+import { money, mFt2, eFt1, ft0 } from "./format";
 import { APP_VERSION } from "@/lib/version";
 
 export { money };
@@ -80,20 +80,23 @@ function companyHtml(s: CompanySnapshot, v: Variant): string {
   rows.push(`<tr><td style="padding:22px 0 18px">${kick("Összefoglaló")}
     <div style="${SERIF}font-size:27px;line-height:1.25;color:${K.ink};padding-top:8px">${esc(s.headline)}</div></td></tr>`);
   const sv = s.stockValue;
-  // 2 × 2 rács, hogy telefonon is elférjen
-  const svCell = sv ? `<div style="${SANS}font-size:11px;color:${K.accent};text-transform:uppercase;letter-spacing:.08em;font-weight:700">Készlet értéke</div>
-      <div style="${SERIF}font-size:28px;font-weight:700;color:${K.ink};line-height:1.15;padding-top:3px;white-space:nowrap">${money(sv.value)}</div>
-      <div style="${SANS}font-size:12px;font-weight:300;color:${K.mute};padding-top:3px">beszerzési ár: ${money(sv.purchase)}</div>
-      <div style="${SANS}font-size:11px;font-weight:300;color:${K.mute};padding-top:1px">${sv.pct != null ? `${sv.count} autó · +${Math.round(sv.pct * 100)}% medián bruttó fedezettel` : `${sv.count} autó · még nincs eladás a mediánhoz`}</div>` : figure("Eladó autó", `${s.kpi.stock ?? "–"} db`);
+  // 2 × 2 rács, hogy telefonon is elférjen; mind a négy szám ugyanabban a kiemelt stílusban
+  const kpiCell = (lbl: string, val: string, note1: string, note2 = "") => `<div style="${SANS}font-size:11px;color:${K.accent};text-transform:uppercase;letter-spacing:.08em;font-weight:700">${esc(lbl)}</div>
+      <div style="${SERIF}font-size:28px;font-weight:700;color:${K.ink};line-height:1.15;padding-top:3px;white-space:nowrap">${val}</div>
+      <div style="${SANS}font-size:12px;font-weight:300;color:${K.mute};padding-top:3px">${note1}</div>
+      ${note2 ? `<div style="${SANS}font-size:11px;font-weight:300;color:${K.mute};padding-top:1px">${note2}</div>` : ""}`;
+  const svCell = sv
+    ? kpiCell("Készlet értéke", mFt2(sv.value), `beszerzési ár: ${mFt2(sv.purchase)}`, sv.pct != null ? `${sv.count} autó · +${Math.round(sv.pct * 100)}% medián bruttó fedezettel` : `${sv.count} autó · még nincs eladás a mediánhoz`)
+    : kpiCell("Eladó autó", `${s.kpi.stock ?? "–"} db`, "");
   rows.push(`<tr><td style="padding:16px 0 14px;border-top:1px solid ${K.hair}">${vrule([
-    figure("Pénztár (Ft)", money(s.kpi.cashHuf), "forintpénztár egyenlege"),
-    figure("Összes pénz", money(s.kpi.liquidity), "pénztár + bank, mai árfolyamon"),
+    kpiCell("Pénztár (Ft)", eFt1(s.kpi.cashHuf), "forintpénztár egyenlege"),
+    kpiCell("Összes pénz", eFt1(s.kpi.liquidity), "pénztár + bank, mai árfolyamon"),
   ])}</td></tr>`);
   rows.push(`<tr><td style="padding:14px 0 16px;border-top:1px dotted ${K.hair};border-bottom:1px solid ${K.hair}">${vrule([
-    figure("Tegnapi bevétel", money(s.kpi.revenueDay), shortD(s.day)),
+    kpiCell("Tegnapi bevétel", ft0(s.kpi.revenueDay), shortD(s.day)),
     svCell,
   ])}</td></tr>`);
-  rows.push(`<tr><td style="padding:10px 0 0;${SANS}font-size:12.5px;color:${K.mute}">Eladó autó: <b style="color:${K.ink}">${s.kpi.stock ?? "–"} db</b> &nbsp;·&nbsp; Lejárt vevői tartozás: <b style="color:${s.kpi.lateReceivableCount ? K.red : K.ink}">${s.kpi.lateReceivableCount ? money(s.kpi.lateReceivable) : "nincs"}</b></td></tr>`);
+  rows.push(`<tr><td style="padding:10px 0 0;${SANS}font-size:12.5px;color:${K.mute}">Eladó autó: <b style="color:${K.ink}">${s.kpi.stock ?? "–"} db</b> &nbsp;·&nbsp; Lejárt vevői tartozás: <b style="color:${s.kpi.lateReceivableCount ? K.red : K.ink}">${s.kpi.lateReceivableCount ? money(s.kpi.lateReceivable) : "nincs"}</b> &nbsp;·&nbsp; Lejárt szállítói tartozás: <b style="color:${s.kpi.latePayableCount ? K.red : K.ink}">${s.kpi.latePayableCount ? money(s.kpi.latePayable) : "nincs"}</b></td></tr>`);
 
   // eredmény-rovat
   const r = s.results;

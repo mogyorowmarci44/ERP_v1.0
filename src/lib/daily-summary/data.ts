@@ -42,7 +42,7 @@ export type CompanySnapshot = {
   date: string; // a küldés napja
   day: string; // a „tegnap”
   headline: string;
-  kpi: { cash: number; cashHuf: number; liquidity: number; revenueDay: number; stock: number | null; lateReceivable: number; lateReceivableCount: number };
+  kpi: { cash: number; cashHuf: number; liquidity: number; revenueDay: number; stock: number | null; lateReceivable: number; lateReceivableCount: number; latePayable: number; latePayableCount: number };
   /** v3.9.5 – a készlet értéke: beszerzési ár × (1 + medián bruttó fedezet %). */
   stockValue: { purchase: number; value: number; pct: number | null; count: number } | null;
   /** v3.9.4 – eredmények: folyó hó / negyedév / év (tény) és teljes év a Forecast alapján. */
@@ -310,6 +310,8 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
       stock: cars ? cars.lanes.red.count + cars.lanes.yellow.count + cars.lanes.green.count : null,
       lateReceivable: sum(recvLate.map(toHuf)),
       lateReceivableCount: recvLate.length,
+      latePayable: sum(payLate.map(toHuf)),
+      latePayableCount: payLate.length,
     },
     stockValue,
     results: {
