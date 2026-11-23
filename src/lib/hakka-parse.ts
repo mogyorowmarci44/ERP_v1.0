@@ -1,12 +1,12 @@
 /**
  * v3.3.3 – A Kincstár HAKKA (hakka.allamkincstar.gov.hu) országos havi adatállományának feldolgozása HIPA-szabályokká.
- * A fájl formátumát a Kincstár határozza meg (zip / xlsx / xls / csv / xml) – a feldolgozó ezért rugalmas:
+ * A fájl formátumát a Kincstár határozza meg (zip / xlsx / csv / xml; a régi .xls-t xlsx-ként kell menteni) – a feldolgozó ezért rugalmas:
  * minden táblázatban megkeresi az önkormányzat nevét, az adónemet, a mértéket és a mentesség szövegét, és
  * diagnosztikát ad vissza (fájlok, munkalapok, fejlécek), hogy formátumváltozásnál látszódjon, mi érkezett.
  * Tiszta függvények (nincs adatbázis) – tesztelhető.
  */
 import { unzipSync } from "fflate";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { HIPA_EXEMPT_MAX, HIPA_RATE_MAX, type HipaRule } from "./corp-tax";
 
 type Row = Record<string, string>;
@@ -37,20 +37,54 @@ function xmlTables(name: string, text: string): Table[] {
 }
 const unescapeXml = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 
-/** Táblázat (xlsx/xls/csv) → sorok; a fejléc az első olyan sor, amelyben legalább 3 szöveges cella van. */
-function sheetTables(name: string, buf: Uint8Array, isText: boolean): Table[] {
-  const wb = isText ? XLSX.read(decode(buf), { type: "string", raw: true }) : XLSX.read(buf, { type: "array", cellDates: false });
-  return wb.SheetNames.map((sn) => {
-    const aoa = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sn], { header: 1, raw: false, defval: "" }) as unknown[][];
-    let h = aoa.findIndex((r) => r.filter((c) => typeof c === "string" && /[a-záéíóöőúüű]{3,}/i.test(c)).length >= 3);
-    if (h < 0) h = 0;
-    const headers = (aoa[h] ?? []).map((c, i) => String(c || `oszlop${i + 1}`).trim());
-    const rows = aoa.slice(h + 1).filter((r) => r.some((c) => String(c).trim())).map((r) => Object.fromEntries(headers.map((k, i) => [k, String(r[i] ?? "").trim()])));
-    return { name: `${name} › ${sn}`, rows, headers };
+/** Kétdimenziós tömb → tábla; a fejléc az első olyan sor, amelyben legalább 3 szöveges cella van. */
+function aoaTable(name: string, aoa: string[][]): Table {
+  let h = aoa.findIndex((r) => r.filter((c) => /[a-záéíóöőúüű]{3,}/i.test(c)).length >= 3);
+  if (h < 0) h = 0;
+  const headers = (aoa[h] ?? []).map((c, i) => String(c || `oszlop${i + 1}`).trim());
+  const rows = aoa.slice(h + 1).filter((r) => r.some((c) => c.trim())).map((r) => Object.fromEntries(headers.map((k, i) => [k, String(r[i] ?? "").trim()])));
+  return { name, rows, headers };
+}
+
+/** v3.9.7 – CSV / TXT beolvasása (elválasztó: ; , vagy tab – az első sorok alapján; idézőjeles mezők). */
+export function parseCsv(text: string): string[][] {
+  const sample = text.split(/\r?\n/).slice(0, 10).join("\n");
+  const delim = [";", "\t", ","].map((d) => [d, sample.split(d).length] as const).sort((a, b) => b[1] - a[1])[0][0];
+  const out: string[][] = [];
+  let row: string[] = [], cell = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else cell += ch;
+    } else if (ch === '"' && cell === "") quoted = true;
+    else if (ch === delim) { row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); out.push(row); row = []; cell = "";
+    } else cell += ch;
+  }
+  if (cell !== "" || row.length) { row.push(cell); out.push(row); }
+  return out;
+}
+
+/** v3.9.7 – xlsx beolvasása az exceljs-szel (az ismert hibás `xlsx` 0.18 csomag helyett); a cellák megjelenített szövegével. */
+async function xlsxTables(name: string, buf: Uint8Array): Promise<Table[]> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf as unknown as ArrayBuffer);
+  return wb.worksheets.map((ws) => {
+    const aoa: string[][] = [];
+    ws.eachRow({ includeEmpty: false }, (r) => {
+      const cells: string[] = [];
+      for (let c = 1; c <= r.cellCount; c++) cells.push(r.getCell(c).text ?? "");
+      aoa.push(cells);
+    });
+    return aoaTable(`${name} › ${ws.name}`, aoa);
   });
 }
 
-export function filesToTables(files: { name: string; data: Uint8Array }[], diag: string[]): Table[] {
+export async function filesToTables(files: { name: string; data: Uint8Array }[], diag: string[]): Promise<Table[]> {
   const out: Table[] = [];
   for (const f of files) {
     const lower = f.name.toLowerCase();
@@ -59,15 +93,17 @@ export function filesToTables(files: { name: string; data: Uint8Array }[], diag:
         const inner = unzipSync(f.data);
         const entries = Object.entries(inner).filter(([n, d]) => !n.endsWith("/") && d.length);
         diag.push(`${f.name}: zip, ${entries.length} fájl (${entries.map(([n]) => n).slice(0, 12).join(", ")})`);
-        out.push(...filesToTables(entries.map(([n, d]) => ({ name: n, data: d })), diag));
+        out.push(...(await filesToTables(entries.map(([n, d]) => ({ name: n, data: d })), diag)));
       } else if (lower.endsWith(".xml")) {
         const t = xmlTables(f.name, decode(f.data));
         diag.push(`${f.name}: xml, ${t[0]?.rows.length ?? 0} rekord`);
         out.push(...t);
       } else if (/\.(csv|txt)$/.test(lower)) {
-        out.push(...sheetTables(f.name, f.data, true));
-      } else if (/\.(xlsx|xlsm|xls|ods)$/.test(lower) || f.data[0] === 0xd0) {
-        out.push(...sheetTables(f.name, f.data, false));
+        out.push(aoaTable(f.name, parseCsv(decode(f.data))));
+      } else if (/\.(xlsx|xlsm)$/.test(lower) || (f.data[0] === 0x50 && f.data[1] === 0x4b)) {
+        out.push(...(await xlsxTables(f.name, f.data)));
+      } else if (/\.(xls|ods)$/.test(lower) || f.data[0] === 0xd0) {
+        diag.push(`${f.name}: régi Excel (.xls) / .ods formátum – nem olvasható, mentsd el xlsx-ként vagy csv-ként, és töltsd fel újra`);
       } else {
         diag.push(`${f.name}: ismeretlen formátum, kihagyva (${f.data.length} bájt)`);
       }
@@ -159,8 +195,8 @@ export function tablesToRules(tables: Table[], norm: (s: string) => string, sour
   return { rules, diagnostics: diag, withExemption: list.filter((r) => r.exemptBelow != null).length };
 }
 
-export function parseHakkaFiles(files: { name: string; data: Uint8Array }[], norm: (s: string) => string, sourceLabel: string): ParseResult {
+export async function parseHakkaFiles(files: { name: string; data: Uint8Array }[], norm: (s: string) => string, sourceLabel: string): Promise<ParseResult> {
   const diag: string[] = [];
-  const tables = filesToTables(files, diag);
+  const tables = await filesToTables(files, diag);
   return tablesToRules(tables, norm, sourceLabel, diag);
 }

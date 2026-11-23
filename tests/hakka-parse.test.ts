@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { zipSync, strToU8 } from "fflate";
 import { parseExemption, parseRate, hufAmounts, parseHakkaFiles } from "@/lib/hakka-parse";
 
@@ -36,22 +36,37 @@ describe("HAKKA – fájlok feldolgozása", () => {
     ["Kisfalu Község Önkormányzata", "Helyi iparűzési adó (állandó jelleg)", "adómérték", "", "1,5"],
     ["Kisfalu Község Önkormányzata", "Építményadó", "adómérték", "", "1000"],
   ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "HIPA");
-  const xlsx = new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer);
+  const makeXlsx = async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("HIPA");
+    ws.addRow(["Települési adók – 2026. november"]); // cím-sor a fejléc fölött
+    for (const r of aoa) ws.addRow(r);
+    return new Uint8Array(await wb.xlsx.writeBuffer());
+  };
 
-  it("xlsx egy zipben → településenkénti szabály", () => {
+  it("xlsx egy zipben → településenkénti szabály", async () => {
+    const xlsx = await makeXlsx();
     const zip = zipSync({ "helyiadok_2026_11.xlsx": xlsx, "olvass.txt": strToU8("info") });
-    const r = parseHakkaFiles([{ name: "letoltes.zip", data: zip }], norm, "Kincstár (HAKKA) 2026-11");
+    const r = await parseHakkaFiles([{ name: "letoltes.zip", data: zip }], norm, "Kincstár (HAKKA) 2026-11");
     expect(r.rules[norm("Mór Városi Önkormányzat")]).toMatchObject({ rate: 0.02, exemptBelow: 2_500_000, exemptInclusive: false });
     expect(r.rules[norm("Ajka Város Önkormányzata")]).toMatchObject({ rate: 0.02, exemptBelow: 500_000, exemptInclusive: true });
     expect(r.rules[norm("Kisfalu Község Önkormányzata")]).toMatchObject({ rate: 0.015, exemptBelow: null });
     expect(r.withExemption).toBe(2);
     expect(r.diagnostics.some((d) => d.includes("zip"))).toBe(true);
   });
-  it("CSV (pontosvessző, Windows-1250 is)", () => {
+  it("CSV (pontosvessző, Windows-1250 is)", async () => {
     const csv = aoa.map((r) => r.join(";")).join("\n");
-    const r = parseHakkaFiles([{ name: "adat.csv", data: strToU8(csv) }], norm, "x");
+    const r = await parseHakkaFiles([{ name: "adat.csv", data: strToU8(csv) }], norm, "x");
     expect(r.rules[norm("Mór Városi Önkormányzat")]?.exemptBelow).toBe(2_500_000);
+  });
+  it("CSV idézőjeles mezőkkel (vessző az értékben), CRLF", async () => {
+    const csv = aoa.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const r = await parseHakkaFiles([{ name: "adat.csv", data: strToU8(csv) }], norm, "x");
+    expect(r.rules[norm("Mór Városi Önkormányzat")]).toMatchObject({ rate: 0.02, exemptBelow: 2_500_000 });
+    expect(r.rules[norm("Kisfalu Község Önkormányzata")]?.rate).toBe(0.015);
+  });
+  it("régi .xls: érthető üzenet, nem hiba", async () => {
+    const r = await parseHakkaFiles([{ name: "regi.xls", data: new Uint8Array([0xd0, 0xcf, 0x11, 0xe0]) }], norm, "x");
+    expect(r.diagnostics.some((d) => d.includes("xlsx-ként"))).toBe(true);
   });
 });
