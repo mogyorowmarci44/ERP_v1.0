@@ -4,21 +4,21 @@ const series = Array.from({ length: 30 }, (_, i) => 3_200_000 + Math.round(Math.
 
 export const pezcar: CompanySnapshot = {
   companyId: 1, name: "PezCar Kft", private: false, date: "2026-11-24", day: "2026-11-23",
-  headline: "Tegnap 1 autó ment el 486 e Ft nettó fedezettel. 2 teendő vár, ebből 1 sürgős.",
+  headline: "Tegnap eladtunk egy autót, 486 e Ft nettó fedezettel. Két dolog vár rád, az egyik sürgős.",
   kpi: { cash: 2_310_000, cashHuf: 412_500, liquidity: 2_356_000, revenueDay: 2_748_000, stock: 4, lateReceivable: 0, lateReceivableCount: 0 },
   results: { month: 612_000, quarter: 1_840_000, year: 4_900_000, yearForecast: 6_350_000, yearForecastAfterTax: 5_780_000, forecastPartial: false },
   deadlines: { vat: { date: "2026-12-21", days: 27 }, payroll: { date: "2026-12-14", days: 20 } },
   todos: [
-    { level: "red", text: "Járulékbevallás, 2026. október – nincs beküldve", path: "/c/1/filings" },
-    { level: "yellow", text: "12 beérkező bizonylat könyvelésre vár", path: "/c/1/inbox" },
+    { level: "red", text: "Az októberi járulékbevallás még nincs beadva", path: "/c/1/filings" },
+    { level: "yellow", text: "12 beérkező bizonylat vár könyvelésre", path: "/c/1/inbox" },
   ],
   cars: {
     daysSinceSale: 1, capital: 11_200_000, avgDays: 58,
     soldDay: [{ title: "Suzuki Vitara (RLM-512)", f2: 486_000 }],
     lanes: { red: { count: 1, capital: 6_700_000, holding: 312_000 }, yellow: { count: 1, capital: 2_300_000, holding: 61_000 }, green: { count: 2, capital: 2_200_000, holding: 21_000 } },
     top: [
-      { title: "Suzuki SX4 (NKR-204)", days: 96, holding: 142_000, status: "red", note: "8 nap múlva nullszaldó" },
-      { title: "Suzuki Swift (SMR-731)", days: 71, holding: 61_000, status: "yellow", note: "cél ár 2 590 e Ft, most 2 690 e Ft" },
+      { title: "Suzuki SX4 (NKR-204)", days: 96, holding: 142_000, status: "red", note: "8 nap múlva elfogy rajta a nyereség" },
+      { title: "Suzuki Swift (SMR-731)", days: 71, holding: 61_000, status: "yellow", note: "most 2 690 e Ft, a célár 2 790 e Ft" },
     ],
     greenCount: 2,
   },
