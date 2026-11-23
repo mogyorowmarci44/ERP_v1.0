@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Mail,
   Gauge,
   ShieldCheck,
   LayoutDashboard,
@@ -142,6 +143,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/fx`}><Coins />Árfolyamok (MNB)</NavLink>
 
           <div className="group">Rendszer</div>
+          <NavLink href={`${b}/summary`}><Mail />Napi összefoglaló</NavLink>
           <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
           <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
           <NavLink href={`${b}/import`}><Upload />Adatimport / export</NavLink>

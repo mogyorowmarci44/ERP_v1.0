@@ -15,3 +15,10 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      # v3.9.2 – napi összefoglaló e-mail (Gmail alkalmazásjelszó) és az ütemező titkos kulcsa
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: CRON_SECRET
+        sync: false

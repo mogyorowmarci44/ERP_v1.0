@@ -1087,3 +1087,22 @@ export const taxFilings = pgTable(
   },
   (t) => [uniqueIndex("tax_filings_hash").on(t.companyId, t.sha256), index("tax_filings_period").on(t.companyId, t.form, t.periodFrom)],
 );
+
+/**
+ * v3.9.2 – Napi összefoglaló e-mail címzettjei cégenként. A változat a tartalmat adja:
+ * ceo = számok + teendők + autókészlet, cfo = számok + teendők + pénzügyi napló (CSV melléklettel), full = mind.
+ * A holding e-mail címzettjei az app_settings „dailySummary” kulcsában vannak (nem cégenkéntiek).
+ */
+export const summaryRecipients = pgTable(
+  "summary_recipients",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    variant: varchar("variant", { length: 8 }).notNull().default("ceo"),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("summary_recipients_company_email").on(t.companyId, t.email)],
+);
