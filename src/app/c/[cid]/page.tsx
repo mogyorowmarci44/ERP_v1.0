@@ -16,6 +16,7 @@ import { unclosedVatPeriods } from "@/lib/vat-closing";
 import { dueAccruals } from "@/lib/accruals";
 import { operationStartOf } from "@/lib/kpi";
 import { salesGap, type GapTone } from "@/lib/sales-gap";
+import { draftCounts, draftText } from "@/lib/drafts";
 
 const INBOX_TODO = ["review", "error", "new", "extracted"];
 const STALE_DAYS = 90;
@@ -45,14 +46,14 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   const { company } = await requireCompany(cid);
   const t = today();
   if (isPrivate(company)) return <GhOverview cid={cid} profile={company.taxProfile} sp={await searchParams} />;
-  const [tb, recv, pay, stock, vat, [inbox], [drafts], [last], money] = await Promise.all([
+  const [tb, recv, pay, stock, vat, [inbox], drafts, [last], money] = await Promise.all([
     trialBalance(cid, yearStart(t), t),
     openItems(cid, "out"),
     openItems(cid, "in"),
     vehicleStock(cid),
     vatAnalytics(cid, monthStart(t), monthEnd(t)),
     db.select({ n: count() }).from(schema.inboxDocuments).where(and(eq(schema.inboxDocuments.companyId, cid), inArray(schema.inboxDocuments.status, INBOX_TODO))),
-    db.select({ n: count() }).from(schema.invoices).where(and(eq(schema.invoices.companyId, cid), eq(schema.invoices.status, "draft"))),
+    draftCounts(cid),
     db.select({ at: max(schema.journalEntries.createdAt) }).from(schema.journalEntries).where(eq(schema.journalEntries.companyId, cid)),
     cashSplit(cid, t),
   ]);
@@ -82,7 +83,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   type Todo = { icon: React.ReactNode; text: string; href: string; tag: string; warn?: boolean };
   const todos: Todo[] = [];
   if (inbox.n) todos.push({ icon: <Inbox />, text: `${inbox.n} beérkező bizonylat könyvelésre vár`, href: `${b}/inbox`, tag: "Megnyitás" });
-  if (drafts.n) todos.push({ icon: <FilePlus2 />, text: `${drafts.n} számla piszkozatban – még nincs lekönyvelve`, href: `${b}/invoices?dir=in`, tag: "Piszkozat" });
+  if (drafts.total) todos.push({ icon: <FilePlus2 />, text: draftText(drafts), href: drafts.href, tag: "Piszkozat" });
   if (recvLate.length) todos.push({ icon: <Clock />, text: `${recvLate.length} lejárt vevőszámla · ${eFt(recvLate.reduce((s, r) => s + toHuf(r), 0))}`, href: `${b}/reports/open-items`, tag: "Lejárt", warn: true });
   if (payLate.length) todos.push({ icon: <Clock />, text: `${payLate.length} lejárt szállítói számla · ${eFt(payLate.reduce((s, r) => s + toHuf(r), 0))}`, href: `${b}/reports/open-items`, tag: "Fizetendő", warn: true });
   todos.push({ icon: <Percent />, text: `Következő ÁFA-bevallás határideje: ${fmtDate(vatDue)}`, href: `${b}/reports/vat`, tag: `${vatDays} nap`, warn: vatDays <= 5 });

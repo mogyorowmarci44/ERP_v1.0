@@ -189,6 +189,22 @@ export async function cancelInvoiceAction(fd: FormData) {
   });
 }
 
+/** v3.9.4 – Piszkozat rontottnak (érvénytelenített papírszámla) jelölése / visszavonása. */
+export async function voidInvoiceAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  const id = Number(fd.get("id"));
+  await runOrRedirect(`/c/${cid}/invoices/${id}`, async () => {
+    const [inv] = await db.select().from(schema.invoices).where(and(eq(schema.invoices.id, id), eq(schema.invoices.companyId, cid)));
+    if (!inv) throw new Error("A számla nem található.");
+    if (inv.status !== "draft") throw new Error("Csak piszkozat jelölhető rontottnak (könyvelt számlát sztornózni kell).");
+    const on = fd.get("on") === "1";
+    await db.update(schema.invoices).set({ voidedAt: on ? new Date() : null }).where(eq(schema.invoices.id, id));
+    revalidatePath(`/c/${cid}/invoices`);
+    return `/c/${cid}/invoices/${id}?ok=${encodeURIComponent(on ? "Rontottnak jelölve – nem könyvelendő, nem teendő." : "Rontott jelölés visszavonva.")}`;
+  });
+}
+
 /** Könyvelt számla tételmegnevezésének javítása (összeg nem változik), naplózva. */
 export async function renameInvoiceLineAction(fd: FormData) {
   const cid = cidOf(fd);

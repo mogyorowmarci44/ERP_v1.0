@@ -11,7 +11,6 @@ import { isPrivate } from "@/lib/entity";
 import { nextVatDeadline } from "@/lib/vat-deadline";
 import { cashSplit } from "@/lib/cash-split";
 import { unclosedVatPeriods } from "@/lib/vat-closing";
-import { dueAccruals } from "@/lib/accruals";
 import { operationStartOf } from "@/lib/kpi";
 import { salesGap } from "@/lib/sales-gap";
 import { filingsOverview } from "@/lib/filings";
@@ -24,6 +23,10 @@ import { loadGuesthouse } from "@/lib/guesthouse";
 import { kpis, sumRange } from "@/lib/gh-calc";
 import { accommodationStart, availableDays } from "@/lib/gh-view";
 import { MEMBER_LOAN_ACCOUNT } from "@/lib/member-loans";
+import { draftCounts, draftText } from "@/lib/drafts";
+import { dueDate, formFor, nextWorkday } from "@/lib/anyk";
+
+const periodKey = (d: string) => d.slice(0, 7);
 import { money } from "./format";
 
 export type Level = "red" | "yellow" | "green";
@@ -38,7 +41,11 @@ export type CompanySnapshot = {
   date: string; // a küldés napja
   day: string; // a „tegnap”
   headline: string;
-  kpi: { cash: number; revenueDay: number; stock: number | null; lateReceivable: number; lateReceivableCount: number };
+  kpi: { cash: number; cashHuf: number; liquidity: number; revenueDay: number; stock: number | null; lateReceivable: number; lateReceivableCount: number };
+  /** v3.9.4 – eredmények: folyó hó / negyedév / év (tény) és teljes év a Forecast alapján. */
+  results: { month: number; quarter: number; year: number; yearForecast: number | null; yearForecastAfterTax: number | null; forecastPartial: boolean };
+  /** v3.9.4 – következő bevallási határidők. */
+  deadlines: { vat: { date: string; days: number } | null; payroll: { date: string; days: number } | null };
   todos: Todo[];
   cars: null | {
     daysSinceSale: number | null;
@@ -99,7 +106,10 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
   const ms = monthStart(t);
   const pt = prevMonthSameDay(t);
 
-  const [tbDay, tbMtd, tbPrev, tbYtd, tbNow, recv, pay, cash, vat, [inbox], [drafts]] = await Promise.all([
+  const qs = `${t.slice(0, 5)}${String(Math.floor((Number(t.slice(5, 7)) - 1) / 3) * 3 + 1).padStart(2, "0")}-01`;
+  const settings = company.settings as { summaryExcludeVehicles?: number[] | null };
+  const excluded = new Set(settings?.summaryExcludeVehicles ?? []);
+  const [tbDay, tbMtd, tbPrev, tbYtd, tbNow, recv, pay, cash, vat, [inbox], drafts, tbQtd] = await Promise.all([
     trialBalance(cid, day, day),
     trialBalance(cid, ms, t),
     trialBalance(cid, monthStart(pt), pt),
@@ -110,7 +120,8 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
     cashSplit(cid, t),
     vatAnalytics(cid, ms, t),
     db.select({ n: count() }).from(schema.inboxDocuments).where(and(eq(schema.inboxDocuments.companyId, cid), inArray(schema.inboxDocuments.status, INBOX_TODO))),
-    db.select({ n: count() }).from(schema.invoices).where(and(eq(schema.invoices.companyId, cid), eq(schema.invoices.status, "draft"))),
+    draftCounts(cid),
+    trialBalance(cid, qs, t),
   ]);
   const cashTotal = sum(cash.map((c) => c.huf));
   const recvLate = recv.filter((r) => r.dueDate && r.dueDate < t);
@@ -120,9 +131,16 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
   // --- Teendők -----------------------------------------------------------
   const todos: Todo[] = [];
   for (const c of cash) if (c.huf < -0.5 && c.key.startsWith("cash")) todos.push({ level: "red", text: `Negatív pénztáregyenleg (${c.label}): ${eFt(c.huf)}`, path: `${p}/money` });
+  let payrollDeadline: CompanySnapshot["deadlines"]["payroll"] = null;
   if (!priv) {
     try {
       const fo = await filingsOverview(cid);
+      if (fo.payroll.length) {
+        // a következő járulékbevallás: az előző hó bevallása, ha még nem járt le, különben a folyó hóé
+        const prev = periodKey(addDaysIso(monthStart(t), -1));
+        const due = dueDate(formFor("payroll", prev), prev) >= t ? dueDate(formFor("payroll", prev), prev) : dueDate(formFor("payroll", periodKey(t)), periodKey(t));
+        payrollDeadline = { date: due, days: daysBetween(t, due) };
+      }
       for (const r of fo.vat) {
         if (r.status === "missing") todos.push({ level: "red", text: `ÁFA-bevallás, ${ym(r.period)} – nincs beküldve (határidő: ${r.due.replaceAll("-", ".")}.)`, path: `${p}/filings` });
         else if (r.status === "due") todos.push({ level: "yellow", text: `ÁFA-bevallás, ${ym(r.period)} – esedékes ${r.due.replaceAll("-", ".")}.`, path: `${p}/filings` });
@@ -138,21 +156,23 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
   if (recvLate.length) todos.push({ level: "yellow", text: `${recvLate.length} lejárt vevőszámla · ${eFt(sum(recvLate.map(toHuf)))}`, path: `${p}/reports/open-items` });
   if (payLate.length) todos.push({ level: "yellow", text: `${payLate.length} lejárt szállítói számla · ${eFt(sum(payLate.map(toHuf)))}`, path: `${p}/reports/open-items` });
   if (inbox.n) todos.push({ level: "yellow", text: `${inbox.n} beérkező bizonylat könyvelésre vár`, path: `${p}/inbox` });
-  if (drafts.n) todos.push({ level: "yellow", text: `${drafts.n} számla piszkozatban`, path: `${p}/invoices?dir=in` });
-  const [vatOpen, accDue] = await Promise.all([unclosedVatPeriods(cid).catch(() => []), dueAccruals(cid).catch(() => [])]);
+  if (drafts.total) todos.push({ level: "yellow", text: draftText(drafts), path: drafts.href });
+  const vatOpen = await unclosedVatPeriods(cid).catch(() => []);
   if (vatOpen.length) todos.push({ level: "yellow", text: `${vatOpen.length} lejárt ÁFA-időszak nincs lezárva`, path: `${p}/reports/vat/closing` });
-  if (accDue.length) todos.push({ level: "yellow", text: `${accDue.length} időbeli elhatárolás feloldásra vár`, path: `${p}/closing/accruals` });
+  // v3.9.4: az időbeli elhatárolások nem kerülnek a napi összefoglalóba
+  let vatDeadline: CompanySnapshot["deadlines"]["vat"] = null;
   if (!priv) {
-    const vatDue = nextVatDeadline(company.vatPeriod, t);
-    const d = daysBetween(t, vatDue);
-    todos.push({ level: d <= 5 ? "yellow" : "green", text: `Következő ÁFA-határidő: ${vatDue.replaceAll("-", ".")}. (${d} nap)`, path: `${p}/reports/vat` });
+    const vatDue = nextWorkday(nextVatDeadline(company.vatPeriod, t));
+    vatDeadline = { date: vatDue, days: daysBetween(t, vatDue) };
+    if (vatDeadline.days <= 5) todos.push({ level: "yellow", text: `ÁFA-bevallás határideje ${vatDue.replaceAll("-", ".")}. (${vatDeadline.days} nap)`, path: `${p}/filings` });
   }
+  if (payrollDeadline && payrollDeadline.days <= 5) todos.push({ level: "yellow", text: `Járulékbevallás határideje ${payrollDeadline.date.replaceAll("-", ".")}. (${payrollDeadline.days} nap)`, path: `${p}/filings` });
   todos.sort((a, b) => "ryg".indexOf(a.level[0]) - "ryg".indexOf(b.level[0]));
 
   // --- Autók -------------------------------------------------------------
   let cars: CompanySnapshot["cars"] = null;
   if (!priv) {
-    const [stockCars, soldCars, redDays, saleRows, opStart] = await Promise.all([
+    const [stockAll, soldCars, redDays, saleRows, opStart] = await Promise.all([
       loadStockCars(cid),
       loadSoldCars(cid, day, day),
       redDaysOf(cid),
@@ -160,6 +180,7 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
         where i.company_id = ${cid} and i.direction = 'out' and i.status = 'posted' and il.vehicle_id is not null`) as unknown as Promise<Array<{ d: string }>>,
       operationStartOf(cid),
     ]);
+    const stockCars = stockAll.filter((c) => !excluded.has(c.id));
     const sv = stockView(stockCars, redDays);
     const sold = soldView(soldCars);
     const lane = (rows: typeof sv.red) => ({ count: rows.length, capital: sum(rows.map((x) => x.r.capital)), holding: sum(rows.map((x) => x.r.holding)) });
@@ -193,9 +214,12 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
     };
   });
   let cashIn30: number | null = null;
+  let yearFc: { preTax: number; afterTax: number; partial: boolean } | null = null;
   if (!priv) {
     try {
       const fc = runForecast(await loadForecastInput(cid), "base", "week");
+      const fy = fc.years.find((y) => y.year === t.slice(0, 4));
+      if (fy) yearFc = { preTax: fy.preTax, afterTax: fy.afterTax, partial: fy.partial };
       const target = addDaysIso(t, 30);
       const w = fc.months.find((m) => m.start <= target && m.end >= target) ?? fc.months.at(-1);
       cashIn30 = w ? w.endCash + w.endBank : null;
@@ -209,8 +233,11 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
   const payablesDue14 = sum(pay.filter((r) => !r.dueDate || r.dueDate <= addDaysIso(t, 14)).map(toHuf));
   const memberLoansBal = Math.max(0, -balOf(tbNow, (c) => c.startsWith(MEMBER_LOAN_ACCOUNT)));
   let cashSeries: number[] = [];
+  let liquidity = cashTotal;
   try {
     const mm = await moneyMonitor(cid, addDaysIso(t, -29), t, "day");
+    // napi értéken: a devizás számlák a mai MNB árfolyamon
+    liquidity = sum(mm.accounts.filter((a) => !a.code.startsWith("389")).map((a) => a.revaluedHuf ?? a.balanceHuf));
     const n = mm.columns.length;
     cashSeries = Array.from({ length: n }, (_, i) => sum(mm.accounts.filter((a) => !a.code.startsWith("389")).map((a) => a.series[i]?.close ?? 0)));
   } catch {
@@ -250,11 +277,22 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
     headline: parts.join(" "),
     kpi: {
       cash: cashTotal,
+      cashHuf: cash.find((c) => c.key === "cashHuf")?.huf ?? 0,
+      liquidity,
       revenueDay: revenueOf(tbDay),
       stock: cars ? cars.lanes.red.count + cars.lanes.yellow.count + cars.lanes.green.count : null,
       lateReceivable: sum(recvLate.map(toHuf)),
       lateReceivableCount: recvLate.length,
     },
+    results: {
+      month: resultOf(tbMtd),
+      quarter: resultOf(tbQtd),
+      year: resultOf(tbYtd),
+      yearForecast: yearFc?.preTax ?? null,
+      yearForecastAfterTax: yearFc?.afterTax ?? null,
+      forecastPartial: yearFc?.partial ?? false,
+    },
+    deadlines: { vat: vatDeadline, payroll: payrollDeadline },
     todos,
     cars,
     finance: {

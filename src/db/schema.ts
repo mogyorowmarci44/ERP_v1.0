@@ -270,6 +270,8 @@ export type CompanySettings = {
   holdingFixPerDay?: number | null;
   /** v3.5.0 – KészletMérleg: ennyi napon belül elért nullszaldó már „beavatkozni” (piros). */
   merlegRedDays?: number | null;
+  /** v3.9.4 – a napi összefoglalóból kihagyott (szándékosan készleten tartott) gépkocsik. */
+  summaryExcludeVehicles?: number[] | null;
   /** v3.3.3 – Az ERP előtti évek elhatárolt vesztesége (keletkezés éve, összeg). */
   openingLosses?: { year: string; amount: number }[] | null;
 };
@@ -582,6 +584,8 @@ export const invoices = pgTable(
     status: docStatusEnum("status").notNull().default("draft"),
     /** Újranyitott (javításra visszavett) számla eredeti könyvelési tételszáma – újrakönyveléskor ezt kapja vissza. */
     reuseEntryNumber: varchar("reuse_entry_number", { length: 32 }),
+    /** v3.9.4 – rontott / érvénytelenített (papír) számla: piszkozatként, a sorszám miatt marad; nem könyvelhető, nem teendő. */
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
     journalEntryId: integer("journal_entry_id").references(() => journalEntries.id),
     note: text("note"),
     /** v2.2 – helyesbítő számla: az eredeti (helyesbített) számla. */

@@ -1,13 +1,15 @@
 /** v3.9.2 – Napi összefoglaló e-mail: címzettek és változatuk cégenként, előnézet, próbaküldés. */
 import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { Flash } from "@/components/Flash";
 import { companySnapshot } from "@/lib/daily-summary/data";
 import { renderCompanyMail, VARIANT_LABEL, type Variant } from "@/lib/daily-summary/render";
 import { companyEnabled, getSummarySettings, smtpConfigured } from "@/lib/daily-summary/send";
-import { addRecipientAction, updateRecipientAction, testRecipientAction, toggleCompanySummaryAction } from "./actions";
+import { addRecipientAction, updateRecipientAction, testRecipientAction, toggleCompanySummaryAction, saveSummaryExcludeAction } from "./actions";
+import { inArray } from "drizzle-orm";
+import { isPrivate } from "@/lib/entity";
 import { SummarySwitch } from "@/components/SummarySwitch";
 
 const VARIANTS = Object.keys(VARIANT_LABEL) as Variant[];
@@ -22,6 +24,9 @@ export default async function SummaryPage({ params, searchParams }: { params: Pr
     db.select().from(schema.summaryRecipients).where(eq(schema.summaryRecipients.companyId, cid)).orderBy(asc(schema.summaryRecipients.name)),
     getSummarySettings(),
   ]);
+  const stockCars = isPrivate(company) ? [] : await db.select().from(schema.vehicles)
+    .where(and(eq(schema.vehicles.companyId, cid), inArray(schema.vehicles.status, ["in_stock", "reserved"]))).orderBy(asc(schema.vehicles.make), asc(schema.vehicles.model));
+  const excluded = new Set((company.settings as { summaryExcludeVehicles?: number[] | null }).summaryExcludeVehicles ?? []);
   const pv: Variant = VARIANTS.find((v) => v === sp.preview) ?? "ceo";
   let preview = "";
   let previewError = "";
@@ -109,6 +114,25 @@ export default async function SummaryPage({ params, searchParams }: { params: Pr
         Ügyvezető: számok, teendők, autókészlet. Pénzügyes: számok, teendők, pénzügyi napló + a tegnapi napló CSV-ben. Teljes: mind a négy blokk.
         A holding összesítő e-mail címzettjeit az <Link href="/admin/summary">Admin › Napi összefoglaló</Link> oldalon lehet beállítani.
       </p>
+
+      {stockCars.length > 0 && (
+        <>
+          <h2>Kihagyott autók</h2>
+          <form action={saveSummaryExcludeAction} className="card">
+            <input type="hidden" name="cid" value={cid} />
+            <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>A bejelölt autók nem szerepelnek az összefoglalóban (készletszám, lekötött tőke, sávok) – pl. a szándékosan készleten tartott autó.</p>
+            <div className="row" style={{ flexWrap: "wrap", gap: "8px 20px" }}>
+              {stockCars.map((v) => (
+                <label key={v.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input type="checkbox" name="exclude" value={v.id} defaultChecked={excluded.has(v.id)} disabled={!canWrite} />
+                  {v.make} {v.model}{v.plate ? ` (${v.plate})` : ""}
+                </label>
+              ))}
+            </div>
+            {canWrite && <div style={{ marginTop: 10 }}><button>Mentés</button></div>}
+          </form>
+        </>
+      )}
 
       <h2 style={{ display: "flex", alignItems: "center", gap: 12 }}>
         Előnézet
