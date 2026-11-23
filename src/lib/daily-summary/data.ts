@@ -368,6 +368,9 @@ export async function holdingSnapshot(t = today(), cache = new Map<number, Compa
   };
   const red = S((c) => c.todos.filter((x) => x.level === "red").length);
   const open = S((c) => c.todos.filter((x) => x.level !== "green").length);
-  const headline = `A cégcsoportnak ${money(cash)} pénze van, ebben a hónapban eddig ${money(totals.mtdResult, true)} az eredmény. ${open ? `${open} teendő${red ? `, ebből ${red} sürgős` : ""}.` : "Minden rendben."}`;
+  const cnt = (n: number) => (n <= 10 ? numberToHungarian(n).replace(/kettő$/, "két") : String(n));
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+  const todoTxt = open ? `${cap(cnt(open))} dolog vár rád${red ? (red === open ? (open === 1 ? ", és sürgős" : ", mind sürgős") : red === 1 ? ", az egyik sürgős" : `, ebből ${cnt(red)} sürgős`) : ""}.` : "Minden rendben, nincs teendő.";
+  const headline = `A cégcsoportnak ${money(S((c) => c.kpi.liquidity))} pénze van, ebben a hónapban eddig ${money(totals.mtdResult, true)} az eredmény. ${todoTxt}`;
   return { date: t, day: addDaysIso(t, -1), companies, totals, cashSeries, lanes: { red: lane("red"), yellow: lane("yellow"), green: lane("green") }, bestSale, headline };
 }

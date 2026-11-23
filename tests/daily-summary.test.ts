@@ -18,19 +18,22 @@ describe("pénz formázás", () => {
 describe("változatok blokkjai", () => {
   it("ügyvezető: autókészlet igen, napló nem", () => {
     const m = renderCompanyMail(pezcar, "ceo");
-    expect(m.html).toContain("Autókészlet");
-    expect(m.html).not.toContain("Pénzügyi napló");
-    expect(m.subject).toBe("PezCar Kft – napi jelentés, nov. 24. · 2 teendő");
+    expect(m.html).toContain("KészletMérleg szerint");
+    expect(m.html).not.toContain("Tegnapi egyéb történések");
+    expect(m.html).toContain("PezCar Kft</td>");
+    expect(m.subject).toBe("PezCar Kft – napi összefoglaló, nov. 24. · 2 teendő");
   });
   it("pénzügyes: napló igen, autókészlet nem", () => {
     const m = renderCompanyMail(pezcar, "cfo");
-    expect(m.html).toContain("Pénzügyi napló");
-    expect(m.html).not.toContain("KészletMérleg megnyitása");
+    expect(m.html).toContain("Tegnapi egyéb történések");
+    expect(m.html).not.toContain("KészletMérleg szerint");
   });
   it("teljes: mind", () => {
     const m = renderCompanyMail(pezcar, "full");
-    expect(m.html).toContain("Pénzügyi napló");
-    expect(m.html).toContain("Autókészlet");
+    expect(m.html).toContain("Tegnapi egyéb történések");
+    expect(m.html).toContain("KészletMérleg szerint");
+    expect(m.html).toContain("Várható éves eredmény (2026)");
+    expect(m.html).toContain("Járulékbevallás");
     expect(m.html).toContain("Mogyorosi Holding™");
   });
   it("escape-el", () => {
@@ -45,7 +48,7 @@ describe("holding", () => {
     expect(m.html).toContain("MM Car Trade Kft");
     expect(m.html).toContain("<b>PezCar Kft</b> · ");
     expect(m.html).toContain("43%");
-    expect(m.subject).toMatch(/^Holding napi jelentés, nov\. 24\./);
+    expect(m.subject).toMatch(/^Mogyorosi Holding – napi összefoglaló, nov\. 24\./);
   });
 });
 

@@ -36,9 +36,10 @@ export const pezcar: CompanySnapshot = {
 export const mmcar: CompanySnapshot = {
   ...pezcar, companyId: 2, name: "MM Car Trade Kft", headline: "Tegnap nem volt eladás, az utolsó óta 9 nap telt el. 1 teendő vár.",
   kpi: { cash: 1_950_000, cashHuf: 180_000, liquidity: 1_950_000, revenueDay: 0, stock: 3, lateReceivable: 0, lateReceivableCount: 0 },
-  todos: [{ level: "yellow", text: "1 lejárt szállítói számla · 82 eFt", path: "/c/2/reports/open-items" }],
+  todos: [{ level: "yellow", text: "1 szállítói számla fizetési határideje lejárt · 82 e Ft", path: "/c/2/reports/open-items" }],
   cars: { ...pezcar.cars!, daysSinceSale: 9, soldDay: [], capital: 7_200_000, lanes: { red: { count: 0, capital: 0, holding: 0 }, yellow: { count: 1, capital: 2_300_000, holding: 60_000 }, green: { count: 2, capital: 4_900_000, holding: 37_000 } }, top: [pezcar.cars!.top[1]] },
   finance: { ...pezcar.finance, mtdResult: 240_000, prevMtdResult: 190_000 },
+  results: { month: 240_000, quarter: 520_000, year: 1_100_000, yearForecast: 1_450_000, yearForecastAfterTax: 1_310_000, forecastPartial: false },
   extra: { ...pezcar.extra, memberLoans: 0, taxLiability: 200_000, payablesDue14: 120_000, cashSeries: series.map((x) => x * 0.6) },
 };
 
@@ -46,6 +47,8 @@ export const dezsavu: CompanySnapshot = {
   ...pezcar, companyId: 3, name: "Dézsavű", private: true, headline: "Hó eddig 11 vendégéjszaka. Minden rendben.",
   kpi: { cash: 560_000, cashHuf: 60_000, liquidity: 560_000, revenueDay: 42_000, stock: null, lateReceivable: 0, lateReceivableCount: 0 },
   todos: [], cars: null, finance: { ...pezcar.finance, mtdResult: 118_000, prevMtdResult: 90_000, cashIn30: null },
+  results: { month: 118_000, quarter: 260_000, year: 400_000, yearForecast: null, yearForecastAfterTax: null, forecastPartial: false },
+  deadlines: { vat: null, payroll: null },
   extra: { ...pezcar.extra, memberLoans: 0, taxLiability: 0, payablesDue14: 0, cashSeries: series.map((x) => x * 0.15), guesthouse: { occupancy: 0.43, nextStay: "2026-11-28", nights: 11 } },
 };
 
@@ -55,5 +58,5 @@ export const holding: HoldingSnapshot = {
   cashSeries: series.map((x) => x * 1.75),
   lanes: { red: { count: 1, capital: 6_700_000, holding: 312_000 }, yellow: { count: 2, capital: 4_600_000, holding: 121_000 }, green: { count: 4, capital: 7_100_000, holding: 58_000 } },
   bestSale: { company: "PezCar Kft", title: "Suzuki Vitara (RLM-512)", f2: 486_000 },
-  headline: "A holding pénze 4,82 M Ft, hó eddig +970 e Ft eredmény. 3 teendő, ebből 1 sürgős.",
+  headline: "A cégcsoportnak 4,87 M Ft pénze van, ebben a hónapban eddig +970 e Ft az eredmény. Három dolog vár rád, az egyik sürgős.",
 };
