@@ -6,7 +6,8 @@ export const pezcar: CompanySnapshot = {
   companyId: 1, name: "PezCar Kft", private: false, date: "2026-11-24", day: "2026-11-23",
   headline: "Tegnap eladtunk egy autót, 486 e Ft nettó fedezettel. Két dolog vár rád, az egyik sürgős.",
   kpi: { cash: 2_310_000, cashHuf: 412_500, liquidity: 2_356_000, revenueDay: 2_748_000, stock: 4, lateReceivable: 0, lateReceivableCount: 0 },
-  results: { month: 612_000, quarter: 1_840_000, year: 4_900_000, yearForecast: 6_350_000, yearForecastAfterTax: 5_780_000, forecastPartial: false },
+  stockValue: { purchase: 9_850_000, value: 11_620_000, pct: 0.18, count: 4 },
+  results: { month: -73_000, quarter: 0, year: 1_840_000, yearForecast: 2_350_000, yearForecastAfterTax: 2_130_000, forecastPartial: false },
   deadlines: { vat: { date: "2026-12-21", days: 27 }, payroll: { date: "2026-12-14", days: 20 } },
   todos: [
     { level: "red", text: "Az októberi járulékbevallás még nincs beadva", path: "/c/1/filings" },
@@ -46,7 +47,7 @@ export const mmcar: CompanySnapshot = {
 export const dezsavu: CompanySnapshot = {
   ...pezcar, companyId: 3, name: "Dézsavű", private: true, headline: "Hó eddig 11 vendégéjszaka. Minden rendben.",
   kpi: { cash: 560_000, cashHuf: 60_000, liquidity: 560_000, revenueDay: 42_000, stock: null, lateReceivable: 0, lateReceivableCount: 0 },
-  todos: [], cars: null, finance: { ...pezcar.finance, mtdResult: 118_000, prevMtdResult: 90_000, cashIn30: null },
+  todos: [], cars: null, stockValue: null, finance: { ...pezcar.finance, mtdResult: 118_000, prevMtdResult: 90_000, cashIn30: null },
   results: { month: 118_000, quarter: 260_000, year: 400_000, yearForecast: null, yearForecastAfterTax: null, forecastPartial: false },
   deadlines: { vat: null, payroll: null },
   extra: { ...pezcar.extra, memberLoans: 0, taxLiability: 0, payablesDue14: 0, cashSeries: series.map((x) => x * 0.15), guesthouse: { occupancy: 0.43, nextStay: "2026-11-28", nights: 11 } },

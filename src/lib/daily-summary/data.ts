@@ -11,7 +11,7 @@ import { isPrivate } from "@/lib/entity";
 import { nextVatDeadline } from "@/lib/vat-deadline";
 import { cashSplit } from "@/lib/cash-split";
 import { unclosedVatPeriods } from "@/lib/vat-closing";
-import { operationStartOf } from "@/lib/kpi";
+import { companyKpis, operationStartOf } from "@/lib/kpi";
 import { salesGap } from "@/lib/sales-gap";
 import { filingsOverview } from "@/lib/filings";
 import { loadStockCars, loadSoldCars, redDaysOf } from "@/lib/keszlet-merleg";
@@ -43,6 +43,8 @@ export type CompanySnapshot = {
   day: string; // a „tegnap”
   headline: string;
   kpi: { cash: number; cashHuf: number; liquidity: number; revenueDay: number; stock: number | null; lateReceivable: number; lateReceivableCount: number };
+  /** v3.9.5 – a készlet értéke: beszerzési ár × (1 + medián bruttó fedezet %). */
+  stockValue: { purchase: number; value: number; pct: number | null; count: number } | null;
   /** v3.9.4 – eredmények: folyó hó / negyedév / év (tény) és teljes év a Forecast alapján. */
   results: { month: number; quarter: number; year: number; yearForecast: number | null; yearForecastAfterTax: number | null; forecastPartial: boolean };
   /** v3.9.4 – következő bevallási határidők. */
@@ -206,6 +208,22 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
     };
   }
 
+  // --- Készlet értéke ----------------------------------------------------
+  let stockValue: CompanySnapshot["stockValue"] = null;
+  if (!priv) {
+    try {
+      const k = await companyKpis(cid, t);
+      if (k) {
+        const inStock = k.stock.cars.filter((c) => !excluded.has(c.id));
+        const purchase = sum(inStock.map((c) => c.base));
+        const pct = k.margin.medF1OnBase;
+        stockValue = { purchase, value: purchase * (1 + (pct ?? 0)), pct, count: inStock.length };
+      }
+    } catch {
+      stockValue = null;
+    }
+  }
+
   // --- Pénzügyi napló ----------------------------------------------------
   const entries = await journalList(cid, day, day);
   const entryRows: EntryRow[] = entries.map((e) => {
@@ -293,6 +311,7 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
       lateReceivable: sum(recvLate.map(toHuf)),
       lateReceivableCount: recvLate.length,
     },
+    stockValue,
     results: {
       month: resultOf(tbMtd),
       quarter: resultOf(tbQtd),

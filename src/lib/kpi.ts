@@ -256,6 +256,8 @@ export async function companyKpis(companyId: number, asOf = today()) {
       safety: beRevenue != null && monthlyRevenue > 0 ? (monthlyRevenue - beRevenue) / monthlyRevenue : null,
       medDaily: median(soldTtm.filter((c) => c.days && c.days > 0).map((c) => (c.saleNet - c.cost) / c.days!)),
       medOnCost: median(soldTtm.filter((c) => c.cost > 0).map((c) => (c.saleNet - c.cost) / c.cost)),
+      /** v3.9.5 – medián bruttó fedezet a beszerzési árhoz viszonyítva (TTM; ha nincs, az összes eladott autó). */
+      medF1OnBase: median((soldTtm.length ? soldTtm : cars.filter((c) => c.status === "sold")).filter((c) => c.base > 0).map((c) => (c.saleNet - c.base) / c.base)),
     },
     money: {
       cash: round2(cash), payables: round2(payables), fixedMonthly: round2(fixedMonthly),
