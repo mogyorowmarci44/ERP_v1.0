@@ -1,0 +1,326 @@
+/**
+ * v3.9.2 – Napi összefoglaló: adatgyűjtés cégenként és holding szinten.
+ * Minden szám a könyvelésből jön (ugyanazok a riportfüggvények, mint a felületen), a „tegnap” a küldés előtti nap.
+ */
+import "server-only";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { db, schema } from "@/db";
+import { trialBalance, openItems, journalList, vatAnalytics, type TrialBalanceRow } from "@/lib/reports";
+import { addDaysIso, monthStart, today } from "@/lib/dates";
+import { isPrivate } from "@/lib/entity";
+import { nextVatDeadline } from "@/lib/vat-deadline";
+import { cashSplit } from "@/lib/cash-split";
+import { unclosedVatPeriods } from "@/lib/vat-closing";
+import { dueAccruals } from "@/lib/accruals";
+import { operationStartOf } from "@/lib/kpi";
+import { salesGap } from "@/lib/sales-gap";
+import { filingsOverview } from "@/lib/filings";
+import { loadStockCars, loadSoldCars, redDaysOf } from "@/lib/keszlet-merleg";
+import { stockView, soldView, type KmStatus } from "@/lib/keszlet-merleg-calc";
+import { loadForecastInput } from "@/lib/forecast-data";
+import { runForecast } from "@/lib/forecast";
+import { moneyMonitor } from "@/lib/money-monitor";
+import { loadGuesthouse } from "@/lib/guesthouse";
+import { kpis, sumRange } from "@/lib/gh-calc";
+import { accommodationStart, availableDays } from "@/lib/gh-view";
+import { MEMBER_LOAN_ACCOUNT } from "@/lib/member-loans";
+import { money } from "./format";
+
+export type Level = "red" | "yellow" | "green";
+export type Todo = { level: Level; text: string; path: string };
+export type CarRow = { title: string; days: number | null; holding: number; status: KmStatus; note: string };
+export type EntryRow = { label: string; amount: number; debit: string; credit: string };
+
+export type CompanySnapshot = {
+  companyId: number;
+  name: string;
+  private: boolean;
+  date: string; // a küldés napja
+  day: string; // a „tegnap”
+  headline: string;
+  kpi: { cash: number; revenueDay: number; stock: number | null; lateReceivable: number; lateReceivableCount: number };
+  todos: Todo[];
+  cars: null | {
+    daysSinceSale: number | null;
+    capital: number;
+    avgDays: number | null;
+    soldDay: Array<{ title: string; f2: number }>;
+    lanes: Record<KmStatus, { count: number; capital: number; holding: number }>;
+    top: CarRow[];
+    greenCount: number;
+  };
+  finance: {
+    entries: EntryRow[];
+    entryCount: number;
+    mtdResult: number;
+    prevMtdResult: number;
+    vatBalance: number; // + = fizetendő
+    cashIn30: number | null;
+  };
+  /** Holding nézethez. */
+  extra: {
+    mtdRevenue: number;
+    ytdResult: number;
+    taxLiability: number;
+    payablesDue14: number;
+    memberLoans: number;
+    cashSeries: number[]; // utolsó 30 nap záró pénzeszköz
+    guesthouse: null | { occupancy: number | null; nextStay: string | null; nights: number };
+  };
+};
+
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+const balOf = (tb: TrialBalanceRow[], pred: (c: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
+const periodOf = (tb: TrialBalanceRow[], pred: (c: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.periodDebit - r.periodCredit, 0);
+/** Eredmény az időszak forgalmából: bevétel (9) − ráfordítás (5, 8). */
+const resultOf = (tb: TrialBalanceRow[]) => -periodOf(tb, (c) => c.startsWith("9")) - periodOf(tb, (c) => c.startsWith("5") || c.startsWith("8"));
+const revenueOf = (tb: TrialBalanceRow[]) => -periodOf(tb, (c) => c.startsWith("9"));
+const toHuf = (r: { currency: string; openFx: number; grossHuf: string | number; grossFx: string | number }) =>
+  r.currency === "HUF" ? r.openFx : (r.openFx * Number(r.grossHuf)) / Number(r.grossFx || 1);
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+const eFt = (n: number) => money(n);
+const HU_MONTH = ["január", "február", "március", "április", "május", "június", "július", "augusztus", "szeptember", "október", "november", "december"];
+const ym = (p: string) => `${p.slice(0, 4)}. ${HU_MONTH[Number(p.slice(5, 7)) - 1]}`;
+/** Előző hónap azonos napja (rövidebb hónapnál a hónap vége). */
+function prevMonthSameDay(t: string): string {
+  const y = Number(t.slice(0, 4)), m = Number(t.slice(5, 7)) - 1;
+  const py = m === 0 ? y - 1 : y, pm = m === 0 ? 12 : m;
+  const last = new Date(Date.UTC(py, pm, 0)).getUTCDate();
+  return `${py}-${String(pm).padStart(2, "0")}-${String(Math.min(Number(t.slice(8, 10)), last)).padStart(2, "0")}`;
+}
+
+const INBOX_TODO = ["review", "error", "new", "extracted"];
+
+export async function companySnapshot(cid: number, t = today()): Promise<CompanySnapshot> {
+  const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, cid));
+  if (!company) throw new Error(`Nincs ilyen cég: ${cid}`);
+  const priv = isPrivate(company);
+  const day = addDaysIso(t, -1);
+  const ms = monthStart(t);
+  const pt = prevMonthSameDay(t);
+
+  const [tbDay, tbMtd, tbPrev, tbYtd, tbNow, recv, pay, cash, vat, [inbox], [drafts]] = await Promise.all([
+    trialBalance(cid, day, day),
+    trialBalance(cid, ms, t),
+    trialBalance(cid, monthStart(pt), pt),
+    trialBalance(cid, `${t.slice(0, 4)}-01-01`, t),
+    trialBalance(cid, t, t),
+    openItems(cid, "out"),
+    openItems(cid, "in"),
+    cashSplit(cid, t),
+    vatAnalytics(cid, ms, t),
+    db.select({ n: count() }).from(schema.inboxDocuments).where(and(eq(schema.inboxDocuments.companyId, cid), inArray(schema.inboxDocuments.status, INBOX_TODO))),
+    db.select({ n: count() }).from(schema.invoices).where(and(eq(schema.invoices.companyId, cid), eq(schema.invoices.status, "draft"))),
+  ]);
+  const cashTotal = sum(cash.map((c) => c.huf));
+  const recvLate = recv.filter((r) => r.dueDate && r.dueDate < t);
+  const payLate = pay.filter((r) => r.dueDate && r.dueDate < t);
+  const p = `/c/${cid}`;
+
+  // --- Teendők -----------------------------------------------------------
+  const todos: Todo[] = [];
+  for (const c of cash) if (c.huf < -0.5 && c.key.startsWith("cash")) todos.push({ level: "red", text: `Negatív pénztáregyenleg (${c.label}): ${eFt(c.huf)}`, path: `${p}/money` });
+  if (!priv) {
+    try {
+      const fo = await filingsOverview(cid);
+      for (const r of fo.vat) {
+        if (r.status === "missing") todos.push({ level: "red", text: `ÁFA-bevallás, ${ym(r.period)} – nincs beküldve (határidő: ${r.due.replaceAll("-", ".")}.)`, path: `${p}/filings` });
+        else if (r.status === "due") todos.push({ level: "yellow", text: `ÁFA-bevallás, ${ym(r.period)} – esedékes ${r.due.replaceAll("-", ".")}.`, path: `${p}/filings` });
+      }
+      for (const r of fo.payroll) {
+        if (r.status === "missing") todos.push({ level: "red", text: `Járulékbevallás, ${ym(r.period)} – nincs beküldve`, path: `${p}/filings` });
+        else if (r.status === "due") todos.push({ level: "yellow", text: `Járulékbevallás, ${ym(r.period)} – esedékes ${r.due.replaceAll("-", ".")}.`, path: `${p}/filings` });
+      }
+    } catch {
+      /* a bevallás-áttekintő hibája ne állítsa meg az e-mailt */
+    }
+  }
+  if (recvLate.length) todos.push({ level: "yellow", text: `${recvLate.length} lejárt vevőszámla · ${eFt(sum(recvLate.map(toHuf)))}`, path: `${p}/reports/open-items` });
+  if (payLate.length) todos.push({ level: "yellow", text: `${payLate.length} lejárt szállítói számla · ${eFt(sum(payLate.map(toHuf)))}`, path: `${p}/reports/open-items` });
+  if (inbox.n) todos.push({ level: "yellow", text: `${inbox.n} beérkező bizonylat könyvelésre vár`, path: `${p}/inbox` });
+  if (drafts.n) todos.push({ level: "yellow", text: `${drafts.n} számla piszkozatban`, path: `${p}/invoices?dir=in` });
+  const [vatOpen, accDue] = await Promise.all([unclosedVatPeriods(cid).catch(() => []), dueAccruals(cid).catch(() => [])]);
+  if (vatOpen.length) todos.push({ level: "yellow", text: `${vatOpen.length} lejárt ÁFA-időszak nincs lezárva`, path: `${p}/reports/vat/closing` });
+  if (accDue.length) todos.push({ level: "yellow", text: `${accDue.length} időbeli elhatárolás feloldásra vár`, path: `${p}/closing/accruals` });
+  if (!priv) {
+    const vatDue = nextVatDeadline(company.vatPeriod, t);
+    const d = daysBetween(t, vatDue);
+    todos.push({ level: d <= 5 ? "yellow" : "green", text: `Következő ÁFA-határidő: ${vatDue.replaceAll("-", ".")}. (${d} nap)`, path: `${p}/reports/vat` });
+  }
+  todos.sort((a, b) => "ryg".indexOf(a.level[0]) - "ryg".indexOf(b.level[0]));
+
+  // --- Autók -------------------------------------------------------------
+  let cars: CompanySnapshot["cars"] = null;
+  if (!priv) {
+    const [stockCars, soldCars, redDays, saleRows, opStart] = await Promise.all([
+      loadStockCars(cid),
+      loadSoldCars(cid, day, day),
+      redDaysOf(cid),
+      db.execute(sql`select distinct i.fulfillment_date::text d from invoice_lines il join invoices i on i.id = il.invoice_id
+        where i.company_id = ${cid} and i.direction = 'out' and i.status = 'posted' and il.vehicle_id is not null`) as unknown as Promise<Array<{ d: string }>>,
+      operationStartOf(cid),
+    ]);
+    const sv = stockView(stockCars, redDays);
+    const sold = soldView(soldCars);
+    const lane = (rows: typeof sv.red) => ({ count: rows.length, capital: sum(rows.map((x) => x.r.capital)), holding: sum(rows.map((x) => x.r.holding)) });
+    const days = sv.rows.map((x) => x.r.days).filter((d): d is number => d != null);
+    const note = (x: (typeof sv.rows)[number]) => {
+      if (x.status === "red") return x.r.price < x.r.floor ? `ár a nullszaldó (${eFt(x.r.floor)}) alatt` : `${x.r.daysToFloor} nap múlva nullszaldó`;
+      if (x.status === "yellow") return `cél ár ${eFt(x.r.goal)}, most ${eFt(x.r.price)}`;
+      return "";
+    };
+    cars = {
+      daysSinceSale: salesGap(saleRows.map((r) => r.d), opStart, t).daysSince,
+      capital: sv.totals.capital,
+      avgDays: days.length ? Math.round(sum(days) / days.length) : null,
+      soldDay: sold.rows.map((x) => ({ title: x.title, f2: x.r.f2 })),
+      lanes: { red: lane(sv.red), yellow: lane(sv.yellow), green: lane(sv.green) },
+      top: [...sv.red, ...sv.yellow].slice(0, 5).map((x) => ({ title: x.plate ? `${x.title} (${x.plate})` : x.title, days: x.r.days, holding: x.r.holding, status: x.status, note: note(x) })),
+      greenCount: sv.green.length,
+    };
+  }
+
+  // --- Pénzügyi napló ----------------------------------------------------
+  const entries = await journalList(cid, day, day);
+  const entryRows: EntryRow[] = entries.map((e) => {
+    const deb = [...new Set(e.lines.filter((l) => Number(l.l.debit) > 0).map((l) => l.code))];
+    const cre = [...new Set(e.lines.filter((l) => Number(l.l.credit) > 0).map((l) => l.code))];
+    return {
+      label: `${e.journalCode} · ${e.description ?? e.number}`,
+      amount: sum(e.lines.map((l) => Number(l.l.debit))),
+      debit: deb.slice(0, 3).join(" / "),
+      credit: cre.slice(0, 3).join(" / "),
+    };
+  });
+  let cashIn30: number | null = null;
+  if (!priv) {
+    try {
+      const fc = runForecast(await loadForecastInput(cid), "base", "week");
+      const target = addDaysIso(t, 30);
+      const w = fc.months.find((m) => m.start <= target && m.end >= target) ?? fc.months.at(-1);
+      cashIn30 = w ? w.endCash + w.endBank : null;
+    } catch {
+      cashIn30 = null;
+    }
+  }
+
+  // --- Holding kiegészítők ----------------------------------------------
+  const taxLiability = Math.max(0, -balOf(tbNow, (c) => c.startsWith("46")));
+  const payablesDue14 = sum(pay.filter((r) => !r.dueDate || r.dueDate <= addDaysIso(t, 14)).map(toHuf));
+  const memberLoansBal = Math.max(0, -balOf(tbNow, (c) => c.startsWith(MEMBER_LOAN_ACCOUNT)));
+  let cashSeries: number[] = [];
+  try {
+    const mm = await moneyMonitor(cid, addDaysIso(t, -29), t, "day");
+    const n = mm.columns.length;
+    cashSeries = Array.from({ length: n }, (_, i) => sum(mm.accounts.filter((a) => !a.code.startsWith("389")).map((a) => a.series[i]?.close ?? 0)));
+  } catch {
+    cashSeries = [];
+  }
+  let guesthouse: CompanySnapshot["extra"]["guesthouse"] = null;
+  if (priv) {
+    try {
+      const d = await loadGuesthouse(cid, company.taxProfile);
+      const start = accommodationStart(d.days);
+      const k = kpis(sumRange(d.days, ms, t), availableDays(ms, t, start, d.asOf), d.include);
+      const next = d.stays.filter((s) => s.from >= t).sort((a, b) => a.from.localeCompare(b.from))[0];
+      guesthouse = { occupancy: k.occupancy, nextStay: next?.from ?? null, nights: k.nights };
+    } catch {
+      guesthouse = null;
+    }
+  }
+
+  // --- Fejléc mondat -----------------------------------------------------
+  const red = todos.filter((x) => x.level === "red").length;
+  const open = todos.filter((x) => x.level !== "green").length;
+  const parts: string[] = [];
+  if (cars) {
+    if (cars.soldDay.length) parts.push(`Tegnap ${cars.soldDay.length} autó ment el ${eFt(sum(cars.soldDay.map((s) => s.f2)))} nettó fedezettel.`);
+    else parts.push(cars.daysSinceSale != null ? `Tegnap nem volt eladás, az utolsó óta ${cars.daysSinceSale} nap telt el.` : "Tegnap nem volt eladás.");
+  } else if (guesthouse) {
+    parts.push(`Hó eddig ${guesthouse.nights} vendégéjszaka.`);
+  }
+  parts.push(open ? `${open} teendő vár${red ? `, ebből ${red} sürgős` : ""}.` : "Minden rendben.");
+
+  return {
+    companyId: cid,
+    name: company.name,
+    private: priv,
+    date: t,
+    day,
+    headline: parts.join(" "),
+    kpi: {
+      cash: cashTotal,
+      revenueDay: revenueOf(tbDay),
+      stock: cars ? cars.lanes.red.count + cars.lanes.yellow.count + cars.lanes.green.count : null,
+      lateReceivable: sum(recvLate.map(toHuf)),
+      lateReceivableCount: recvLate.length,
+    },
+    todos,
+    cars,
+    finance: {
+      entries: entryRows,
+      entryCount: entryRows.length,
+      mtdResult: resultOf(tbMtd),
+      prevMtdResult: resultOf(tbPrev),
+      vatBalance: vat.balance,
+      cashIn30,
+    },
+    extra: {
+      mtdRevenue: revenueOf(tbMtd),
+      ytdResult: resultOf(tbYtd),
+      taxLiability,
+      payablesDue14,
+      memberLoans: memberLoansBal,
+      cashSeries,
+      guesthouse,
+    },
+  };
+}
+
+export type HoldingSnapshot = {
+  date: string;
+  day: string;
+  companies: CompanySnapshot[];
+  totals: { cash: number; revenueDay: number; mtdResult: number; prevMtdResult: number; ytdResult: number; capital: number; stock: number; obligations14: number; cover: number | null; memberLoans: number };
+  cashSeries: number[];
+  lanes: Record<KmStatus, { count: number; capital: number; holding: number }>;
+  bestSale: { company: string; title: string; f2: number } | null;
+  headline: string;
+};
+
+/** Az összes cég egyben (a holding tulajdonosainak). */
+export async function holdingSnapshot(t = today(), cache = new Map<number, CompanySnapshot>()): Promise<HoldingSnapshot> {
+  const list = await db.select({ id: schema.companies.id }).from(schema.companies).orderBy(schema.companies.name);
+  const companies: CompanySnapshot[] = [];
+  for (const c of list) companies.push(cache.get(c.id) ?? (await companySnapshot(c.id, t)));
+  const S = (f: (c: CompanySnapshot) => number) => sum(companies.map(f));
+  const len = Math.max(0, ...companies.map((c) => c.extra.cashSeries.length));
+  const cashSeries = Array.from({ length: len }, (_, i) => S((c) => c.extra.cashSeries[c.extra.cashSeries.length - len + i] ?? 0));
+  const lane = (k: KmStatus) => ({ count: S((c) => c.cars?.lanes[k].count ?? 0), capital: S((c) => c.cars?.lanes[k].capital ?? 0), holding: S((c) => c.cars?.lanes[k].holding ?? 0) });
+
+  // a hónap legjobb eladása (nettó fedezet)
+  let bestSale: HoldingSnapshot["bestSale"] = null;
+  for (const c of companies) {
+    if (c.private) continue;
+    const sold = soldView(await loadSoldCars(c.companyId, monthStart(t), t));
+    for (const x of sold.rows) if (!bestSale || x.r.f2 > bestSale.f2) bestSale = { company: c.name, title: x.title, f2: x.r.f2 };
+  }
+  const cash = S((c) => c.kpi.cash);
+  const obligations14 = S((c) => c.extra.taxLiability + c.extra.payablesDue14);
+  const totals = {
+    cash,
+    revenueDay: S((c) => c.kpi.revenueDay),
+    mtdResult: S((c) => c.finance.mtdResult),
+    prevMtdResult: S((c) => c.finance.prevMtdResult),
+    ytdResult: S((c) => c.extra.ytdResult),
+    capital: S((c) => c.cars?.capital ?? 0),
+    stock: S((c) => c.kpi.stock ?? 0),
+    obligations14,
+    cover: obligations14 > 0.5 ? cash / obligations14 : null,
+    memberLoans: S((c) => c.extra.memberLoans),
+  };
+  const red = S((c) => c.todos.filter((x) => x.level === "red").length);
+  const open = S((c) => c.todos.filter((x) => x.level !== "green").length);
+  const headline = `A holding pénze ${money(cash)}, hó eddig ${money(totals.mtdResult, true)} eredmény. ${open ? `${open} teendő${red ? `, ebből ${red} sürgős` : ""}.` : "Minden rendben."}`;
+  return { date: t, day: addDaysIso(t, -1), companies, totals, cashSeries, lanes: { red: lane("red"), yellow: lane("yellow"), green: lane("green") }, bestSale, headline };
+}

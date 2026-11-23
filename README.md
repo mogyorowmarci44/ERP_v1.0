@@ -39,6 +39,15 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.9.2 – Napi összefoglaló e-mail
+
+- Minden nap 6:59-kor (Budapest) e-mail a tegnapi napról és a mai állapotról.
+- **Cégszintű jelentés** (Rendszer › Napi összefoglaló): címzettenként választható változat – *Ügyvezető* (számok, teendők, autókészlet), *Pénzügyes* (számok, teendők, pénzügyi napló + a tegnapi napló CSV-ben), *Teljes* (mind). Előnézet változatonként, próbaküldés, szüneteltetés.
+- **Holding jelentés** (Admin › Napi összefoglaló): minden cég egyben – összesítő számok, cégenkénti tábla, 14 napos fedezettség (pénz vs. 46x adótartozás + esedékes szállítók), összes teendő cégnévvel, autók sávonként, tagi kölcsönök, vendégház. Címzettek csak itt állíthatók.
+- Teendők: be nem küldött / esedékes ÁFA- és járulékbevallás, negatív pénztár, lejárt vevők / szállítók, beérkező bizonylatok, piszkozatok, le nem zárt ÁFA-időszak, elhatárolás, következő ÁFA-határidő.
+- Küldés SMTP-n (alapból Gmail alkalmazásjelszóval). Ütemezés: GitHub Actions (`.github/workflows/daily-summary.yml`, 04:59 és 05:59 UTC) hívja a `/api/daily-summary` végpontot `CRON_SECRET`-tel; az ERP naponta egyszer küld, 6:45 és 12:00 között az első hívásra.
+- Beállítás: Render → `SMTP_USER`, `SMTP_PASS`, `CRON_SECRET`; GitHub → Actions secrets: `ERP_URL`, `CRON_SECRET`.
+
 ## v3.9.1 – Dinamikus időszakválasztó
 
 - Új közös `PeriodPicker`: a nézet bontásához illeszkedő naptár – Napi: két havi naptár, Heti: hetek (hétszámmal), Havi: két év hónapjai, Negyedéves: három év negyedévei, Éves: évrács. Két kattintás (kezdő és záró egység) és már frissül, nincs külön „Frissítés”.

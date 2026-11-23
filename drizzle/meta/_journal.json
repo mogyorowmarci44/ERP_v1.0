@@ -183,6 +183,13 @@
       "when": 1795176650731,
       "tag": "0025_v3_6_tax_filings",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795443272236,
+      "tag": "0026_v3_9_2_daily_summary",
+      "breakpoints": true
     }
   ]
 }

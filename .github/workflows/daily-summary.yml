@@ -1,0 +1,30 @@
+name: Napi összefoglaló (6:59)
+
+# A GitHub ütemezője UTC-ben fut: 04:59 UTC = 6:59 nyári időben, 05:59 UTC = 6:59 téli időben.
+# Az ERP naponta csak egyszer küld (6:45 és 12:00 között az első hívásra), a másik hívás kimarad.
+# Beállítás: Settings → Secrets and variables → Actions → ERP_URL (pl. https://mm-erp.onrender.com) és CRON_SECRET.
+on:
+  schedule:
+    - cron: "59 4 * * *"
+    - cron: "59 5 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Küldés most, időablaktól függetlenül"
+        type: boolean
+        default: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: ERP felébresztése (ingyenes Render alszik)
+        run: curl -s -o /dev/null --retry 5 --retry-delay 20 --retry-all-errors --max-time 90 "${{ secrets.ERP_URL }}/api/health" || true
+      - name: Napi összefoglaló küldése
+        run: |
+          q=""
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then q="?force=1"; fi
+          curl -fsS --retry 3 --retry-delay 30 --retry-all-errors --max-time 280 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.ERP_URL }}/api/daily-summary$q"
