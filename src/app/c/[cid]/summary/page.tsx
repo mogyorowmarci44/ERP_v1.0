@@ -6,8 +6,9 @@ import { requireCompany } from "@/lib/auth";
 import { Flash } from "@/components/Flash";
 import { companySnapshot } from "@/lib/daily-summary/data";
 import { renderCompanyMail, VARIANT_LABEL, type Variant } from "@/lib/daily-summary/render";
-import { getSummarySettings, smtpConfigured } from "@/lib/daily-summary/send";
-import { addRecipientAction, updateRecipientAction, testRecipientAction } from "./actions";
+import { companyEnabled, getSummarySettings, smtpConfigured } from "@/lib/daily-summary/send";
+import { addRecipientAction, updateRecipientAction, testRecipientAction, toggleCompanySummaryAction } from "./actions";
+import { SummarySwitch } from "@/components/SummarySwitch";
 
 const VARIANTS = Object.keys(VARIANT_LABEL) as Variant[];
 const SHORT: Record<Variant, string> = { ceo: "Ügyvezető", cfo: "Pénzügyes", full: "Teljes" };
@@ -15,7 +16,7 @@ const SHORT: Record<Variant, string> = { ceo: "Ügyvezető", cfo: "Pénzügyes",
 export default async function SummaryPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
   const sp = await searchParams;
-  const { company, role } = await requireCompany(cid);
+  const { company, role, user } = await requireCompany(cid);
   const canWrite = role !== "viewer";
   const [list, st] = await Promise.all([
     db.select().from(schema.summaryRecipients).where(eq(schema.summaryRecipients.companyId, cid)).orderBy(asc(schema.summaryRecipients.name)),
@@ -43,6 +44,17 @@ export default async function SummaryPage({ params, searchParams }: { params: Pr
       {!smtpConfigured() && (
         <div className="flash error">Az e-mail küldés még nincs beállítva: a Renderen kell megadni az SMTP_USER (Gmail cím) és SMTP_PASS (alkalmazásjelszó) változót. Addig az előnézet működik, a küldés nem.</div>
       )}
+      <div className={`card sum-master${companyEnabled(st, cid) ? "" : " off"}`} style={{ marginBottom: 12 }}>
+        <div>
+          <strong>{company.name} napi összefoglalója</strong>
+          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            {!st.enabled
+              ? <>A napi összefoglaló az egész rendszerben ki van kapcsolva{user.isAdmin ? <> – <Link href="/admin/summary">Admin › Napi összefoglaló</Link></> : " (admin kapcsolhatja vissza)"}.</>
+              : companyEnabled(st, cid) ? "Bekapcsolva: minden nap 6:59-kor megy a lenti címzetteknek." : "Kikapcsolva: ennek a cégnek a címzettjei nem kapnak e-mailt, a lista megmarad."}
+          </div>
+        </div>
+        <SummarySwitch on={!st.disabledCompanies.includes(cid)} what="company" cid={cid} action={toggleCompanySummaryAction} disabled={!canWrite || !st.enabled} />
+      </div>
       {st.lastRun && (
         <p className="muted" style={{ fontSize: 13 }}>
           Utolsó kiküldés: {st.lastRun.date.replaceAll("-", ".")}. · {st.lastRun.sent} e-mail{st.lastRun.failed ? ` · ${st.lastRun.failed} hiba` : ""}

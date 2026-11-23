@@ -12,9 +12,29 @@ import { companySnapshot, holdingSnapshot, type CompanySnapshot } from "./data";
 import { renderCompanyMail, renderHoldingMail, type Mail, type Variant } from "./render";
 
 export type RunLog = { date: string; at: string; trigger: string; sent: number; failed: number; errors: string[] };
-export type DailySummarySettings = { enabled: boolean; holdingEmails: string[]; lastRun: RunLog | null };
+/**
+ * enabled = fő kapcsoló (kikapcsolva semmi nem megy ki, a kézi „Küldés most” sem);
+ * holdingEnabled = a holding e-mail; disabledCompanies = azok a cégek, amelyek jelentése szünetel.
+ */
+export type DailySummarySettings = { enabled: boolean; holdingEnabled: boolean; disabledCompanies: number[]; holdingEmails: string[]; lastRun: RunLog | null };
 const KEY = "dailySummary";
-const DEFAULTS: DailySummarySettings = { enabled: true, holdingEmails: [], lastRun: null };
+const DEFAULTS: DailySummarySettings = { enabled: true, holdingEnabled: true, disabledCompanies: [], holdingEmails: [], lastRun: null };
+
+/** Egy cég jelentése kimegy-e (fő kapcsoló és a cég kapcsolója). */
+export const companyEnabled = (st: DailySummarySettings, cid: number) => st.enabled && !st.disabledCompanies.includes(cid);
+
+/** Kapcsolók állítása (fő / holding / cég). */
+export async function setSummaryToggle(what: { all?: boolean; holding?: boolean; company?: { id: number; on: boolean } }) {
+  const st = await getSummarySettings();
+  const patch: Partial<DailySummarySettings> = {};
+  if (what.all !== undefined) patch.enabled = what.all;
+  if (what.holding !== undefined) patch.holdingEnabled = what.holding;
+  if (what.company) {
+    const rest = st.disabledCompanies.filter((x) => x !== what.company!.id);
+    patch.disabledCompanies = what.company.on ? rest : [...rest, what.company.id];
+  }
+  await saveSummarySettings(patch);
+}
 
 export async function getSummarySettings(): Promise<DailySummarySettings> {
   const [r] = await db.select().from(schema.appSettings).where(eq(schema.appSettings.key, KEY));
@@ -86,8 +106,8 @@ export function companyMailFor(s: CompanySnapshot, variant: Variant) {
 export async function runDailySummary(opts: { trigger: "cron" | "manual"; force?: boolean }): Promise<{ skipped?: string; log?: RunLog }> {
   const t = today();
   const st = await getSummarySettings();
+  if (!st.enabled) return { skipped: "a napi összefoglaló ki van kapcsolva" };
   if (opts.trigger === "cron") {
-    if (!st.enabled) return { skipped: "kikapcsolva" };
     const w = shouldRunNow(budapestTime(), st.lastRun?.date ?? null, t);
     if (!w.ok && !opts.force) return { skipped: w.reason };
   }
@@ -96,6 +116,7 @@ export async function runDailySummary(opts: { trigger: "cron" | "manual"; force?
   const cache = new Map<number, CompanySnapshot>();
   const byCompany = await recipientsByCompany();
   for (const [cid, list] of byCompany) {
+    if (!companyEnabled(st, cid)) continue;
     let snap: CompanySnapshot;
     try {
       snap = await companySnapshot(cid, t);
@@ -114,7 +135,7 @@ export async function runDailySummary(opts: { trigger: "cron" | "manual"; force?
       }
     }
   }
-  if (st.holdingEmails.length) {
+  if (st.holdingEnabled && st.holdingEmails.length) {
     try {
       const mail = renderHoldingMail(await holdingSnapshot(t, cache));
       for (const to of st.holdingEmails) {

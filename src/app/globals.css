@@ -1104,3 +1104,14 @@ tbody tr.att-row:hover td { background: var(--surface-2); }
 .pp-cal.weeks .pp-cell.start, .pp-cal.weeks .pp-cell.end, .pp-cal.weeks .pp-cell.start.end { border-radius: 0; }
 .pp-cal.weeks td:nth-child(2) .pp-cell, .pp-cal.weeks td:nth-child(2) .pp-cell.start.end { border-radius: var(--r-sm) 0 0 var(--r-sm); }
 .pp-cal.weeks td:last-child .pp-cell, .pp-cal.weeks td:last-child .pp-cell.start.end { border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+
+/* v3.9.3 – be / ki kapcsoló */
+.sw-form { display: inline-flex; }
+.sw { display: inline-flex; align-items: center; gap: 10px; padding: 5px 12px 5px 6px; border-radius: 999px; font-weight: 600; color: var(--muted); }
+.sw .sw-knob { position: relative; width: 38px; height: 22px; border-radius: 999px; background: var(--line); transition: background .15s; flex: none; }
+.sw .sw-knob::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: left .15s; }
+.sw.on { color: var(--pos); }
+.sw.on .sw-knob { background: var(--pos); }
+.sw.on .sw-knob::after { left: 19px; }
+.sum-master { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.sum-master.off { border-color: color-mix(in srgb, var(--neg) 40%, var(--line)); background: color-mix(in srgb, var(--neg) 5%, var(--surface)); }

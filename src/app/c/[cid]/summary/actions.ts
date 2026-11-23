@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { runOrRedirect, str, intOrNull } from "@/lib/action-utils";
-import { sendTestCompany } from "@/lib/daily-summary/send";
+import { sendTestCompany, setSummaryToggle } from "@/lib/daily-summary/send";
 import type { Variant } from "@/lib/daily-summary/render";
 
 const VARIANTS: Variant[] = ["ceo", "cfo", "full"];
@@ -58,5 +58,17 @@ export async function testRecipientAction(fd: FormData) {
     if (!r) throw new Error("Nincs ilyen címzett.");
     await sendTestCompany(cid, r.email, variantOf(r.variant));
     return okTo(cid, `Próba e-mail elküldve: ${r.email}`);
+  });
+}
+
+/** v3.9.3 – A cég napi összefoglalójának be / ki kapcsolása. */
+export async function toggleCompanySummaryAction(fd: FormData) {
+  const cid = Number(fd.get("cid"));
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(back(cid), async () => {
+    const on = fd.get("on") === "1";
+    await setSummaryToggle({ company: { id: cid, on } });
+    revalidatePath(back(cid));
+    return okTo(cid, on ? "A cég napi összefoglalója bekapcsolva." : "A cég napi összefoglalója kikapcsolva – a címzettek megmaradnak.");
   });
 }
