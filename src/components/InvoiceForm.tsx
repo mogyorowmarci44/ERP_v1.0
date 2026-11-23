@@ -8,6 +8,10 @@ import type { AccountOpt, PartnerOpt, VatOpt, VehicleOpt } from "@/lib/options";
 import { saveInvoiceAction, getRateAction } from "@/app/c/[cid]/actions";
 import { vatRateDate } from "@/lib/fx";
 import { fmtDate } from "@/lib/dates";
+import { cleanPartnerInput, findDuplicatePartner, type NewPartnerInput } from "@/lib/partner-input";
+
+const NEW = "__new";
+const emptyPartner = (): NewPartnerInput => ({ name: "", taxNumber: "", euVatNumber: "", country: "HU", address: "", email: "", isPrivatePerson: false });
 
 type Line = { description: string; quantity: string; unitPrice: string; vatCodeId: number; accountId: number; vehicleId: number | null };
 
@@ -46,6 +50,17 @@ export function InvoiceForm(props: {
   const [error, setError] = useState<string | null>(null);
   const [h, setH] = useState(props.initial);
   const [lines, setLines] = useState<Line[]>(props.initial.lines);
+  /** v3.9.0 – új partner felvétele a számlán; null = meglévő partnert választ. A számla mentésekor kerül a Partnerek közé. */
+  const [np, setNp] = useState<NewPartnerInput | null>(partners.length === 0 && !props.corrects ? emptyPartner() : null);
+  const npCheck = useMemo(() => {
+    if (!np) return null;
+    try {
+      const c = cleanPartnerInput(np);
+      return { error: null as string | null, dup: findDuplicatePartner(partners, c) };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e), dup: undefined };
+    }
+  }, [np, partners]);
 
   const accByCode = (code: string) => accounts.find((a) => a.code === code)?.id ?? accounts[0]?.id ?? 0;
   const vatByCode = (code: string) => vatCodes.find((v) => v.code === code)?.id ?? vatCodes[0]?.id ?? 0;
@@ -128,13 +143,17 @@ export function InvoiceForm(props: {
 
   const submit = (postNow: boolean) => {
     setError(null);
+    if (np && npCheck?.error) {
+      setError(`Új partner: ${npCheck.error}`);
+      return;
+    }
     start(async () => {
       try {
         const res = await saveInvoiceAction(
           cid,
           {
             direction,
-            partnerId: Number(h.partnerId),
+            partnerId: np ? 0 : Number(h.partnerId),
             invoiceNumber: h.invoiceNumber,
             issueDate: h.issueDate,
             fulfillmentDate: h.fulfillmentDate,
@@ -157,6 +176,7 @@ export function InvoiceForm(props: {
           },
           props.invoiceId,
           postNow,
+          np,
         );
         if (res.error) setError(res.error);
         else router.push(`/c/${cid}/invoices/${res.id}?ok=${encodeURIComponent(postNow ? "Számla könyvelve." : "Piszkozat mentve.")}`);
@@ -178,12 +198,55 @@ export function InvoiceForm(props: {
         </div>
       )}
       <div className="card form-grid">
-        <label>Partner
-          <select value={h.partnerId ?? ""} onChange={(e) => setH({ ...h, partnerId: Number(e.target.value) || null })} required disabled={!!props.corrects}>
+        <label>{direction === "out" ? "Vevő" : "Szállító"}
+          <select
+            value={np ? NEW : (h.partnerId ?? "")}
+            onChange={(e) => {
+              if (e.target.value === NEW) setNp(np ?? emptyPartner());
+              else {
+                setNp(null);
+                setH({ ...h, partnerId: Number(e.target.value) || null });
+              }
+            }}
+            required
+            disabled={!!props.corrects}
+          >
             <option value="">– válassz –</option>
-            {partners.map((p) => <option key={p.id} value={p.id}>{p.name}{p.country !== "HU" ? ` (${p.country})` : ""}</option>)}
+            {!props.corrects && <option value={NEW}>+ Új partner…</option>}
+            {partners.map((p) => <option key={p.id} value={p.id}>{p.name}{p.country !== "HU" ? ` (${p.country})` : ""}{p.taxNumber ? ` · ${p.taxNumber}` : ""}</option>)}
           </select>
         </label>
+        {np && (
+          <fieldset className="card" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            <legend>Új {direction === "out" ? "vevő" : "szállító"}</legend>
+            <div className="form-grid">
+              <label>Név<input value={np.name} onChange={(e) => setNp({ ...np, name: e.target.value })} required autoFocus /></label>
+              <label>Ország (ISO)<input value={np.country ?? ""} maxLength={2} onChange={(e) => setNp({ ...np, country: e.target.value.toUpperCase() })} /></label>
+              <label>
+                {(np.country || "HU") === "HU" ? (np.isPrivatePerson ? "Adószám / adóazonosító jel (nem kötelező)" : "Adószám") : "Adószám (helyi)"}
+                <input className="mono" value={np.taxNumber ?? ""} placeholder={(np.country || "HU") === "HU" ? "12345678-1-12" : ""} onChange={(e) => setNp({ ...np, taxNumber: e.target.value })} />
+              </label>
+              <label>Közösségi adószám<input className="mono" value={np.euVatNumber ?? ""} placeholder={(np.country || "HU") === "HU" ? "HU12345678" : "DE123456789"} onChange={(e) => setNp({ ...np, euVatNumber: e.target.value })} /></label>
+              <label style={{ gridColumn: "span 2" }}>Cím<input value={np.address ?? ""} onChange={(e) => setNp({ ...np, address: e.target.value })} /></label>
+              <label>E-mail<input type="email" value={np.email ?? ""} onChange={(e) => setNp({ ...np, email: e.target.value })} /></label>
+              <label style={{ alignSelf: "end", display: "flex", gap: 6 }}>
+                <input type="checkbox" checked={!!np.isPrivatePerson} onChange={(e) => setNp({ ...np, isPrivatePerson: e.target.checked })} /> Magánszemély
+              </label>
+            </div>
+            <div style={{ marginTop: 8, fontSize: 13 }}>
+              {npCheck?.dup ? (
+                <span>
+                  Ez a partner már szerepel: <strong>{npCheck.dup.name}</strong>{npCheck.dup.taxNumber ? ` (${npCheck.dup.taxNumber})` : ""} – mentéskor a meglévőt használom.{" "}
+                  <button type="button" onClick={() => { setH({ ...h, partnerId: npCheck.dup!.id }); setNp(null); }}>Meglévő kiválasztása</button>
+                </span>
+              ) : npCheck?.error && np.name.trim() ? (
+                <span style={{ color: "var(--neg)" }}>{npCheck.error}</span>
+              ) : (
+                <span className="muted">A partner a számla mentésekor (piszkozat vagy könyvelés) kerül a Partnerek közé.</span>
+              )}
+            </div>
+          </fieldset>
+        )}
         <label>{direction === "out" ? "Számlaszám" : "Szállítói számlaszám"}<input value={h.invoiceNumber} onChange={(e) => setH({ ...h, invoiceNumber: e.target.value })} required /></label>
         <label>Kelte<input type="date" value={h.issueDate} onChange={(e) => setH({ ...h, issueDate: e.target.value, fulfillmentDate: h.fulfillmentDate || e.target.value })} /></label>
         <label>Teljesítés (ÁFA)<input type="date" value={h.fulfillmentDate} onChange={(e) => setH({ ...h, fulfillmentDate: e.target.value })} /></label>

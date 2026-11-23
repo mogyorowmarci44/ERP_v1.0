@@ -7,7 +7,7 @@ export type Opt = { id: number; label: string };
 export type AccountOpt = { id: number; code: string; name: string; currency: string };
 export type VatOpt = { id: number; code: string; name: string; rate: number; kind: string };
 export type VehicleOpt = { id: number; label: string; vatTreatment: string; marginBase: number };
-export type PartnerOpt = { id: number; name: string; country: string };
+export type PartnerOpt = { id: number; name: string; country: string; taxNumber: string | null; euVatNumber: string | null };
 
 export async function formOptions(cid: number, includeVehicleIds: number[] = []) {
   const [partners, accounts, vatCodes, vehicles] = await Promise.all([
@@ -31,7 +31,7 @@ export async function formOptions(cid: number, includeVehicleIds: number[] = [])
     });
   }
   return {
-    partners: partners.map((p) => ({ id: p.id, name: p.name, country: p.country })) as PartnerOpt[],
+    partners: partners.map((p) => ({ id: p.id, name: p.name, country: p.country, taxNumber: p.taxNumber, euVatNumber: p.euVatNumber })) as PartnerOpt[],
     accounts: accounts.map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency })) as AccountOpt[],
     vatCodes: vatCodes.map((v) => ({ id: v.id, code: v.code, name: v.name, rate: Number(v.rate), kind: v.kind })) as VatOpt[],
     vehicles: vehicleOpts,

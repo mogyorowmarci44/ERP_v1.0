@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireCompany } from "@/lib/auth";
 import { formOptions } from "@/lib/options";
 import { InvoiceForm } from "@/components/InvoiceForm";
@@ -24,9 +23,6 @@ export default async function NewInvoicePage({ params, searchParams }: { params:
   return (
     <>
       <h1>{orig ? `Helyesbítő ${dir === "out" ? "vevőszámla" : "szállítói számla"} – ${orig.invoiceNumber}` : dir === "out" ? "Új vevőszámla" : "Új szállítói számla / beszerzés"}</h1>
-      {o.partners.length === 0 && (
-        <div className="flash error">Előbb vegyél fel partnert: <Link href={`/c/${cid}/partners`}>Partnerek</Link></div>
-      )}
       <InvoiceForm
         cid={cid}
         direction={dir}
