@@ -32,6 +32,7 @@ import { extendLoan, recordMemberLoan, revalueMemberLoans, setLoanDueDate, undoL
 import { invoiceAudit } from "@/lib/invoice-audit";
 import { updateEntryMeta, renameInvoiceLine, setEntryChecked, updateManualEntry, reopenInvoice, logInvoiceRepost, editPayment, type EntryLineInput } from "@/lib/journal-edit";
 import { DEFAULT_TAX_PROFILE, isPrivate, taxProfileFromForm } from "@/lib/entity";
+import { cleanPartnerInput, findDuplicatePartner, type NewPartnerInput } from "@/lib/partner-input";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
@@ -42,18 +43,21 @@ export async function savePartnerAction(fd: FormData) {
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/partners`, async () => {
     const id = intOrNull(fd, "id");
-    const values = {
-      companyId: cid,
+    const clean = cleanPartnerInput({
       name: str(fd, "name"),
       taxNumber: optStr(fd, "taxNumber"),
       euVatNumber: optStr(fd, "euVatNumber"),
-      country: (str(fd, "country") || "HU").toUpperCase(),
+      country: str(fd, "country"),
       address: optStr(fd, "address"),
       email: optStr(fd, "email"),
       isPrivatePerson: fd.get("isPrivatePerson") === "on",
-      note: optStr(fd, "note"),
-    };
-    if (!values.name) throw new Error("A partner neve kötelező.");
+    }, { requireHuTax: !id });
+    const values = { companyId: cid, ...clean, note: optStr(fd, "note") };
+    if (!id) {
+      const existing = await db.select().from(schema.partners).where(eq(schema.partners.companyId, cid));
+      const dup = findDuplicatePartner(existing, clean);
+      if (dup) throw new Error(`Ez a partner már szerepel: ${dup.name}${dup.taxNumber ? ` (${dup.taxNumber})` : ""}.`);
+    }
     if (id) await db.update(schema.partners).set(values).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, cid)));
     else await db.insert(schema.partners).values(values);
     revalidatePath(`/c/${cid}/partners`);
@@ -126,13 +130,30 @@ export async function saveAccountAction(fd: FormData) {
 
 export type ActionResult = { error?: string; id?: number };
 
-export async function saveInvoiceAction(cid: number, input: InvoiceInput, invoiceId?: number, postNow = false): Promise<ActionResult> {
+export async function saveInvoiceAction(
+  cid: number,
+  input: InvoiceInput,
+  invoiceId?: number,
+  postNow = false,
+  /** v3.9.0 – a számla-űrlapon felvett új partner; a számlával együtt (egy tranzakcióban) kerül a Partnerek közé. */
+  newPartner?: NewPartnerInput | null,
+): Promise<ActionResult> {
   const { user } = await requireCompany(cid, { write: true });
   try {
     for (const d of [input.issueDate, input.fulfillmentDate]) if (!isDate(d)) throw new Error("Hiányzó vagy hibás dátum.");
     if (!input.invoiceNumber.trim()) throw new Error("A számlaszám kötelező.");
-    if (!input.partnerId) throw new Error("Partnert kell választani.");
-    const id = await saveInvoiceDraft(cid, input, invoiceId);
+    const np = newPartner ? cleanPartnerInput(newPartner) : null;
+    if (!np && !input.partnerId) throw new Error("Partnert kell választani.");
+    const id = await db.transaction(async (tx) => {
+      let partnerId = input.partnerId;
+      if (np) {
+        const existing = await tx.select().from(schema.partners).where(eq(schema.partners.companyId, cid));
+        const dup = findDuplicatePartner(existing, np);
+        partnerId = dup ? dup.id : (await tx.insert(schema.partners).values({ companyId: cid, ...np }).returning({ id: schema.partners.id }))[0].id;
+      }
+      return saveInvoiceDraft(cid, { ...input, partnerId }, invoiceId, tx);
+    });
+    if (np) revalidatePath(`/c/${cid}/partners`);
     if (postNow) {
       const [cur] = await db.select({ r: schema.invoices.reuseEntryNumber }).from(schema.invoices).where(eq(schema.invoices.id, id));
       await postInvoice(cid, id, user.id);

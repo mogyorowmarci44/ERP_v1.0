@@ -39,6 +39,13 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.9.0 – Új partner a vevő- és szállítói számlán
+
+- Az Új vevőszámla / Új szállítói számla (és a piszkozat szerkesztése) Vevő / Szállító listájában „+ Új partner…”: név, ország, adószám, közösségi adószám, cím, e-mail, magánszemély.
+- Az új partner a számla mentésekor (piszkozat vagy könyvelés) a számlával egy tranzakcióban kerül a Partnerek közé – ha a mentés hibára fut, partner sem jön létre.
+- Adószám-ellenőrzés: magyar cégnél kötelező, `12345678-1-12` alakra normalizálva, törzsszám-ellenőrző számjeggyel és ÁFA-kóddal (1–5); magánszemélynél elhagyható, adóazonosító jel is megadható; külföldinél a közösségi adószám országkóddal kezdődik.
+- Duplikáció-szűrés: azonos törzsszám / közösségi adószám (adószám nélkül azonos név) esetén figyelmeztet, és a meglévő partnert használja új felvétele helyett. Ugyanez az ellenőrzés a Partnerek oldalon is.
+
 ## v3.8.2 – „Beküldve” gomb az ÁNYK Exportban
 
 - Az ÁNYK Export minden hónapjánál (ÁFA és járulék) „Beküldve” gomb: ha a hónapnak van betöltött változata, a legutolsót jelöli beküldöttnek; ha nincs (vagy ÁFA-önellenőrzés), az ERP által előállított XML-t eltárolja változatként (`…_ERP.xml`), és azt jelöli. Fájlt betölteni nem kell hozzá.
