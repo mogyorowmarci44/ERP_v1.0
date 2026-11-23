@@ -197,6 +197,13 @@
       "when": 1795445737921,
       "tag": "0027_v3_9_4_voided_invoice",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795450000000,
+      "tag": "0028_v3_9_6_integrity",
+      "breakpoints": true
     }
   ]
 }

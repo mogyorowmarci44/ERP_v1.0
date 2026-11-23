@@ -1,4 +1,5 @@
 /** Lekérdezések / riportok: főkönyvi kivonat, karton, napló, ÁFA analitika, nyitott tételek, készlet. */
+import { loadManualVatLines } from "./vat-return-data";
 import { and, asc, desc, eq, gte, lte, lt, sql, inArray } from "drizzle-orm";
 import { db, schema, type DbOrTx } from "@/db";
 import { round2 } from "./money";
@@ -157,8 +158,16 @@ export async function vatAnalytics(companyId: number, from: string, to: string, 
     .where(and(eq(invoices.companyId, companyId), eq(invoices.status, "posted"), gte(invoices.fulfillmentDate, from), lte(invoices.fulfillmentDate, to)))
     .orderBy(asc(invoices.direction), asc(vatCodes.code), asc(invoices.fulfillmentDate));
 
+  // v3.9.6: a számla nélküli (kézi) ÁFA-tételek is – így az analitika egyezik a 466 / 467 főkönyvi forgalmával
+  const manual = (await loadManualVatLines(companyId, from, to)).map((m) => ({
+    direction: m.direction, invoiceId: null as number | null, entryId: m.entryId as number | null, invoiceNumber: m.invoiceNumber, fulfillmentDate: m.fulfillmentDate,
+    status: "posted" as const, partnerName: m.partnerName, partnerTax: m.partnerTax, vatCode: `${m.rate} (kézi)`, vatName: `Kézi ÁFA-tétel ${m.rate}%`, vatKind: "normal" as const,
+    description: "Számla nélküli (kézi) ÁFA-tétel", netHuf: m.net, vatHuf: m.vat, grossHuf: m.gross, marginPurchaseHuf: null as number | null,
+  }));
+  const allRows = [...rows.map((r) => ({ ...r, invoiceId: r.invoiceId as number | null, entryId: null as number | null })), ...manual];
+
   const summary = new Map<string, { direction: string; vatCode: string; vatName: string; vatKind: string; net: number; vat: number; gross: number; count: number }>();
-  for (const r of rows) {
+  for (const r of allRows) {
     const k = `${r.direction}|${r.vatCode}`;
     const s = summary.get(k) ?? { direction: r.direction, vatCode: r.vatCode, vatName: r.vatName, vatKind: r.vatKind, net: 0, vat: 0, gross: 0, count: 0 };
     s.net = round2(s.net + Number(r.netHuf));
@@ -173,7 +182,7 @@ export async function vatAnalytics(companyId: number, from: string, to: string, 
   const deductible = opts.noInputVatDeduction
     ? 0
     : round2(all.filter((s) => s.direction === "in" && s.vatKind !== "non_deductible").reduce((a, s) => a + s.vat, 0));
-  return { rows, summary: all, payable, deductible, balance: round2(payable - deductible) };
+  return { rows: allRows, summary: all, payable, deductible, balance: round2(payable - deductible) };
 }
 
 /** Nyitott vevő / szállító tételek. */

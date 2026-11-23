@@ -12,7 +12,7 @@ const URL = process.env.TEST_DATABASE_URL;
 
 describe.skipIf(!URL)("könyvelési folyamat (integráció)", () => {
   // a modulok csak a DATABASE_URL beállítása után tölthetők be
-  let m: {
+  let m: { eq: typeof import("drizzle-orm").eq;
     db: typeof import("@/db"); L: typeof import("@/lib/ledger"); R: typeof import("@/lib/reports"); S: typeof import("@/lib/statements");
     A: typeof import("@/lib/assets"); P: typeof import("@/lib/payroll"); D: typeof import("@/lib/delta-import"); X: typeof import("@/lib/data-export");
     M: typeof import("@/lib/matching"); V: typeof import("@/lib/vat-closing"); AC: typeof import("@/lib/accruals"); ML: typeof import("@/lib/member-loans");
@@ -37,6 +37,7 @@ describe.skipIf(!URL)("könyvelési folyamat (integráció)", () => {
   beforeAll(async () => {
     process.env.DATABASE_URL = URL;
     m = {
+      eq: (await import("drizzle-orm")).eq,
       db: await import("@/db"), L: await import("@/lib/ledger"), R: await import("@/lib/reports"), S: await import("@/lib/statements"),
       A: await import("@/lib/assets"), P: await import("@/lib/payroll"), D: await import("@/lib/delta-import"), X: await import("@/lib/data-export"),
       M: await import("@/lib/matching"), V: await import("@/lib/vat-closing"), AC: await import("@/lib/accruals"), ML: await import("@/lib/member-loans"),
@@ -178,5 +179,64 @@ describe.skipIf(!URL)("könyvelési folyamat (integráció)", () => {
     expect(Math.abs(va.deductible - bal(t, "466"))).toBeLessThan(1);
     const x = await m.X.buildExport(cid, "2026-01-01", "2026-12-31");
     expect(Math.abs(x.balances.reduce((s, b) => s + b.balance, 0))).toBeLessThan(0.01);
+  });
+
+  it("v3.9.6: készpénz 5 Ft-os kerekítés, ÁFA-befizetés a 468-ra, zárás-újraszámolás, kézi ÁFA a bevallásban", async () => {
+    const sup = await partner("Bolt Kft");
+    await m.db.db.update(m.db.schema.partners).set({ taxNumber: "12345676-2-41" }).where(m.eq(m.db.schema.partners.id, sup));
+    // 10 000 + 27% = 12 700 → 12 700; 10 001 nettó → 12 701 bruttó → készpénzben 12 700, a különbözet 979
+    const id = await inv("in", sup, "KP-1", "2026-11-03", [["Anyag", 10_001, "27", "512"]], { paymentMethod: "cash" });
+    await m.L.payInvoice(cid, id, { date: "2026-11-03", moneyAccountId: await acc("381"), amountFx: 12_700 }, userId);
+    expect((await m.db.db.transaction((tx) => m.L.invoiceOpenAmount(tx, id))).openFx).toBe(0);
+    const t1 = await m.R.trialBalance(cid, "2026-11-01", "2026-11-30");
+    expect(bal(t1, "979")).toBe(-1);
+
+    // NAV ÁFA-befizetés kézi bank tételként a 467-re → automatikusan a 468-ra kerül
+    const e = await m.L.manualEntry(cid, { journalCode: "BA", date: "2026-11-05", description: "ÁFA befizetés", lines: [{ accountId: await acc("467"), debit: 1_000, credit: 0 }, { accountId: await acc("384"), debit: 0, credit: 1_000 }] }, userId);
+    const el = (await m.db.db.select().from(m.db.schema.journalLines)).filter((l) => l.entryId === e.id);
+    expect(el.find((l) => Number(l.debit) === 1_000)!.accountId).toBe(await acc("468"));
+
+    // kézi visszáru-jóváírás (K 466) bekerül az ÁFA analitikába és a bevallás soraiba
+    await m.L.manualEntry(cid, { journalCode: "PE", date: "2026-11-06", description: "Visszáru – Bolt Kft [VJ-1]", lines: [
+      { accountId: await acc("381"), debit: 1_270, credit: 0, partnerId: sup }, { accountId: await acc("512"), debit: 0, credit: 1_000, partnerId: sup }, { accountId: await acc("466"), debit: 0, credit: 270, partnerId: sup }] }, userId);
+    const VR = await import("@/lib/vat-return-data");
+    const ml = await VR.loadManualVatLines(cid, "2026-11-01", "2026-11-30");
+    expect(ml).toHaveLength(1);
+    expect(ml[0]).toMatchObject({ direction: "in", vat: -270, net: -1_000, invoiceNumber: "VJ-1" });
+    const t2 = await m.R.trialBalance(cid, "2026-01-01", "2026-11-30");
+    const va = await m.R.vatAnalytics(cid, "2026-01-01", "2026-11-30");
+    expect(Math.abs(va.deductible - bal(t2, "466"))).toBeLessThan(1);
+
+    // ÁFA-zárás, majd utólag a lezárt időszakba könyvelt tétel → újraszámolás után a 468 = a tényleges fizetendő
+    const r = await m.V.closeVatPeriod(cid, "2026-11-01", "2026-11-30", userId);
+    await inv("out", await partner("Vevő2", true), "V-NOV", "2026-11-20", [["Szerviz", 10_000, "27", "911"]]);
+    const before = bal(await m.R.trialBalance(cid, "2026-01-01", "2026-11-30"), "467");
+    expect(before).toBe(-2_700);
+    const rc = await m.V.recomputeVatClosings(cid, userId);
+    expect(rc.changed).toBeGreaterThan(0);
+    const t3 = await m.R.trialBalance(cid, "2026-01-01", "2026-11-30");
+    expect(bal(t3, "467")).toBe(0);
+    expect(bal(t3, "466")).toBe(0);
+    const [cl] = (await m.db.db.select().from(m.db.schema.vatClosings)).filter((x) => x.companyId === cid && x.toDate === "2026-11-30");
+    expect(Number(cl.payable)).toBe(r.net + 2_700);
+  });
+
+  it("v3.9.6: egyezőség, partner-összevonás, adatbázis-szintű T = K védelem", async () => {
+    const a = await partner("Dupla Kft"), b = await partner("DUPLA KFT.");
+    for (const id of [a, b]) await m.db.db.update(m.db.schema.partners).set({ taxNumber: "12345676-2-41" }).where(m.eq(m.db.schema.partners.id, id));
+    await inv("in", b, "D-1", "2026-11-10", [["Anyag", 1_000, "27", "512"]]);
+    const C = await import("@/lib/consistency");
+    const PM = await import("@/lib/partner-merge");
+    let checks = await C.runConsistency(cid);
+    expect(checks.find((c) => c.key === "partners")!.level).toBe("warn");
+    await PM.mergeAllDuplicates(cid);
+    checks = await C.runConsistency(cid);
+    expect(checks.find((c) => c.key === "partners")!.level).toBe("ok");
+    for (const k of ["balance", "invoice_gl", "stock", "reversed", "vat_payment"]) expect(checks.find((c) => c.key === k)!.level).toBe("ok");
+    // kiegyensúlyozatlan tétel az adatbázisba sem kerülhet be
+    const [ent] = (await m.db.db.select().from(m.db.schema.journalEntries)).filter((x) => x.companyId === cid);
+    await expect(m.db.db.transaction(async (tx) => {
+      await tx.insert(m.db.schema.journalLines).values({ entryId: ent.id, companyId: cid, accountId: await acc("384"), debit: 1, credit: 0 });
+    })).rejects.toThrow();
   });
 });

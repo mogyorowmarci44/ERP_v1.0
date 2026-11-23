@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
@@ -48,8 +49,11 @@ export async function destroySession() {
   c.delete(MFA_COOKIE);
 }
 
-/** Csak a 2FA-n átjutott, érvényes verziójú munkamenet számít bejelentkezettnek. */
-export async function getUser() {
+/**
+ * Csak a 2FA-n átjutott, érvényes verziójú munkamenet számít bejelentkezettnek.
+ * v3.9.6: kérésenként egyszer fut (React cache) – a layout és az oldal ugyanazt az eredményt kapja.
+ */
+export const getUser = cache(async function getUser() {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   try {
@@ -64,7 +68,7 @@ export async function getUser() {
   } catch {
     return null;
   }
-}
+});
 
 // --- Kétlépcsős azonosítás: köztes állapot a jelszó és a kód között ----------------------------
 
@@ -134,6 +138,13 @@ export async function requireAdmin() {
 
 /** Ellenőrzi, hogy a felhasználó tagja-e a cégnek; visszaadja a céget és a szerepkört. */
 export async function requireCompany(companyId: number, opts: { write?: boolean } = {}) {
+  const r = await companyMembership(companyId);
+  if (opts.write && r.role === "viewer") throw new Error("Nincs írási jogosultságod ehhez a céghez.");
+  return r;
+}
+
+/** v3.9.6: kérésenként egyszer (React cache) – a layout és az oldal közös lekérdezése. */
+const companyMembership = cache(async (companyId: number) => {
   const user = await requireUser();
   // A logó (base64) nélkül – azt a /api/logo útvonal szolgálja ki
   const { logoData: _omit, ...companyCols } = getTableColumns(schema.companies);
@@ -144,9 +155,8 @@ export async function requireCompany(companyId: number, opts: { write?: boolean 
     .innerJoin(schema.companies, eq(schema.companies.id, schema.memberships.companyId))
     .where(and(eq(schema.memberships.userId, user.id), eq(schema.memberships.companyId, companyId)));
   if (!row) redirect("/");
-  if (opts.write && row.role === "viewer") throw new Error("Nincs írási jogosultságod ehhez a céghez.");
   return { user, company: row.company, role: row.role };
-}
+});
 
 /** Tagság ellenőrzése átirányítás nélkül (API útvonalakhoz). */
 export async function isMember(userId: number, companyId: number) {

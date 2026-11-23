@@ -2,7 +2,7 @@
  * v3.7.0 – ÁFA-bevallás az ERP-ből: időszakonként a könyvelt számlákból számolt bevallás, összevetve a mérvadó (beküldött)
  * változattal, átviteli lánccal és önellenőrzési pótlékkal; ÁNYK-XML előállítás (egyenként vagy ZIP-ben).
  */
-import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 import { zipSync, strToU8 } from "fflate";
 import { db, schema } from "@/db";
 import { today } from "./dates";
@@ -28,11 +28,54 @@ export async function loadVatLines(companyId: number, from: string, to: string):
     .innerJoin(s.partners, eq(s.partners.id, s.invoices.partnerId))
     .where(and(eq(s.invoices.companyId, companyId), eq(s.invoices.status, "posted"), gte(s.invoices.fulfillmentDate, from), lte(s.invoices.fulfillmentDate, to)))
     .orderBy(asc(s.invoices.fulfillmentDate), asc(s.invoices.invoiceNumber));
-  return rows.map((r) => ({
+  const fromInvoices: VatLine[] = rows.map((r) => ({
     direction: r.direction, kind: r.kind, rate: Number(r.rate), net: Number(r.net), vat: Number(r.vat), gross: Number(r.gross),
     marginPurchase: r.marginPurchase == null ? null : Number(r.marginPurchase), invoiceNumber: r.invoiceNumber ?? "", fulfillmentDate: r.fulfillmentDate,
     partnerName: r.partnerName, partnerTax: r.partnerTax,
   }));
+  return [...fromInvoices, ...(await loadManualVatLines(companyId, from, to))];
+}
+
+/**
+ * v3.9.6 – Számla nélküli (kézi / vegyes) tételek ÁFA-sorai: pl. kézzel könyvelt visszáru-jóváírás (K 466) vagy egyéb
+ * ÁFA-korrekció. Ezek eddig a főkönyvben szerepeltek, a bevallásból viszont kimaradtak. A NAV-befizetések (468) és az
+ * ÁFA-zárás nem tartoznak ide; a stornózott tételpárok kiesnek.
+ */
+export async function loadManualVatLines(companyId: number, from: string, to: string): Promise<Array<VatLine & { entryId: number }>> {
+  const rows = (await db.execute(sql`
+    with e as (
+      select e.id, e.number, e.date::text as d, e.description from journal_entries e
+      where e.company_id = ${companyId} and e.date between ${from}::date and ${to}::date
+        and coalesce(e.source_type, 'manual') not in ('invoice', 'vat_closing', 'payment', 'storno')
+        and e.reversed_by_id is null and e.reversal_of_id is null
+        and exists (select 1 from journal_lines l join accounts a on a.id = l.account_id where l.entry_id = e.id and a.code in ('466', '467')))
+    select e.id, e.number, e.d, e.description, a.code, l.debit::float8 as debit, l.credit::float8 as credit, l.vat_code_id,
+      vc.rate::float8 as rate, coalesce(p.name, ep.name) as partner_name, coalesce(p.tax_number, ep.tax_number) as partner_tax
+    from e join journal_lines l on l.entry_id = e.id join accounts a on a.id = l.account_id
+    left join vat_codes vc on vc.id = l.vat_code_id
+    left join partners p on p.id = l.partner_id
+    left join lateral (select p2.name, p2.tax_number from journal_lines l2 join partners p2 on p2.id = l2.partner_id where l2.entry_id = e.id limit 1) ep on true
+    order by e.d, e.id`)) as unknown as Array<{ id: number; number: string; d: string; description: string; code: string; debit: number; credit: number; vat_code_id: number | null; rate: number | null; partner_name: string | null; partner_tax: string | null }>;
+  const out: Array<VatLine & { entryId: number }> = [];
+  const byEntry = new Map<number, typeof rows>();
+  for (const r of rows) byEntry.set(r.id, [...(byEntry.get(r.id) ?? []), r]);
+  for (const ls of byEntry.values()) {
+    const ref = /\[([^\]]+)\]/.exec(ls[0].description)?.[1] ?? /számla\s+(\S+)/i.exec(ls[0].description)?.[1] ?? ls[0].number;
+    for (const l of ls.filter((x) => x.code === "466" || x.code === "467")) {
+      const dir: "in" | "out" = l.code === "466" ? "in" : "out";
+      const vat = dir === "in" ? Number(l.debit) - Number(l.credit) : Number(l.credit) - Number(l.debit);
+      if (Math.abs(vat) < 0.005) continue;
+      const rate = Number(l.rate ?? 27) || 27;
+      // adóalap: a tétel azonos ÁFA-kódú, nem ÁFA-számlás sorai; ha nincs ilyen, az ÁFA-ból visszaszámolva
+      const peers = ls.filter((x) => x.vat_code_id != null && x.vat_code_id === l.vat_code_id && x.code !== "466" && x.code !== "467");
+      const net = peers.length
+        ? Math.round(peers.reduce((a, x) => a + (dir === "in" ? Number(x.debit) - Number(x.credit) : Number(x.credit) - Number(x.debit)), 0))
+        : Math.round((vat * 100) / rate);
+      out.push({ entryId: Number(l.id), direction: dir, kind: "normal", rate, net, vat, gross: net + vat, marginPurchase: null, invoiceNumber: ref, fulfillmentDate: String(l.d).slice(0, 10),
+        partnerName: l.partner_name ?? ls.find((x) => x.partner_name)?.partner_name ?? "Ismeretlen partner", partnerTax: l.partner_tax ?? ls.find((x) => x.partner_tax)?.partner_tax ?? null });
+    }
+  }
+  return out;
 }
 
 type Filing = typeof s.taxFilings.$inferSelect;

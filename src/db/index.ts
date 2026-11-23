@@ -5,8 +5,12 @@ import * as schema from "./schema";
 const globalForDb = globalThis as unknown as { pg?: ReturnType<typeof postgres> };
 
 function makeClient() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL nincs beállítva");
+  let url = process.env.DATABASE_URL;
+  if (!url) {
+    // v3.9.6: a `next build` oldaladat-gyűjtése DATABASE_URL nélkül is lefusson (a kapcsolat csak az első lekérdezéskor nyílik)
+    if (process.env.NEXT_PHASE !== "phase-production-build") throw new Error("DATABASE_URL nincs beállítva");
+    url = "postgres://build:build@127.0.0.1:1/build";
+  }
   // Neon pooled (PgBouncer) kapcsolatnál a prepared statement-ek nem támogatottak.
   return postgres(url, { max: 10, prepare: false });
 }
