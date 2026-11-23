@@ -39,6 +39,12 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.9.3 – Napi összefoglaló be / ki kapcsolása
+
+- **Fő kapcsoló** (Admin › Napi összefoglaló): kikapcsolva semmilyen összefoglaló nem megy ki – sem az ütemezett, sem a „Küldés most”; a címzettek és beállítások megmaradnak.
+- **Holding kapcsoló** és **cégenkénti kapcsoló** ugyanott egy táblában; a cég kapcsolója a cég saját *Napi összefoglaló* oldalán is elérhető (írási joggal).
+- A kapcsolók az `app_settings.dailySummary` kulcsban (`enabled`, `holdingEnabled`, `disabledCompanies`), migráció nem kell.
+
 ## v3.9.2 – Napi összefoglaló e-mail
 
 - Minden nap 6:59-kor (Budapest) e-mail a tegnapi napról és a mai állapotról.

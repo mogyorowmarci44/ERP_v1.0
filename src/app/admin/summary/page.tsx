@@ -8,14 +8,22 @@ import { APP_VERSION } from "@/lib/version";
 import { holdingSnapshot } from "@/lib/daily-summary/data";
 import { renderHoldingMail } from "@/lib/daily-summary/render";
 import { getSummarySettings, recipientsByCompany, smtpConfigured } from "@/lib/daily-summary/send";
-import { saveHoldingAction, testHoldingAction, runNowAction } from "./actions";
+import { saveHoldingAction, testHoldingAction, runNowAction, toggleSummaryAction } from "./actions";
+import { SummarySwitch } from "@/components/SummarySwitch";
+import { asc } from "drizzle-orm";
+import { db, schema } from "@/db";
+import { isPrivate } from "@/lib/entity";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminSummaryPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
   const sp = await searchParams;
-  const [st, byCompany] = await Promise.all([getSummarySettings(), recipientsByCompany()]);
+  const [st, byCompany, companies] = await Promise.all([
+    getSummarySettings(),
+    recipientsByCompany(),
+    db.select().from(schema.companies).orderBy(asc(schema.companies.name)),
+  ]);
   const companyRecipients = [...byCompany.values()].reduce((s, l) => s + l.length, 0);
   let preview = "", previewError = "";
   try {
@@ -37,12 +45,48 @@ export default async function AdminSummaryPage({ searchParams }: { searchParams:
       <Flash error={sp.error} ok={sp.ok} />
       {!smtpConfigured() && <div className="flash error">Az e-mail küldés nincs beállítva: a Renderen add meg az SMTP_USER (Gmail cím) és SMTP_PASS (Gmail alkalmazásjelszó) változót.</div>}
 
+      <div className={`card sum-master${st.enabled ? "" : " off"}`} style={{ marginBottom: 16 }}>
+        <div>
+          <strong style={{ fontSize: 16 }}>Napi összefoglaló e-mail</strong>
+          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            {st.enabled
+              ? "Minden nap 6:59-kor kimegy a bekapcsolt cégek címzettjeinek és a holding címzettjeinek."
+              : "Kikapcsolva: semmilyen összefoglaló nem megy ki (a „Küldés most” sem). A címzettek és beállítások megmaradnak."}
+          </div>
+        </div>
+        <SummarySwitch on={st.enabled} what="all" action={toggleSummaryAction} />
+      </div>
+
+      <h2>Cégenként</h2>
+      <table style={{ marginBottom: 16 }}>
+        <thead><tr><th>Cég</th><th>Címzettek</th><th>Küldés</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Holding összesítő</strong> <span className="muted">(minden cég egyben)</span></td>
+            <td>{st.holdingEmails.length ? st.holdingEmails.join(", ") : <span className="muted">nincs megadva</span>}</td>
+            <td><SummarySwitch on={st.holdingEnabled} what="holding" action={toggleSummaryAction} disabled={!st.enabled} /></td>
+            <td></td>
+          </tr>
+          {companies.filter((c) => !isPrivate(c)).map((c) => {
+            const n = byCompany.get(c.id)?.length ?? 0;
+            const on = !st.disabledCompanies.includes(c.id);
+            return (
+              <tr key={c.id}>
+                <td>{c.name}</td>
+                <td>{n ? `${n} aktív címzett` : <span className="muted">nincs címzett</span>}</td>
+                <td><SummarySwitch on={on} what={`company:${c.id}`} action={toggleSummaryAction} disabled={!st.enabled} /></td>
+                <td style={{ textAlign: "right" }}><Link href={`/c/${c.id}/summary`}>Címzettek →</Link></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
       <div className="grid cols-2" style={{ gap: 16, alignItems: "start" }}>
         <form action={saveHoldingAction} className="card grid" style={{ gap: 10 }}>
           <strong>Holding e-mail címzettjei</strong>
           <span className="muted" style={{ fontSize: 13 }}>Minden cég adata benne van – csak a holding tulajdonosainak. Több cím vesszővel elválasztva.</span>
           <textarea name="emails" rows={2} defaultValue={st.holdingEmails.join(", ")} placeholder={me.email} />
-          <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" name="enabled" defaultChecked={st.enabled} /> Napi küldés bekapcsolva (minden nap 6:59)</label>
           <div><button className="primary">Mentés</button></div>
         </form>
         <div className="card grid" style={{ gap: 8 }}>

@@ -67,3 +67,13 @@ describe("CSV melléklet", () => {
     expect(c.filename).toBe("naplo_PezCar_Kft_2026-11-23.csv");
   });
 });
+
+describe("v3.9.3 kapcsolók", () => {
+  it("fő kapcsoló és cégkapcsoló", async () => {
+    const { companyEnabled } = await import("@/lib/daily-summary/send");
+    const base = { enabled: true, holdingEnabled: true, disabledCompanies: [2], holdingEmails: [], lastRun: null };
+    expect(companyEnabled(base, 1)).toBe(true);
+    expect(companyEnabled(base, 2)).toBe(false);
+    expect(companyEnabled({ ...base, enabled: false }, 1)).toBe(false);
+  });
+});
