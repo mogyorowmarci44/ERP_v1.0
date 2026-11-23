@@ -3,12 +3,13 @@ import { requireCompany } from "@/lib/auth";
 import { Flash } from "@/components/Flash";
 import { PrintButton } from "@/components/PrintButton";
 import { fmtHuf } from "@/lib/money";
-import { fmtDate } from "@/lib/dates";
+import { fmtDate, today } from "@/lib/dates";
 import { loadSoldCars, loadStockCars, redDaysOf } from "@/lib/keszlet-merleg";
 import { soldView, stockView, type KmGroupBy, type KmStatus } from "@/lib/keszlet-merleg-calc";
 import type { AutoMerleg } from "@/lib/auto-merleg-calc";
 import { periodOf } from "./period";
 import { saveRedDaysAction } from "./actions";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -114,13 +115,8 @@ export default async function KeszletMerlegPage({ params, searchParams }: { para
         <>
           <form className="row km-filters no-print">
             <input type="hidden" name="tab" value="sold" />
-            <label>Időszak
-              <select name="p" defaultValue={per.key}>
-                <option value="12m">Elmúlt 12 hónap</option><option value="ytd">Idei év</option><option value="prev">Tavalyi év</option><option value="custom">Egyéni</option>
-              </select>
-            </label>
-            <label>Ettől<input type="date" name="from" defaultValue={per.from} /></label>
-            <label>Eddig<input type="date" name="to" defaultValue={per.to} /></label>
+            <input type="hidden" name="p" value="custom" />
+            <PeriodPicker unit="day" label="Időszak" from={per.from} to={per.to} today={today()} />
             <label>Csoportosítás
               <select name="g" defaultValue={groupBy}>
                 <option value="none">Nincs</option><option value="model">Márka / modell</option><option value="origin">Import / belföld</option><option value="month">Hónap</option>

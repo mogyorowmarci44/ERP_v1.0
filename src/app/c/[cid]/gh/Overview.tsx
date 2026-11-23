@@ -6,11 +6,12 @@ import { fmtDate } from "@/lib/dates";
 import { PNL_INCLUDE_LABEL, flatRateSchedule, vatExemptThreshold } from "@/lib/entity";
 import { loadGuesthouse, propertyReturn } from "@/lib/guesthouse";
 import { SALE_METHOD_LABEL } from "@/lib/valuation";
-import { addDays, breakEven, groupBy, kpis, paybackFlows, paybackSummary, periodKey, periodLabel, periodRange, prevPeriod, sumRange, type Gran } from "@/lib/gh-calc";
+import { addDays, breakEven, groupBy, kpis, paybackFlows, paybackSummary, periodKey, periodLabel, periodRange, sumRange, type Gran } from "@/lib/gh-calc";
 import { accommodationStart, availableDays, comparison, fmtNum, fmtPct, parseGran } from "@/lib/gh-view";
 import { Flash } from "@/components/Flash";
 import { RefreshCard } from "./RefreshCard";
-import { IncludeToggle, Kpi, Meter, Seg, ScopeNav } from "@/components/gh/GhUi";
+import { IncludeToggle, Kpi, Meter, Seg } from "@/components/gh/GhUi";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 const HU_M = ["jan", "feb", "már", "ápr", "máj", "jún", "júl", "aug", "szep", "okt", "nov", "dec"];
 
@@ -27,9 +28,6 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
 
   const base = `/c/${cid}`;
   const href = (gg: Gran, p?: string) => `${base}?g=${gg}${p ? `&p=${p}` : ""}`;
-  const prevKey = prevPeriod(key, g);
-  const nextFrom = addDays(periodRange(key, g).to, 1);
-  const nextKey = nextFrom <= asOf ? periodKey(nextFrom, g) : null;
 
   // utolsó 12 hónap: fedezeti pont
   const ttmFrom = addDays(asOf, -364);
@@ -72,7 +70,7 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
         </div>
         <div className="toolbar">
           <Seg items={(["week", "month", "year"] as Gran[]).map((x) => ({ href: href(x), label: x === "week" ? "Hét" : x === "month" ? "Hónap" : "Év", on: g === x }))} />
-          <ScopeNav prev={start && periodRange(prevKey, g).to >= start ? href(g, prevKey) : null} next={nextKey ? href(g, nextKey) : null} label={periodLabel(key, g)} />
+          <PeriodPicker unit={g} single={{ param: "p" }} from={periodRange(key, g).from} to={periodRange(key, g).to} min={start ?? d.first} max={asOf} display={periodLabel(key, g)} today={asOf} />
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import { cashbook, CASH_CATEGORY_LABEL, type CashCategory } from "@/lib/cashbook
 import { fmtHuf, round2 } from "@/lib/money";
 import { fmtDate, isDate, today } from "@/lib/dates";
 import { PrintButton } from "@/components/PrintButton";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 /** v2.0 – Bevételi-kiadási (pénzforgalmi) nyilvántartás. */
 export default async function CashbookPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -32,8 +33,7 @@ export default async function CashbookPage({ params, searchParams }: { params: P
         <PrintButton />
       </div>
       <form className="row card no-print" style={{ marginBottom: 12 }}>
-        <label>-tól<input type="date" name="from" defaultValue={from} /></label>
-        <label>-ig<input type="date" name="to" defaultValue={to} /></label>
+        <PeriodPicker unit="day" label="Időszak" from={from} to={to} today={today()} />
         <label>Kategória
           <select name="cat" defaultValue={cat}>
             <option value="">mind</option>

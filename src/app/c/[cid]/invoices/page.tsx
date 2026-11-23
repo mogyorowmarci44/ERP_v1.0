@@ -7,6 +7,7 @@ import { fmtHuf, fmtMoney } from "@/lib/money";
 import { fmtDate, isDate, yearStart, monthEnd, today } from "@/lib/dates";
 import { invoiceAudit } from "@/lib/invoice-audit";
 import { toggleInvoiceCheckAction } from "../actions";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 const statusHu = { draft: "piszkozat", posted: "könyvelt", cancelled: "sztornózott" } as const;
 
@@ -54,8 +55,7 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
       <Flash error={sp.error} ok={sp.ok} />
       <form className="row card" style={{ marginBottom: 12 }}>
         <input type="hidden" name="dir" value={dir} />
-        <label>Teljesítés-tól<input type="date" name="from" defaultValue={from} /></label>
-        <label>-ig<input type="date" name="to" defaultValue={to} /></label>
+        <PeriodPicker unit="day" label="Teljesítés" from={from} to={to} today={today()} />
         <label>Keresés<input name="q" defaultValue={q} placeholder="számlaszám / partner" /></label>
         <input type="hidden" name="check" value={chk} />
         <button style={{ alignSelf: "end" }}>Szűrés</button>

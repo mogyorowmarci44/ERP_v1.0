@@ -2,7 +2,9 @@ import Link from "next/link";
 import { sankeyDetail } from "@/lib/sankey-detail";
 import { requireCompany } from "@/lib/auth";
 import { dailyRows } from "@/lib/reports";
-import { buckets, buildPnl, buildCashFlow, buildBalanceSheet, GRAN_LABEL, MAX_COLUMNS, type Granularity, type Statement } from "@/lib/statements";
+import { buckets, buildPnl, buildCashFlow, buildBalanceSheet, GRAN_LABEL, GRANS, MAX_COLUMNS, parseGranularity, type Granularity, type Statement } from "@/lib/statements";
+import { PeriodPicker } from "@/components/PeriodPicker";
+import { snapRange } from "@/lib/period-picker";
 import { fmtHuf } from "@/lib/money";
 import { isDate, today, fmtDate } from "@/lib/dates";
 import { addDays } from "@/lib/fx";
@@ -18,6 +20,7 @@ function defaultRange(gran: Granularity, t: string): [string, string] {
   if (gran === "day") return [addDays(t, -13), t];
   if (gran === "week") return [addDays(t, -7 * 11), t];
   if (gran === "month") return [`${y}-01-01`, t];
+  if (gran === "year") return [`${Number(y) - 2}-01-01`, `${y}-12-31`];
   return [`${y}-01-01`, `${y}-12-31`];
 }
 
@@ -56,7 +59,7 @@ export default async function StatementsPage({ params, searchParams }: { params:
   const sp = await searchParams;
   const { company } = await requireCompany(cid);
   const type: T = sp.type === "cf" || sp.type === "bs" || sp.type === "sankey" ? sp.type : "pnl";
-  const gran: Granularity = (["day", "week", "month", "quarter"] as const).find((g) => g === sp.gran) ?? "month";
+  const gran: Granularity = parseGranularity(sp.gran, "month");
   const t = today();
   const [dFrom, dTo] = defaultRange(gran, t);
   const from = isDate(sp.from) ? sp.from : dFrom;
@@ -85,6 +88,11 @@ export default async function StatementsPage({ params, searchParams }: { params:
     if (!o.gran && sp.from) q.set("from", from);
     if (!o.gran && sp.to) q.set("to", to);
     if (!o.gran && sp.period) q.set("period", sp.period);
+    // bontásváltás: a beállított időszak megmarad (az új egység határaira kerekítve), ha elfér
+    if (o.gran && (sp.from || sp.to)) {
+      const r = snapRange(o.gran, from, to, MAX_COLUMNS);
+      if (r) { q.set("from", r.from); q.set("to", r.to); }
+    }
     return `${base}?${q}`;
   };
 
@@ -96,7 +104,7 @@ export default async function StatementsPage({ params, searchParams }: { params:
           <span className="muted">{company.name}, {fmtDate(from)} – {fmtDate(to)}</span>
         </div>
         <div className="segmented no-print" role="tablist" aria-label="Bontás">
-          {(Object.keys(GRAN_LABEL) as Granularity[]).map((g) => (
+          {GRANS.map((g) => (
             <Link key={g} href={link({ gran: g })} className={g === gran ? "on" : undefined} role="tab" aria-selected={g === gran}>{GRAN_LABEL[g]}</Link>
           ))}
         </div>
@@ -111,9 +119,8 @@ export default async function StatementsPage({ params, searchParams }: { params:
       <form className="row no-print" style={{ marginBottom: 16 }}>
         <input type="hidden" name="type" value={type} />
         <input type="hidden" name="gran" value={gran} />
-        <label>Kezdő dátum<input type="date" name="from" defaultValue={from} /></label>
-        <label>Záró dátum<input type="date" name="to" defaultValue={to} /></label>
-        <button style={{ alignSelf: "end" }}>Frissítés</button>
+        <PeriodPicker unit={gran} label="Időszak" from={from} to={to} today={t} maxUnits={MAX_COLUMNS} />
+        <noscript><button style={{ alignSelf: "end" }}>Frissítés</button></noscript>
       </form>
 
       {tooMany && <div className="flash error">Túl sok oszlop ({cols.length}). {GRAN_LABEL[gran]} bontásnál legfeljebb {MAX_COLUMNS} időszak fér el – szűkítsd a dátumokat vagy válassz nagyobb bontást.</div>}

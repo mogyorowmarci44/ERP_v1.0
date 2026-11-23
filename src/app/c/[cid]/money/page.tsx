@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireCompany } from "@/lib/auth";
 import { moneyMonitor } from "@/lib/money-monitor";
-import { GRAN_LABEL, MAX_COLUMNS, type Granularity } from "@/lib/statements";
+import { GRAN_LABEL, GRANS, MAX_COLUMNS, parseGranularity, type Granularity } from "@/lib/statements";
+import { PeriodPicker } from "@/components/PeriodPicker";
+import { snapRange } from "@/lib/period-picker";
 import { MiniLine } from "@/components/MiniLine";
 import { ClickCard } from "@/components/ClickCard";
 import { fmtHuf, fmtMoney } from "@/lib/money";
@@ -12,6 +14,7 @@ function defaultRange(gran: Granularity, t: string): [string, string] {
   if (gran === "day") return [addDays(t, -29), t];
   if (gran === "week") return [addDays(t, -7 * 15), t];
   if (gran === "month") return [`${Number(t.slice(0, 4)) - 1}${t.slice(4, 7)}-01`, t];
+  if (gran === "year") return [`${Number(t.slice(0, 4)) - 2}-01-01`, t];
   return [`${Number(t.slice(0, 4)) - 1}-01-01`, t];
 }
 
@@ -19,7 +22,7 @@ export default async function MoneyPage({ params, searchParams }: { params: Prom
   const cid = Number((await params).cid);
   const sp = await searchParams;
   await requireCompany(cid);
-  const gran: Granularity = (["day", "week", "month", "quarter"] as const).find((g) => g === sp.gran) ?? "week";
+  const gran: Granularity = parseGranularity(sp.gran, "week");
   const t = today();
   const [dFrom, dTo] = defaultRange(gran, t);
   const from = isDate(sp.from) ? sp.from : dFrom;
@@ -31,6 +34,11 @@ export default async function MoneyPage({ params, searchParams }: { params: Prom
   const active = m.accounts.filter((a) => Math.abs(a.balanceHuf) > 0.5 || a.series.some((s) => Math.abs(s.close) > 0.5 || s.inflow || s.outflow));
   const idle = m.accounts.filter((a) => !active.includes(a));
   const base = `/c/${cid}/money`;
+  // bontásváltás: a beállított időszak megmarad (az új egység határaira kerekítve), ha elfér
+  const granHref = (g: Granularity) => {
+    const r = sp.from || sp.to ? snapRange(g, from, to, MAX_COLUMNS) : null;
+    return r ? `${base}?gran=${g}&from=${r.from}&to=${r.to}` : `${base}?gran=${g}`;
+  };
 
   return (
     <>
@@ -40,16 +48,15 @@ export default async function MoneyPage({ params, searchParams }: { params: Prom
           <span className="muted">Összes pénzeszköz ma: <strong>{fmtHuf(m.total)} Ft</strong></span>
         </div>
         <div className="segmented no-print" role="tablist" aria-label="Bontás">
-          {(Object.keys(GRAN_LABEL) as Granularity[]).map((g) => (
-            <Link key={g} href={`${base}?gran=${g}`} className={g === gran ? "on" : undefined} role="tab" aria-selected={g === gran}>{GRAN_LABEL[g]}</Link>
+          {GRANS.map((g) => (
+            <Link key={g} href={granHref(g)} className={g === gran ? "on" : undefined} role="tab" aria-selected={g === gran}>{GRAN_LABEL[g]}</Link>
           ))}
         </div>
       </div>
       <form className="row no-print" style={{ marginBottom: 16 }}>
         <input type="hidden" name="gran" value={gran} />
-        <label>Kezdő dátum<input type="date" name="from" defaultValue={from} /></label>
-        <label>Záró dátum<input type="date" name="to" defaultValue={to} /></label>
-        <button style={{ alignSelf: "end" }}>Frissítés</button>
+        <PeriodPicker unit={gran} label="Időszak" from={from} to={to} today={t} maxUnits={MAX_COLUMNS} />
+        <noscript><button style={{ alignSelf: "end" }}>Frissítés</button></noscript>
       </form>
 
       {negCash.map((a) => (

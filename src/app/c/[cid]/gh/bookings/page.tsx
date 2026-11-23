@@ -10,8 +10,8 @@ import { loadGuesthouse, withReservations, type Stay } from "@/lib/guesthouse";
 import { addDays, daysBetween, daysInMonth, kpis, sumRange } from "@/lib/gh-calc";
 import { accommodationStart, availableDays, fmtNum, fmtPct } from "@/lib/gh-view";
 import { Flash } from "@/components/Flash";
-import { ScopeNav } from "@/components/gh/GhUi";
 import { addDirectBookingAction, ghReverseAction } from "../actions";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 const CH_LABEL: Record<Stay["channel"], string> = { airbnb: "Airbnb", booking: "Booking.com", direct: "Közvetlen" };
 const MONTHS = ["Január", "Február", "Március", "Április", "Május", "Június", "Július", "Augusztus", "Szeptember", "Október", "November", "December"];
@@ -50,13 +50,12 @@ export default async function BookingsPage({ params, searchParams }: { params: P
     .where(and(eq(schema.accounts.companyId, cid), like(schema.accounts.code, "38%"), eq(schema.accounts.isPosting, true), eq(schema.accounts.isActive, true)));
   const banks = moneyAccs.filter((a) => !a.code.startsWith("389")).sort((a, b) => (a.code === "384" ? -1 : b.code === "384" ? 1 : a.code.localeCompare(b.code)));
 
-  const href = (y: number) => `/c/${cid}/gh/bookings?year=${y}`;
   return (
     <div className="gh">
       <Flash error={sp.error} ok={sp.ok} />
       <div className="topbar">
         <h1>Foglalások</h1>
-        <ScopeNav prev={year > y0 ? href(year - 1) : null} next={year <= y1 ? href(year + 1) : null} label={String(year)} />
+        <PeriodPicker unit="year" single={{ param: "year" }} from={`${year}-01-01`} to={`${year}-12-31`} min={`${y0}-01-01`} max={`${y1 + 1}-12-31`} display={String(year)} today={d.asOf} />
       </div>
 
       <div className="grid cols-4">

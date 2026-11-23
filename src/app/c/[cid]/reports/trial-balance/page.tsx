@@ -3,6 +3,7 @@ import { requireCompany } from "@/lib/auth";
 import { trialBalance } from "@/lib/reports";
 import { fmtHuf } from "@/lib/money";
 import { isDate, yearStart, monthEnd, today, fmtDate } from "@/lib/dates";
+import { PeriodPicker } from "@/components/PeriodPicker";
 
 export default async function TrialBalancePage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
@@ -35,8 +36,7 @@ export default async function TrialBalancePage({ params, searchParams }: { param
         <Link className="btn no-print" href={`/c/${cid}/closing`}>← Évzárás</Link>
       </div>
       <form className="row card no-print" style={{ marginBottom: 12 }}>
-        <label>Dátum-tól<input type="date" name="from" defaultValue={from} /></label>
-        <label>-ig<input type="date" name="to" defaultValue={to} /></label>
+        <PeriodPicker unit="day" label="Dátum" from={from} to={to} today={today()} />
         <label>Szint
           <select name="level" defaultValue={String(level)}>
             <option value="0">analitikus</option><option value="1">számlaosztály</option><option value="2">számlacsoport</option><option value="3">főkönyvi (3 jegy)</option>

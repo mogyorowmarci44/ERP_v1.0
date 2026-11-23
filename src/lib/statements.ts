@@ -10,8 +10,10 @@
 import { round2 } from "./money";
 import { addDays } from "./fx";
 
-export type Granularity = "day" | "week" | "month" | "quarter";
-export const GRAN_LABEL: Record<Granularity, string> = { day: "Napi", week: "Heti", month: "Havi", quarter: "Negyedéves" };
+export type Granularity = "day" | "week" | "month" | "quarter" | "year";
+export const GRAN_LABEL: Record<Granularity, string> = { day: "Napi", week: "Heti", month: "Havi", quarter: "Negyedéves", year: "Éves" };
+export const GRANS = Object.keys(GRAN_LABEL) as Granularity[];
+export const parseGranularity = (v: unknown, fallback: Granularity): Granularity => GRANS.find((g) => g === v) ?? fallback;
 export const MAX_COLUMNS = 92;
 
 export type Bucket = { key: string; label: string; start: string; end: string };
@@ -46,6 +48,9 @@ export function buckets(from: string, to: string, gran: Granularity): Bucket[] {
     } else if (gran === "month") {
       end = monthEndOf(cur);
       label = `${cur.slice(0, 4)}. ${HU_MONTH[Number(cur.slice(5, 7)) - 1]}`;
+    } else if (gran === "year") {
+      end = `${cur.slice(0, 4)}-12-31`;
+      label = cur.slice(0, 4);
     } else {
       const m = Number(cur.slice(5, 7));
       const qEndMonth = Math.ceil(m / 3) * 3;

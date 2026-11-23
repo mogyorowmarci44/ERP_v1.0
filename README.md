@@ -39,6 +39,14 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.9.1 – Dinamikus időszakválasztó
+
+- Új közös `PeriodPicker`: a nézet bontásához illeszkedő naptár – Napi: két havi naptár, Heti: hetek (hétszámmal), Havi: két év hónapjai, Negyedéves: három év negyedévei, Éves: évrács. Két kattintás (kezdő és záró egység) és már frissül, nincs külön „Frissítés”.
+- Gyorsválasztók a bontáshoz (pl. Ez a hónap, Előző negyedév, Elmúlt 12 hónap, Tavaly); ‹ / › a teljes tartományt a saját hosszával lépteti (egész hónap / negyedév / év egységben). Kijelzi az oszlopszámot, és figyelmeztet, ha több, mint ami elfér.
+- Kimutatások és Pénztár és bank: új **Éves** bontás; bontásváltáskor a beállított időszak megmarad (az új egységre kerekítve), ha elfér.
+- Dátumszűrős oldalak (Számlák, Napló, Főkönyvi karton, Főkönyvi kivonat, Pénztárkönyv, ÁFA analitika – havi naptárral, Különbözeti kartonok, KészletMérleg Eladott, bank/pénztár napi nézet): a két dátummező helyett ugyanez a választó; a többi szűrő megmarad.
+- Vendégház (Áttekintés, P&L, Cash-flow, Foglalások): a ‹ év › léptető helyett egy kattintásos hét / hónap / negyedév / év választó.
+
 ## v3.9.0 – Új partner a vevő- és szállítói számlán
 
 - Az Új vevőszámla / Új szállítói számla (és a piszkozat szerkesztése) Vevő / Szállító listájában „+ Új partner…”: név, ország, adószám, közösségi adószám, cím, e-mail, magánszemély.
