@@ -7,3 +7,9 @@ export function money(n: number, sign = false): string {
   const body = a >= 1_000_000 ? `${nf(2).format(a / 1_000_000)} M` : a >= 1000 ? `${nf(0).format(Math.round(a / 1000))} e` : nf(0).format(Math.round(a));
   return `${s}${body} Ft`;
 }
+
+const grp = (d: number) => new Intl.NumberFormat("hu-HU", { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: "always" });
+/** v3.9.5 – fix egységű formák a fejléc-számokhoz (ezres tagolással). */
+export const mFt2 = (n: number) => `${grp(2).format(n / 1_000_000)} M Ft`; // 11,62 M Ft
+export const eFt1 = (n: number) => `${grp(1).format(n / 1000)} e Ft`; // 2 356,0 e Ft
+export const ft0 = (n: number) => `${grp(0).format(Math.round(n))} Ft`; // 2 748 000 Ft

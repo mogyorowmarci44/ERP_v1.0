@@ -39,6 +39,12 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.9.5 – Készlet értéke, színezett eredmények
+
+- Napi összefoglaló fejléce 2 × 2 kiemelt számmal, egységes stílusban: Pénztár (Ft) és Összes pénz e Ft-ban 1 tizedesre, Tegnapi bevétel forintra, **Készlet értéke** M Ft-ban 2 tizedesre – a készleten lévő autók beszerzési ára × (1 + medián bruttó fedezet %, elmúlt 12 hónap eladásaiból), alatta a beszerzési ár.
+- Az eredmény-sorok előjel szerint színezve: pozitív zöld, nulla sárga, negatív piros (a várható éves eredmény is).
+- A lejárt vevői tartozás mellett a lejárt szállítói tartozás is szerepel.
+
 ## v3.9.4 – Napilap stílusú napi összefoglaló, rontott számla
 
 - **Új dizájn** („napilap”): a cég neve a fejlécben, természetes magyar szövegek (Összefoglaló, Eredmény, Teendők, Határidők, Autók, Tegnapi egyéb történések). A holding e-mail ugyanebben a stílusban („Mogyorosi Holding”, tulajdonosi összefoglaló).

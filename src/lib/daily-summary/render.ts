@@ -5,7 +5,7 @@
  * E-mail-biztos: táblázatos elrendezés, inline stílusok, kép és JS nélkül.
  */
 import type { CompanySnapshot, HoldingSnapshot, Level } from "./data";
-import { money } from "./format";
+import { money, mFt2, eFt1, ft0 } from "./format";
 import { APP_VERSION } from "@/lib/version";
 
 export { money };
@@ -59,10 +59,12 @@ const K = { bg: "#efe9dd", paper: "#fbf8f1", ink: "#1b1a17", mute: "#6b655a", ru
 const LV: Record<Level, string> = { red: K.red, yellow: K.yellow, green: K.green };
 const kick = (t: string) => `<div style="${SANS}font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:${K.accent};font-weight:700">${esc(t)}</div>`;
 const head = (t: string, right = "") => `<tr><td style="padding:26px 0 10px;border-top:3px double ${K.rule}"><table role="presentation" width="100%"><tr><td style="${SERIF}font-size:22px;font-style:italic;color:${K.ink}">${esc(t)}</td><td align="right" style="${SANS}font-size:11px;color:${K.mute}">${right}</td></tr></table></td></tr>`;
-const figure = (lbl: string, val: string, note = "", color = K.ink) => `<div style="${SANS}font-size:11px;color:${K.mute};text-transform:uppercase;letter-spacing:.08em">${esc(lbl)}</div>
-  <div style="${SERIF}font-size:26px;color:${color};line-height:1.15;padding-top:4px;white-space:nowrap">${val}</div>${note ? `<div style="${SANS}font-size:11.5px;color:${K.mute};padding-top:2px">${note}</div>` : ""}`;
+const figure = (lbl: string, val: string, note = "", color = K.ink, size = 26) => `<div style="${SANS}font-size:11px;color:${K.mute};text-transform:uppercase;letter-spacing:.08em">${esc(lbl)}</div>
+  <div style="${SERIF}font-size:${size}px;color:${color};line-height:1.15;padding-top:4px;white-space:nowrap">${val}</div>${note ? `<div style="${SANS}font-size:11.5px;color:${K.mute};padding-top:2px">${note}</div>` : ""}`;
 const vrule = (cells: string[]) => `<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${cells.map((c, i) => `<td valign="top" width="${Math.floor(100 / cells.length)}%" style="padding:0 ${i < cells.length - 1 ? 14 : 0}px 0 ${i ? 14 : 0}px;${i ? `border-left:1px solid ${K.hair};` : ""}">${c}</td>`).join("")}</tr></table>`;
-const sign = (n: number) => (n >= 0 ? K.ink : K.red);
+/** v3.9.5 – előjel szerinti szín: pozitív zöld, nulla sárga, negatív piros. */
+const SIGN = { pos: "#1e7a46", zero: "#b07d00", neg: "#b3261e" };
+const sign = (n: number) => (Math.abs(n) < 0.5 ? SIGN.zero : n > 0 ? SIGN.pos : SIGN.neg);
 
 function companyHtml(s: CompanySnapshot, v: Variant): string {
   const b = BLOCKS[v];
@@ -77,12 +79,24 @@ function companyHtml(s: CompanySnapshot, v: Variant): string {
   // vezércikk
   rows.push(`<tr><td style="padding:22px 0 18px">${kick("Összefoglaló")}
     <div style="${SERIF}font-size:27px;line-height:1.25;color:${K.ink};padding-top:8px">${esc(s.headline)}</div></td></tr>`);
-  rows.push(`<tr><td style="padding:16px 0;border-top:1px solid ${K.hair};border-bottom:1px solid ${K.hair}">${vrule([
-    figure("Pénztár (Ft)", money(s.kpi.cashHuf), "forintpénztár egyenlege"),
-    figure("Összes pénz", money(s.kpi.liquidity), "pénztár + bank, mai árfolyamon"),
-    figure("Tegnapi bevétel", money(s.kpi.revenueDay), shortD(s.day)),
+  const sv = s.stockValue;
+  // 2 × 2 rács, hogy telefonon is elférjen; mind a négy szám ugyanabban a kiemelt stílusban
+  const kpiCell = (lbl: string, val: string, note1: string, note2 = "") => `<div style="${SANS}font-size:11px;color:${K.accent};text-transform:uppercase;letter-spacing:.08em;font-weight:700">${esc(lbl)}</div>
+      <div style="${SERIF}font-size:28px;font-weight:700;color:${K.ink};line-height:1.15;padding-top:3px;white-space:nowrap">${val}</div>
+      <div style="${SANS}font-size:12px;font-weight:300;color:${K.mute};padding-top:3px">${note1}</div>
+      ${note2 ? `<div style="${SANS}font-size:11px;font-weight:300;color:${K.mute};padding-top:1px">${note2}</div>` : ""}`;
+  const svCell = sv
+    ? kpiCell("Készlet értéke", mFt2(sv.value), `beszerzési ár: ${mFt2(sv.purchase)}`, sv.pct != null ? `${sv.count} autó · +${Math.round(sv.pct * 100)}% medián bruttó fedezettel` : `${sv.count} autó · még nincs eladás a mediánhoz`)
+    : kpiCell("Eladó autó", `${s.kpi.stock ?? "–"} db`, "");
+  rows.push(`<tr><td style="padding:16px 0 14px;border-top:1px solid ${K.hair}">${vrule([
+    kpiCell("Pénztár (Ft)", eFt1(s.kpi.cashHuf), "forintpénztár egyenlege"),
+    kpiCell("Összes pénz", eFt1(s.kpi.liquidity), "pénztár + bank, mai árfolyamon"),
   ])}</td></tr>`);
-  rows.push(`<tr><td style="padding:10px 0 0;${SANS}font-size:12.5px;color:${K.mute}">Eladó autó: <b style="color:${K.ink}">${s.kpi.stock ?? "–"} db</b> &nbsp;·&nbsp; Lejárt vevői tartozás: <b style="color:${s.kpi.lateReceivableCount ? K.red : K.ink}">${s.kpi.lateReceivableCount ? money(s.kpi.lateReceivable) : "nincs"}</b></td></tr>`);
+  rows.push(`<tr><td style="padding:14px 0 16px;border-top:1px dotted ${K.hair};border-bottom:1px solid ${K.hair}">${vrule([
+    kpiCell("Tegnapi bevétel", ft0(s.kpi.revenueDay), shortD(s.day)),
+    svCell,
+  ])}</td></tr>`);
+  rows.push(`<tr><td style="padding:10px 0 0;${SANS}font-size:12.5px;color:${K.mute}">Eladó autó: <b style="color:${K.ink}">${s.kpi.stock ?? "–"} db</b> &nbsp;·&nbsp; Lejárt vevői tartozás: <b style="color:${s.kpi.lateReceivableCount ? K.red : K.ink}">${s.kpi.lateReceivableCount ? money(s.kpi.lateReceivable) : "nincs"}</b> &nbsp;·&nbsp; Lejárt szállítói tartozás: <b style="color:${s.kpi.latePayableCount ? K.red : K.ink}">${s.kpi.latePayableCount ? money(s.kpi.latePayable) : "nincs"}</b></td></tr>`);
 
   // eredmény-rovat
   const r = s.results;
@@ -90,7 +104,7 @@ function companyHtml(s: CompanySnapshot, v: Variant): string {
   rows.push(head("Eredmény", "adózás előtt"));
   const line = (t: string, n: number | null, strong = false, note = "") => `<tr>
     <td style="${SERIF}font-size:${strong ? 19 : 16}px;color:${K.ink};padding:9px 0;border-bottom:1px dotted ${K.hair};${strong ? "font-weight:700;" : ""}">${esc(t)}${note ? `<span style="${SANS}font-size:11.5px;color:${K.mute};font-weight:400"> · ${note}</span>` : ""}</td>
-    <td align="right" style="${SERIF}font-size:${strong ? 21 : 17}px;color:${n == null ? K.mute : strong ? K.accent : sign(n)};padding:9px 0;border-bottom:1px dotted ${K.hair};white-space:nowrap;${strong ? "font-weight:700;" : ""}">${n == null ? "nincs Forecast" : money(n, true)}</td></tr>`;
+    <td align="right" style="${SERIF}font-size:${strong ? 21 : 17}px;color:${n == null ? K.mute : sign(n)};padding:9px 0;border-bottom:1px dotted ${K.hair};white-space:nowrap;${strong ? "font-weight:700;" : ""}">${n == null ? "nincs Forecast" : money(n, true)}</td></tr>`;
   rows.push(`<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0">
     ${line("Ebben a hónapban", r.month)}
     ${line("Ebben a negyedévben", r.quarter)}
