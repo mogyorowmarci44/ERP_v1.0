@@ -9,6 +9,10 @@ async function main() {
   await migrate(drizzle(client), { migrationsFolder: "./drizzle" });
   await client.end();
   console.log("Migrációk lefutottak.");
+  // v3.9.6 – egyszeri, idempotens adatjavítások (az app_settings.dataFixes-ben nyilvántartva)
+  const { runDataFixes } = await import("./data-fixes");
+  await runDataFixes();
+  process.exit(0);
 }
 
 main().catch((e) => {

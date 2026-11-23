@@ -6,7 +6,7 @@
  * időszakokat is, illetve a 467-re közvetlenül könyvelt befizetéseket is.
  */
 import { and, asc, eq, sql } from "drizzle-orm";
-import { db, schema } from "@/db";
+import { db, schema, type DbOrTx } from "@/db";
 import { accountIdByCode, postEntry, reverseEntry } from "./ledger";
 import { round2 } from "./money";
 import { today } from "./dates";
@@ -43,21 +43,87 @@ async function balances(companyId: number, to: string, from?: string, excludeClo
   return { b466: b("466"), b467: round2(-b("467")) };
 }
 
+/** v3.9.6 – A 466 / 467 napi forgalma (T − K) egyetlen lekérdezéssel; a zárótételek külön jelölve. */
+async function vatDailyMoves(companyId: number, to: string, tx: DbOrTx = db) {
+  const rows = (await tx.execute(sql`
+    select e.date::text as d, a.code, (coalesce(e.source_type, '') = 'vat_closing'
+        or e.reversal_of_id in (select id from journal_entries where company_id = ${companyId} and source_type = 'vat_closing')) as cl,
+      coalesce(sum(l.debit - l.credit), 0)::float8 as bal
+    from journal_lines l join journal_entries e on e.id = l.entry_id join accounts a on a.id = l.account_id
+    where e.company_id = ${companyId} and e.date <= ${to} and a.code in ('466', '467')
+    group by 1, 2, 3`)) as unknown as Array<{ d: string; code: string; cl: boolean; bal: number }>;
+  return rows.map((r) => ({ d: String(r.d).slice(0, 10), code: r.code, cl: !!r.cl, bal: Number(r.bal) }));
+}
+
 export async function listVatPeriods(companyId: number, year: number): Promise<VatPeriodRow[]> {
-  const [c] = await db.select({ vatPeriod: companies.vatPeriod }).from(companies).where(eq(companies.id, companyId));
-  const closings = await db.select({ c: vatClosings, number: schema.journalEntries.number }).from(vatClosings)
-    .leftJoin(schema.journalEntries, eq(schema.journalEntries.id, vatClosings.journalEntryId))
-    .where(eq(vatClosings.companyId, companyId)).orderBy(asc(vatClosings.toDate));
   const t = today();
+  const yearEnd = `${year}-12-31`;
+  const [[c], closings, moves] = await Promise.all([
+    db.select({ vatPeriod: companies.vatPeriod }).from(companies).where(eq(companies.id, companyId)),
+    db.select({ c: vatClosings, number: schema.journalEntries.number }).from(vatClosings)
+      .leftJoin(schema.journalEntries, eq(schema.journalEntries.id, vatClosings.journalEntryId))
+      .where(eq(vatClosings.companyId, companyId)).orderBy(asc(vatClosings.toDate)),
+    vatDailyMoves(companyId, yearEnd < t ? yearEnd : t),
+  ]);
+  const sumOf = (code: string, pred: (m: (typeof moves)[number]) => boolean) => round2(moves.filter((m) => m.code === code && pred(m)).reduce((a, m) => a + m.bal, 0));
   const out: VatPeriodRow[] = [];
   for (const p of vatPeriods(c.vatPeriod, year)) {
     if (p.from > t) break;
     const cl = closings.find((x) => x.c.toDate === p.to);
-    const b = cl ? { b466: 0, b467: 0 } : await balances(companyId, p.to);
-    const mv = await balances(companyId, p.to, p.from, true);
-    out.push({ ...p, closed: cl ? { id: cl.c.id, payable: Number(cl.c.payable), number: cl.number } : null, m466: mv.b466, m467: mv.b467, ...b, net: round2(b.b467 - b.b466), ended: p.to < t });
+    // halmozott (még át nem vezetett) egyenleg az időszak végén – a zárótételekkel együtt
+    const b = cl ? { b466: 0, b467: 0 } : { b466: sumOf("466", (m) => m.d <= p.to), b467: round2(-sumOf("467", (m) => m.d <= p.to)) };
+    const inP = (m: (typeof moves)[number]) => !m.cl && m.d >= p.from && m.d <= p.to;
+    out.push({ ...p, closed: cl ? { id: cl.c.id, payable: Number(cl.c.payable), number: cl.number } : null, m466: sumOf("466", inP), m467: round2(-sumOf("467", inP)), ...b, net: round2(b.b467 - b.b466), ended: p.to < t });
   }
   return out;
+}
+
+/**
+ * v3.9.6 – A meglévő ÁFA-zárások újraszámolása időrendben (pl. ha a zárás után az időszakba könyveltek, vagy egy
+ * tételt átkönyveltek): minden zárás pontosan a még át nem vezetett 466 / 467 egyenleget viszi a 468-ra.
+ * A zárótételek sorai helyben módosulnak, minden változás a tétel-naplóba (journal_line_changes) kerül.
+ */
+export async function recomputeVatClosings(companyId: number, userId?: number) {
+  return db.transaction(async (tx) => {
+    const closings = await tx.select().from(vatClosings).where(eq(vatClosings.companyId, companyId)).orderBy(asc(vatClosings.toDate));
+    if (!closings.length) return { changed: 0 };
+    const moves = await vatDailyMoves(companyId, closings[closings.length - 1].toDate, tx);
+    const [a466, a467, a468] = await Promise.all(["466", "467", "468"].map((c) => accountIdByCode(tx, companyId, c)));
+    let done466 = 0, done467 = 0, changed = 0;
+    for (const c of closings) {
+      const cum = (code: string) => round2(moves.filter((m) => m.code === code && !m.cl && m.d <= c.toDate).reduce((a, m) => a + m.bal, 0));
+      const b466 = round2(cum("466") - done466);
+      const b467 = round2(-(cum("467") - done467));
+      done466 = round2(done466 + b466); done467 = round2(done467 - b467);
+      const net = round2(b467 - b466);
+      if (!c.journalEntryId) continue;
+      const want = new Map<number, { debit: number; credit: number }>([
+        [a467, { debit: b467 > 0 ? b467 : 0, credit: b467 < 0 ? -b467 : 0 }],
+        [a466, { debit: b466 < 0 ? -b466 : 0, credit: b466 > 0 ? b466 : 0 }],
+        [a468, { debit: net < 0 ? -net : 0, credit: net > 0 ? net : 0 }],
+      ]);
+      const lines = await tx.select().from(schema.journalLines).where(eq(schema.journalLines.entryId, c.journalEntryId));
+      const log: Array<typeof schema.journalLineChanges.$inferInsert> = [];
+      for (const [accountId, w] of want) {
+        const l = lines.find((x) => x.accountId === accountId);
+        const zero = Math.abs(w.debit) < 0.005 && Math.abs(w.credit) < 0.005;
+        if (l && zero) {
+          await tx.delete(schema.journalLines).where(eq(schema.journalLines.id, l.id));
+          log.push({ companyId, entryId: c.journalEntryId, lineId: null, field: "line_deleted", oldValue: `${l.debit}/${l.credit}`, newValue: null, userId: userId ?? null });
+        } else if (l && (Number(l.debit) !== w.debit || Number(l.credit) !== w.credit)) {
+          await tx.update(schema.journalLines).set({ debit: w.debit, credit: w.credit }).where(eq(schema.journalLines.id, l.id));
+          if (Number(l.debit) !== w.debit) log.push({ companyId, entryId: c.journalEntryId, lineId: l.id, field: "debit", oldValue: String(l.debit), newValue: String(w.debit), userId: userId ?? null });
+          if (Number(l.credit) !== w.credit) log.push({ companyId, entryId: c.journalEntryId, lineId: l.id, field: "credit", oldValue: String(l.credit), newValue: String(w.credit), userId: userId ?? null });
+        } else if (!l && !zero) {
+          const [n] = await tx.insert(schema.journalLines).values({ entryId: c.journalEntryId, companyId, accountId, debit: w.debit, credit: w.credit, description: "ÁFA-zárás (újraszámolva)" }).returning();
+          log.push({ companyId, entryId: c.journalEntryId, lineId: n.id, field: "line_added", oldValue: null, newValue: `${w.debit}/${w.credit}`, userId: userId ?? null });
+        }
+      }
+      if (log.length) { await tx.insert(schema.journalLineChanges).values(log); changed++; }
+      if (Number(c.payable) !== net) await tx.update(vatClosings).set({ payable: net }).where(eq(vatClosings.id, c.id));
+    }
+    return { changed };
+  });
 }
 
 /** Zárás: VN tétel az időszak utolsó napjával – T 467 / K 466, a különbözet a 468-ra. */
@@ -88,8 +154,8 @@ export async function reopenVatPeriod(companyId: number, closingId: number, user
   const later = await db.select({ id: vatClosings.id }).from(vatClosings).where(and(eq(vatClosings.companyId, companyId), sql`${vatClosings.toDate} > ${c.toDate}`));
   if (later.length) throw new Error("Előbb a későbbi időszakok zárását vond vissza.");
   return db.transaction(async (tx) => {
-    const rev = c.journalEntryId ? await reverseEntry(tx, companyId, c.journalEntryId, c.toDate, userId, "ÁFA-zárás visszavonása") : null;
     await tx.delete(vatClosings).where(eq(vatClosings.id, c.id));
+    const rev = c.journalEntryId ? await reverseEntry(tx, companyId, c.journalEntryId, c.toDate, userId, "ÁFA-zárás visszavonása") : null;
     return rev;
   });
 }
@@ -97,7 +163,7 @@ export async function reopenVatPeriod(companyId: number, closingId: number, user
 /** Lejárt, de le nem zárt időszakok (emlékeztetőhöz). */
 export async function unclosedVatPeriods(companyId: number) {
   const y = Number(today().slice(0, 4));
-  const rows = [...(await listVatPeriods(companyId, y - 1)), ...(await listVatPeriods(companyId, y))];
+  const rows = (await Promise.all([listVatPeriods(companyId, y - 1), listVatPeriods(companyId, y)])).flat();
   // csak azok, amelyekben volt ÁFA-forgalom (a halmozott egyenleg a következő zárással is átvezethető)
   return rows.filter((r) => r.ended && !r.closed && (Math.abs(r.m466) >= 0.5 || Math.abs(r.m467) >= 0.5));
 }

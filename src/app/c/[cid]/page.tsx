@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, count, eq, inArray, max, sql } from "drizzle-orm";
 import {
-  Inbox, FileOutput, FileInput, FilePlus2, BookPlus, ChartNoAxesCombined, Percent, Clock, CarFront, Files, PiggyBank, Library, Database, Cog, ChevronRight, Tag, Scale, Gauge,
+  Inbox, FileOutput, FileInput, FilePlus2, BookPlus, ChartNoAxesCombined, Percent, Clock, CarFront, Files, PiggyBank, Library, Database, Cog, ChevronRight, Tag, Scale, Gauge, ListChecks,
 } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
@@ -13,6 +13,7 @@ import { GhOverview } from "./gh/Overview";
 import { cashSplit } from "@/lib/cash-split";
 import { companyValue, valuationParamsFor } from "@/lib/company-value";
 import { unclosedVatPeriods } from "@/lib/vat-closing";
+import { consistencyCounts } from "@/lib/consistency";
 import { dueAccruals } from "@/lib/accruals";
 import { operationStartOf } from "@/lib/kpi";
 import { salesGap, type GapTone } from "@/lib/sales-gap";
@@ -87,7 +88,8 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   if (recvLate.length) todos.push({ icon: <Clock />, text: `${recvLate.length} lejárt vevőszámla · ${eFt(recvLate.reduce((s, r) => s + toHuf(r), 0))}`, href: `${b}/reports/open-items`, tag: "Lejárt", warn: true });
   if (payLate.length) todos.push({ icon: <Clock />, text: `${payLate.length} lejárt szállítói számla · ${eFt(payLate.reduce((s, r) => s + toHuf(r), 0))}`, href: `${b}/reports/open-items`, tag: "Fizetendő", warn: true });
   todos.push({ icon: <Percent />, text: `Következő ÁFA-bevallás határideje: ${fmtDate(vatDue)}`, href: `${b}/reports/vat`, tag: `${vatDays} nap`, warn: vatDays <= 5 });
-  const [vatOpen, accDue] = await Promise.all([unclosedVatPeriods(cid), dueAccruals(cid)]);
+  const [vatOpen, accDue, cons] = await Promise.all([unclosedVatPeriods(cid), dueAccruals(cid), consistencyCounts(cid).catch(() => ({ errors: 0, warnings: 0 }))]);
+  if (cons.errors || cons.warnings) todos.push({ icon: <ListChecks />, text: cons.errors ? `${cons.errors} egyezőségi hiba a könyvelésben` : `${cons.warnings} egyezőségi figyelmeztetés`, href: `${b}/reports/consistency`, tag: "Egyezőség", warn: true });
   if (vatOpen.length) todos.push({ icon: <Percent />, text: `${vatOpen.length} lejárt ÁFA-időszak nincs lezárva (466 / 467 → 468)`, href: `${b}/reports/vat/closing?year=${vatOpen[0].to.slice(0, 4)}`, tag: "ÁFA-zárás", warn: true });
   if (accDue.length) todos.push({ icon: <Clock />, text: `${accDue.length} időbeli elhatárolás feloldásra vár · ${eFt(accDue.reduce((s, a) => s + a.amount, 0))}`, href: `${b}/closing/accruals`, tag: "Elhatárolás", warn: true });
   if (stale.length) todos.push({ icon: <CarFront />, text: `${stale.length} gépkocsi több mint ${STALE_DAYS} napja készleten`, href: `${b}/vehicles/merleg`, tag: "Figyelj", warn: true });
@@ -97,7 +99,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   const tiles: { title: string; icon: React.ReactNode; badge?: string; links: [string, string][] }[] = [
     { title: "Bizonylatok", icon: <Files />, badge: inbox.n ? `${inbox.n} új` : undefined, links: [["Beérkező bizonylatok", `${b}/inbox`], ["Vevőszámlák", `${b}/invoices?dir=out`], ["Szállítói számlák", `${b}/invoices?dir=in`], ["Vegyes / bank tétel", `${b}/journal/new`]] },
     { title: "Pénzügy", icon: <PiggyBank />, links: [["Pénztár és bank", `${b}/money`], ["Tagi kölcsön", `${b}/member-loans`], ["Bérszámfejtés", `${b}/payroll`]] },
-    { title: "Kimutatások", icon: <ChartNoAxesCombined />, links: [["KPI-Dashboard", `${b}/reports/kpi`], ["P&L, cash-flow, mérleg", `${b}/reports/statements`], ["ÁFA", `${b}/reports/vat`], ["KészletMérleg", `${b}/vehicles/merleg`], ["EPR összesítő", `${b}/vehicles/epr`], ["Nyitott tételek", `${b}/reports/open-items`]] },
+    { title: "Kimutatások", icon: <ChartNoAxesCombined />, links: [["KPI-Dashboard", `${b}/reports/kpi`], ["P&L, cash-flow, mérleg", `${b}/reports/statements`], ["ÁFA", `${b}/reports/vat`], ["KészletMérleg", `${b}/vehicles/merleg`], ["EPR összesítő", `${b}/vehicles/epr`], ["Nyitott tételek", `${b}/reports/open-items`], ["Egyezőség", `${b}/reports/consistency`]] },
     { title: "Főkönyv", icon: <Library />, links: [["Napló", `${b}/journal`], ["Számlakarton", `${b}/reports/ledger`], ["Tárgyi eszközök", `${b}/assets`], ["Évzárás", `${b}/closing`]] },
     { title: "Törzsadatok", icon: <Database />, badge: `${inStock.length} autó`, links: [["Gépkocsi készlet", `${b}/vehicles`], ["KészletMérleg", `${b}/vehicles/merleg`], ["Partnerek", `${b}/partners`], ["Számlatükör", `${b}/accounts`], ["Árfolyamok (MNB)", `${b}/fx`]] },
     { title: "Tervezés és rendszer", icon: <Cog />, links: [["Forecast", `${b}/forecast`], ["ÁrSugó", `${b}/arsugo`], ["Megjelenés", `${b}/appearance`], ["Beállítások", `${b}/settings`], ["Adatimport / export", `${b}/import`]] },

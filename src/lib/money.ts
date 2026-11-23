@@ -1,6 +1,18 @@
-/** Kerekítés 2 tizedesre (devizás összegek). */
+/**
+ * Kerekítés 2 tizedesre (devizás összegek), fél fillértől felfelé, abszolút értékben (előjel-szimmetrikus).
+ * v3.9.6: a lebegőpontos ábrázolás miatt pl. 9 944 590,995 × 100 = 994 459 099,4999… – a 15 értékes jegyre
+ * kerekített szorzat ezt kiküszöböli; a negatív összegek (sztornó) ugyanúgy kerekednek, mint a pozitívak.
+ */
 export function round2(x: number): number {
-  return Math.round((x + Number.EPSILON) * 100) / 100;
+  if (!Number.isFinite(x)) return x;
+  const r = Math.round(Number((Math.abs(x) * 100).toPrecision(15))) / 100;
+  return x < 0 ? -r : r;
+}
+
+/** v3.9.6 – Készpénzes fizetés kerekítése 0 / 5 forintra (2008. évi III. tv. – az 1 és 2 forintos kivezetése). */
+export function roundCash5(x: number): number {
+  const r = Math.round(Math.abs(x) / 5) * 5;
+  return x < 0 ? -r : r;
 }
 
 /** Forint összegek egész forintra kerekítve (kerekítés fél forinttól felfelé, abszolút értékben). */

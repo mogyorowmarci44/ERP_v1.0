@@ -152,3 +152,26 @@ export async function offsetInvoices(companyId: number, invoiceId: number, other
     return entry;
   });
 }
+
+/**
+ * v3.9.6 – Automatikus párosítás: minden nyitott forintos számlához, amelyhez PONTOSAN EGY, a partnerre szóló,
+ * a nyitott összeggel egyező (fel nem használt) kézi tétel tartozik, létrejön a párosítás. Kétes esetben nem nyúl hozzá.
+ */
+export async function autoLinkManualSettlements(companyId: number) {
+  const open = (await db.execute(sql`
+    select i.id, i.invoice_number from invoices i
+    where i.company_id = ${companyId} and i.status = 'posted' and i.currency = 'HUF'
+      and abs(i.gross_fx - coalesce((select sum(p.amount_fx) from payments p join journal_entries e on e.id = p.journal_entry_id
+                                     where p.invoice_id = i.id and e.reversed_by_id is null), 0)) >= 0.005`)) as unknown as Array<{ id: number; invoice_number: string }>;
+  const linked: string[] = [];
+  const usedEntries = new Set<number>();
+  for (const inv of open) {
+    const { candidates } = await matchCandidates(companyId, inv.id);
+    const exact = candidates.filter((c) => c.exact && c.partnerMatch && !usedEntries.has(c.entryId));
+    if (exact.length !== 1) continue;
+    const r = await linkEntryToInvoice(companyId, inv.id, exact[0].entryId);
+    usedEntries.add(exact[0].entryId);
+    linked.push(`${inv.invoice_number} ↔ ${r.number}`);
+  }
+  return linked;
+}

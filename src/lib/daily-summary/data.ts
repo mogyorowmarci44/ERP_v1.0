@@ -11,6 +11,7 @@ import { isPrivate } from "@/lib/entity";
 import { nextVatDeadline } from "@/lib/vat-deadline";
 import { cashSplit } from "@/lib/cash-split";
 import { unclosedVatPeriods } from "@/lib/vat-closing";
+import { consistencyCounts } from "@/lib/consistency";
 import { companyKpis, operationStartOf } from "@/lib/kpi";
 import { salesGap } from "@/lib/sales-gap";
 import { filingsOverview } from "@/lib/filings";
@@ -166,6 +167,10 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
   if (drafts.total) todos.push({ level: "yellow", text: draftText(drafts), path: drafts.href });
   const vatOpen = await unclosedVatPeriods(cid).catch(() => []);
   if (vatOpen.length) todos.push({ level: "yellow", text: `${vatOpen.length} lejárt ÁFA-időszakot még le kell zárni a könyvelésben`, path: `${p}/reports/vat/closing` });
+  // v3.9.6: az Egyezőség oldal hibái / figyelmeztetései
+  const cons = await consistencyCounts(cid).catch(() => ({ errors: 0, warnings: 0 }));
+  if (cons.errors) todos.push({ level: "red", text: `${cons.errors} egyezőségi hiba a könyvelésben (pl. nyitott tétel ↔ főkönyv, ÁFA-befizetés)`, path: `${p}/reports/consistency` });
+  else if (cons.warnings) todos.push({ level: "yellow", text: `${cons.warnings} egyezőségi figyelmeztetés (pl. ÁFA-zárás, partner-duplikátum)`, path: `${p}/reports/consistency` });
   // v3.9.4: az időbeli elhatárolások nem kerülnek a napi összefoglalóba
   let vatDeadline: CompanySnapshot["deadlines"]["vat"] = null;
   if (!priv) {

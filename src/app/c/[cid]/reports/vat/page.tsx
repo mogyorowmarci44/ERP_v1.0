@@ -77,7 +77,7 @@ export default async function VatPage({ params, searchParams }: { params: Promis
           {v.rows.map((r, k) => (
             <tr key={k}>
               <td>{r.direction === "out" ? "É" : "B"}</td><td>{fmtDate(r.fulfillmentDate)}</td>
-              <td><Link href={`/c/${cid}/invoices/${r.invoiceId}`}>{r.invoiceNumber}</Link></td><td>{r.partnerName}</td><td className="mono">{r.partnerTax}</td>
+              <td><Link href={r.invoiceId ? `/c/${cid}/invoices/${r.invoiceId}` : `/c/${cid}/journal/${r.entryId}/edit`}>{r.invoiceNumber}</Link></td><td>{r.partnerName}</td><td className="mono">{r.partnerTax}</td>
               <td>{r.vatCode}</td><td className="num">{fmtHuf(r.netHuf)}</td><td className="num">{fmtHuf(r.vatHuf)}</td>
             </tr>
           ))}

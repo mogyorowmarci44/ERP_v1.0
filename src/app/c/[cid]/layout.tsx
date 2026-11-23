@@ -3,6 +3,7 @@ import {
   Mail,
   Gauge,
   ShieldCheck,
+  ListChecks,
   LayoutDashboard,
   FileOutput,
   FileInput,
@@ -87,6 +88,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/invoices?dir=out`} exact><FileOutput />Bevételi bizonylatok</NavLink>
           <NavLink href={`${b}/invoices?dir=in`} exact><FileInput />Kiadási bizonylatok</NavLink>
           <NavLink href={`${b}/reports/open-items`}><Clock />Nyitott tételek</NavLink>
+          <NavLink href={`${b}/reports/consistency`}><ListChecks />Egyezőség</NavLink>
 
           <div className="group">Adók</div>
           <NavLink href={`${b}/taxes`}><Landmark />Adók (TFH, IFA, tételes, ÁFA-keret)</NavLink>
@@ -128,6 +130,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/vehicles/kartonok`}><ReceiptText />Különbözeti ÁFA kartonok</NavLink>
           <NavLink href={`${b}/vehicles/epr`}><Recycle />EPR összesítő</NavLink>
           <NavLink href={`${b}/reports/open-items`}><Clock />Nyitott tételek</NavLink>
+          <NavLink href={`${b}/reports/consistency`}><ListChecks />Egyezőség</NavLink>
 
           <div className="group">Főkönyv</div>
           <NavLink href={`${b}/journal`} exact><BookOpen />Napló</NavLink>

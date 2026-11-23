@@ -39,6 +39,20 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.9.6 – Egyezőség, ÁFA-befizetés, kerekítés (a teljes körű ERP-teszt javításai)
+
+- **Egyezőség** (Kimutatások › Egyezőség): 10 automatikus ellenőrzés – tételek egyensúlya, számla ↔ főkönyv, számlafej ↔ sorok, nyitott tételek ↔ 31x / 45x partnerenként, NAV ÁFA-befizetés helye, lezárt ÁFA-időszakba utólag könyvelt tétel, pénztár (fillér / negatív), gépkocsi készlet ↔ 261, sztornózott könyvelésű számla, duplikált partner. Javító gombok: *ÁFA-zárások újraszámolása*, *Partnerek összevonása*, *Egyértelmű párosítások elvégzése*. A hibák a nyitóoldal és a napi összefoglaló teendői közé is bekerülnek.
+- **ÁFA-befizetés a 468-ra:** a pénzeszköz (38x) ellenében a 467-re könyvelt tétel automatikusan a 468-at terheli – így az ÁFA-zárás „fizetendő” összege nem torzul.
+- **ÁFA-zárások újraszámolása:** a meglévő zárótételek időrendben újraszámolva (pl. utólag könyvelt tétel vagy átkönyvelés után), minden változás a tétel-naplóban.
+- **Kézi ÁFA-tételek a bevallásban:** a számla nélkül, kézzel könyvelt 466 / 467 tételek (pl. visszáru-jóváírás) az ÁFA analitikában és az ÁNYK-bevallásban (M-lappal) is szerepelnek – a bevallás így egyezik a főkönyvvel.
+- **Készpénz 5 Ft-os kerekítése:** forintos, készpénzes számla pénztárból történő kiegyenlítésénél az átadott összeg 0 / 5 Ft-ra kerekül, a különbözet 979 / 879; a kerekített összeg megadása teljes kiegyenlítésnek számít.
+- **Fordított adózás / KBB:** a számlasor bruttója a partner felé fizetendő (= nettó), egyezően a számlafejjel (meglévő sorok a migrációval).
+- **Pontosabb kerekítés:** a 2 tizedesre kerekítés előjel-szimmetrikus és a lebegőpontos hibáktól mentes.
+- **Adatbázis-szintű védelem:** egy sorban csak Tartozik vagy Követel; kiegyensúlyozatlan tétel nem kerülhet be (tranzakció végén ellenőrzött trigger).
+- **Gyorsabb:** az ÁFA-zárás lista 24 helyett 3 lekérdezés; a felhasználó és a cég kérésenként egyszer töltődik.
+- **Egyszeri adatjavítások** (`scripts/data-fixes.ts`, a migráció után automatikusan, egyszer): ÁFA-befizetések 467 → 468 és a zárások újraszámolása; kézi tétellel rendezett számlák párosítása; duplikált partnerek összevonása; pénztár fillér-maradványának kerekítése; elavult bér-piszkozat törlése; kiállítás előtti határidők; lejárt ÁFA-időszakok zárása; időszakzárás a beszámolós évekre.
+- Függőségek: nodemailer 10.6, uuid 11 (biztonsági javítások); a build DATABASE_URL nélkül is lefut.
+
 ## v3.9.5 – Készlet értéke, színezett eredmények
 
 - Napi összefoglaló fejléce 2 × 2 kiemelt számmal, egységes stílusban: Pénztár (Ft) és Összes pénz e Ft-ban 1 tizedesre, Tegnapi bevétel forintra, **Készlet értéke** M Ft-ban 2 tizedesre – a készleten lévő autók beszerzési ára × (1 + medián bruttó fedezet %, elmúlt 12 hónap eladásaiból), alatta a beszerzési ár.

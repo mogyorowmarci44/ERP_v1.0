@@ -93,13 +93,15 @@ export function computeLine(input: LineInput, direction: Direction, fxRate: numb
     vatFx = vatHuf;
   }
   const selfAssessed = SELF_ASSESSED.includes(vatKind);
+  // v3.9.6: önadózásnál (fordított / KBB) a „bruttó” – a számlafejjel egyezően – a partner felé fizetendő (= nettó);
+  // az ÁFA a vatHuf mezőben marad. Így a sorok bruttó összege mindig egyezik a számla bruttójával.
   return {
     netFx,
     vatFx,
-    grossFx: round2(netFx + vatFx),
+    grossFx: selfAssessed ? netFx : round2(netFx + vatFx),
     netHuf,
     vatHuf,
-    grossHuf: netHuf + vatHuf,
+    grossHuf: selfAssessed ? netHuf : netHuf + vatHuf,
     payableFx: selfAssessed ? netFx : round2(netFx + vatFx),
     payableHuf: selfAssessed ? netHuf : netHuf + vatHuf,
   };
@@ -272,6 +274,9 @@ export type PaymentAccounts = {
   moneyAccountId: number;
   fxGainId: number;
   fxLossId: number;
+  /** v3.9.6 – forintos készpénzes fizetés 5 Ft-os kerekítési különbözete (979 / 879); ha nincs, az árfolyam-számlák. */
+  roundGainId?: number | null;
+  roundLossId?: number | null;
 };
 
 export function buildPaymentPosting(p: PaymentInput, acc: PaymentAccounts): { lines: DraftLine[]; fxDiff: number } {
@@ -293,10 +298,11 @@ export function buildPaymentPosting(p: PaymentInput, acc: PaymentAccounts): { li
     lines.push({ accountId: acc.moneyAccountId, debit: 0, credit: moneyHuf, description: desc, partnerId: p.partnerId, ...moneyMeta });
     fxDiff = round2(partnerHuf - moneyHuf); // + nyereség (kevesebbet fizettünk)
   }
+  const rounding = !isFx && !!acc.roundGainId && !!acc.roundLossId;
   if (fxDiff > 0) {
-    lines.push({ accountId: acc.fxGainId, debit: 0, credit: fxDiff, description: "Realizált árfolyamnyereség", partnerId: p.partnerId });
+    lines.push({ accountId: rounding ? acc.roundGainId! : acc.fxGainId, debit: 0, credit: fxDiff, description: rounding ? "Kerekítési különbözet (készpénz)" : "Realizált árfolyamnyereség", partnerId: p.partnerId });
   } else if (fxDiff < 0) {
-    lines.push({ accountId: acc.fxLossId, debit: -fxDiff, credit: 0, description: "Realizált árfolyamveszteség", partnerId: p.partnerId });
+    lines.push({ accountId: rounding ? acc.roundLossId! : acc.fxLossId, debit: -fxDiff, credit: 0, description: rounding ? "Kerekítési különbözet (készpénz)" : "Realizált árfolyamveszteség", partnerId: p.partnerId });
   }
   assertBalanced(lines);
   return { lines, fxDiff };

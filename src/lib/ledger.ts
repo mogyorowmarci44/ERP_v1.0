@@ -15,7 +15,7 @@ import {
   type DraftLine,
   type VatKind,
 } from "./posting";
-import { round2, roundHuf } from "./money";
+import { round2, roundCash5, roundHuf } from "./money";
 import { vatRateDate } from "./fx";
 import { getMnbRate } from "./fx-service";
 
@@ -221,6 +221,15 @@ export async function manualEntry(
     // Devizás pénzeszköz számlán a devizaösszeg is kötelező (átlagár-nyilvántartás miatt)
     const ids = [...new Set(input.lines.map((l) => l.accountId))];
     const accRows = ids.length ? await tx.select().from(accounts).where(and(eq(accounts.companyId, companyId), inArray(accounts.id, ids))) : [];
+    // v3.9.6: a NAV-nak utalt / befizetett ÁFA a 468 (ÁFA elszámolási) számlát terheli, nem a 467-et – különben az
+    // ÁFA-zárás a befizetést is „fizetendő” forgalomként vezetné át. Pénzeszköz (38x) ellenében a 467 terhelése → 468.
+    const hasMoneyCredit = input.lines.some((l) => l.credit > 0 && accRows.find((x) => x.id === l.accountId)?.code.startsWith("38"));
+    const a467 = accRows.find((x) => x.code === "467");
+    if (hasMoneyCredit && a467 && input.lines.some((l) => l.accountId === a467.id && l.debit > 0)) {
+      const a468 = await accountIdByCode(tx, companyId, "468");
+      input = { ...input, lines: input.lines.map((l) => (l.accountId === a467.id && l.debit > 0 ? { ...l, accountId: a468 } : l)) };
+      if (!accRows.some((x) => x.id === a468)) accRows.push(...(await tx.select().from(accounts).where(eq(accounts.id, a468))));
+    }
     const lines = input.lines.map((l) => {
       const a = accRows.find((x) => x.id === l.accountId);
       if (a && a.currency !== "HUF") {
@@ -653,6 +662,13 @@ export async function payInvoice(companyId: number, invoiceId: number, input: Pa
     const [inv] = await tx.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
     if (!inv || inv.status !== "posted") throw new Error("Csak könyvelt számla rendezhető.");
     const open = await invoiceOpenAmount(tx, invoiceId);
+    const [moneyAcc0] = await tx.select().from(accounts).where(and(eq(accounts.id, input.moneyAccountId), eq(accounts.companyId, companyId)));
+    // v3.9.6 – forintos számla készpénzes kiegyenlítése pénztárból: a ténylegesen átadott összeg 0 / 5 Ft-ra kerekül.
+    // Ha a kerekített összeget adják meg (pl. 12 345 a 12 343 helyett), az a teljes kiegyenlítés.
+    const cashRound = inv.currency === "HUF" && inv.paymentMethod === "cash" && !!moneyAcc0 && moneyAcc0.code.startsWith("381") && moneyAcc0.currency === "HUF";
+    if (cashRound && Math.abs(input.amountFx - open.openFx) <= 2.5 && Math.abs(input.amountFx - open.openFx) > 0.001 && roundCash5(open.openFx) === roundCash5(input.amountFx)) {
+      input = { ...input, amountFx: open.openFx };
+    }
     // Negatív nyitott összeg (helyesbítő / jóváíró számla): visszatérítés negatív összeggel
     if (open.openFx < 0) {
       if (!(input.amountFx < 0)) throw new Error("Jóváíró számlánál a visszatérítés összege negatív (pl. −50 000).");
@@ -665,7 +681,7 @@ export async function payInvoice(companyId: number, invoiceId: number, input: Pa
     const settles = Math.abs(open.openFx - input.amountFx) < 0.005;
     const ctx = await loadPostingContext(tx, companyId, inv.partnerId, inv.direction);
     const s = ctx.company.settings;
-    const [moneyAcc] = await tx.select().from(accounts).where(and(eq(accounts.id, input.moneyAccountId), eq(accounts.companyId, companyId)));
+    const moneyAcc = moneyAcc0;
     if (!moneyAcc || !moneyAcc.code.startsWith("38")) throw new Error("Pénzeszköz számlát (38x) kell választani.");
 
     const invRate = inv.currency === "HUF" ? 1 : Number(inv.exchangeRate);
@@ -676,7 +692,7 @@ export async function payInvoice(companyId: number, invoiceId: number, input: Pa
     let moneyHuf: number;
     let moneyFx: { currency: string; rate: number } | null = null;
     if (moneyAcc.currency === "HUF") {
-      if (inv.currency === "HUF") moneyHuf = input.amountFx;
+      if (inv.currency === "HUF") moneyHuf = cashRound ? roundCash5(input.amountFx) : input.amountFx;
       else {
         // Forintért vásárolt / eladott deviza: a ténylegesen fizetett / kapott forint
         if (!input.moneyHuf || !(input.moneyHuf > 0)) throw new Error("Add meg a forintszámlán ténylegesen terhelt / jóváírt összeget.");
@@ -715,6 +731,7 @@ export async function payInvoice(companyId: number, invoiceId: number, input: Pa
         moneyAccountId: moneyAcc.id,
         fxGainId: await accountIdByCode(tx, companyId, s.fxGain),
         fxLossId: await accountIdByCode(tx, companyId, s.fxLoss),
+        ...(cashRound ? await roundingAccounts(tx, companyId) : {}),
       },
     );
     const entry = await postEntry(tx, {
@@ -742,6 +759,14 @@ export async function payInvoice(companyId: number, invoiceId: number, input: Pa
     });
     return entry;
   });
+}
+
+/** v3.9.6 – A kerekítési különbözet számlái (979 bevétel / 879 ráfordítás), ha a számlatükörben megvannak. */
+async function roundingAccounts(tx: DbOrTx, companyId: number) {
+  const rows = await tx.select({ id: accounts.id, code: accounts.code }).from(accounts)
+    .where(and(eq(accounts.companyId, companyId), inArray(accounts.code, ["979", "879"]), eq(accounts.isPosting, true), eq(accounts.isActive, true)));
+  const gain = rows.find((r) => r.code === "979")?.id ?? null, loss = rows.find((r) => r.code === "879")?.id ?? null;
+  return gain && loss ? { roundGainId: gain, roundLossId: loss } : {};
 }
 
 export async function reversePayment(companyId: number, paymentId: number, date: string, userId?: number) {
