@@ -65,7 +65,7 @@ export async function saveTaxAdjustmentsAction(fd: FormData) {
 }
 
 async function storeParsed(cid: number, files: { name: string; data: Uint8Array }[], label: string, mode: "kincstar" | "upload", log: string[]) {
-  const parsed = parseHakkaFiles(files, normName, label);
+  const parsed = await parseHakkaFiles(files, normName, label);
   const count = Object.keys(parsed.rules).length;
   const diagnostics = [...log, ...parsed.diagnostics].slice(0, 120);
   if (count < 50) {

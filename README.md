@@ -39,6 +39,12 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.9.7 – Az `xlsx` csomag kivezetése
+
+- A HIPA-szabályok (Kincstár HAKKA) beolvasása az ismert biztonsági hibás `xlsx` 0.18.5 helyett a már meglévő `exceljs`-szel (xlsx), illetve saját CSV-olvasóval (pontosvessző / vessző / tab, idézőjeles mezők, Windows-1250) történik. A zip és az xml változatlan.
+- A régi bináris .xls / .ods fájlnál érthető üzenet: mentsd el xlsx-ként vagy csv-ként.
+- `npm audit`: 0 sebezhetőség.
+
 ## v3.9.6 – Egyezőség, ÁFA-befizetés, kerekítés (a teljes körű ERP-teszt javításai)
 
 - **Egyezőség** (Kimutatások › Egyezőség): 10 automatikus ellenőrzés – tételek egyensúlya, számla ↔ főkönyv, számlafej ↔ sorok, nyitott tételek ↔ 31x / 45x partnerenként, NAV ÁFA-befizetés helye, lezárt ÁFA-időszakba utólag könyvelt tétel, pénztár (fillér / negatív), gépkocsi készlet ↔ 261, sztornózott könyvelésű számla, duplikált partner. Javító gombok: *ÁFA-zárások újraszámolása*, *Partnerek összevonása*, *Egyértelmű párosítások elvégzése*. A hibák a nyitóoldal és a napi összefoglaló teendői közé is bekerülnek.
