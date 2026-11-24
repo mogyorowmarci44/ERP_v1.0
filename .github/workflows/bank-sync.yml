@@ -1,0 +1,22 @@
+name: Napi banki letöltés (6:30)
+
+# v3.10.0 – az összekapcsolt bankszámlák előző napig könyvelt tételei → Beérkező bizonylatok → párosítás / könyvelés.
+# A GitHub ütemezője UTC-ben fut: 05:30 UTC = 6:30 téli időben (nyáron 7:30). A napi összefoglaló (6:59) előtt fut,
+# hogy a reggeli levél már a friss banki egyenleget mutassa. Titkok: ERP_URL és CRON_SECRET (ugyanazok, mint a napi összefoglalónál).
+on:
+  schedule:
+    - cron: "30 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: ERP felébresztése (ingyenes Render alszik)
+        run: curl -s -o /dev/null --retry 5 --retry-delay 20 --retry-all-errors --max-time 90 "${{ secrets.ERP_URL }}/api/health" || true
+      - name: Banki tételek letöltése és feldolgozása
+        run: |
+          curl -fsS --retry 2 --retry-delay 30 --retry-all-errors --max-time 280 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.ERP_URL }}/api/bank-sync"

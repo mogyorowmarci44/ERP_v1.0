@@ -252,3 +252,74 @@ export async function repairStatementAction(fd: FormData) {
     return `${base(cid)}/${id}?ok=${encodeURIComponent("Párosítás frissítve.")}`;
   });
 }
+
+// ---------------------------------------------------------------------------
+// v3.10.0 – Közvetlen banki kapcsolat (Enable Banking / PSD2)
+// ---------------------------------------------------------------------------
+
+/** Összekapcsolás: átirányítás a bank jóváhagyó felületére (Erste: George-jóváhagyás). */
+export async function connectBankAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`${base(cid)}/settings`, async () => {
+    const { listAspsps, startAuthorization } = await import("@/lib/bank/enable-banking");
+    const { signState, appBaseUrl } = await import("@/lib/bank/state");
+    const country = (optStr(fd, "country") ?? "HU").toUpperCase();
+    const psuType = fd.get("psuType") === "personal" ? "personal" : "business";
+    const since = optStr(fd, "bankSince") ?? (await import("@/lib/dates")).today();
+    if (!isDate(since)) throw new Error("Hibás kezdőnap.");
+    const wanted = optStr(fd, "aspsp") ?? "Erste";
+    const list = await listAspsps(country);
+    const hit = list.find((a) => a.name.toLowerCase() === wanted.toLowerCase()) ?? list.find((a) => a.name.toLowerCase().includes(wanted.toLowerCase()));
+    if (!hit) throw new Error(`Nem találom a bankot: „${wanted}” (${country}). Elérhető: ${list.map((a) => a.name).slice(0, 30).join(", ")}`);
+    if (hit.psu_types && !hit.psu_types.includes(psuType)) throw new Error(`A(z) ${hit.name} ${psuType === "business" ? "céges" : "lakossági"} számlákhoz nem érhető el az aggregátoron keresztül (elérhető: ${hit.psu_types.join(", ")}).`);
+    const baseUrl = appBaseUrl();
+    if (!baseUrl) throw new Error("Állítsd be az APP_URL környezeti változót (pl. https://mm-erp.onrender.com) – erre tér vissza a bank.");
+    const state = await signState({ cid, uid: user.id, aspsp: hit.name, country, psuType, since });
+    const r = await startAuthorization({ aspspName: hit.name, country, psuType, redirectUrl: `${baseUrl}/api/bank/callback`, state, validDays: 180 });
+    return r.url;
+  });
+}
+
+/** Letöltés most (a napi ütemezéssel azonos). */
+export async function bankSyncNowAction(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`${base(cid)}/settings`, async () => {
+    const { runBankSync } = await import("@/lib/bank/sync");
+    const r = await runBankSync(cid, user.id);
+    refresh(cid);
+    if (r.errors.length) throw new Error(r.errors.join(" | "));
+    const msg = r.days ? `${r.transactions} tranzakció ${r.days} napról – ${r.booked} lekönyvelve, ${r.review} jóváhagyásra vár.` : "Nincs új könyvelt banki tétel (a mai tételek holnap jönnek).";
+    return `${base(cid)}/settings?ok=${encodeURIComponent(msg + (r.warning ? ` ${r.warning}` : ""))}#bank`;
+  });
+}
+
+/** Számla ki- / bekapcsolása és a kezdőnap módosítása. */
+export async function saveBankAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`${base(cid)}/settings`, async () => {
+    const { settings } = await getInboxSettings(cid);
+    if (!settings.bank) throw new Error("Nincs banki kapcsolat.");
+    const since = str(fd, "bankSince");
+    if (!isDate(since)) throw new Error("Hibás kezdőnap.");
+    const on = new Set(fd.getAll("acc").map(String));
+    await saveInboxSettings(cid, { ...settings, bank: { ...settings.bank, since, accounts: settings.bank.accounts.map((a) => ({ ...a, enabled: on.has(a.uid) })) } });
+    return `${base(cid)}/settings?ok=${encodeURIComponent("Banki beállítások mentve.")}#bank`;
+  });
+}
+
+/** Leválasztás: a hozzájárulás visszavonása az aggregátornál és a kapcsolat törlése. */
+export async function disconnectBankAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`${base(cid)}/settings`, async () => {
+    const { settings } = await getInboxSettings(cid);
+    if (settings.bank) {
+      try { await (await import("@/lib/bank/enable-banking")).deleteSession(settings.bank.sessionId); } catch { /* már lejárt – helyben akkor is töröljük */ }
+    }
+    await saveInboxSettings(cid, { ...settings, bank: null });
+    return `${base(cid)}/settings?ok=${encodeURIComponent("Banki kapcsolat leválasztva.")}#bank`;
+  });
+}

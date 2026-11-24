@@ -39,6 +39,20 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.10.0 – Napi automatikus banki letöltés (Erste, PSD2)
+
+- Minden reggel 6:30-kor (GitHub Actions, `.github/workflows/bank-sync.yml` → `/api/bank-sync`) letölti az összekapcsolt bankszámlák **előző napig könyvelt** tételeit, és számlánként, naponként egy kivonatként a Beérkező bizonylatok közé teszi (forrás: „Bank (API)”). Innen ugyanaz a lánc fut, mint a feltöltött CSV / Excel kivonatnál: nyitott számla párosítás, bankköltség (532), pénztárból befizetés (381 → 389 → 384), a már könyvelt pénzmozgások kihagyása, az egyértelműek könyvelése, a többi jóváhagyásra vár. HUF számla → 384, EUR → 3841.
+- Duplikáció ellen: a tranzakciók banki azonosítója (entry reference) a bizonylatban tárolva; 10 napra visszamenőleg újranéz, a későn könyvelt tétel külön kiegészítő kivonatként jön. A függőben lévő (még nem könyvelt) tételek kimaradnak.
+- **Miért Enable Banking?** Az Erste Bank Hungary éles vállalati API-ja (`sapigtw.erstebank.hu/psd2/corporate`) csak MNB / EBA által engedélyezett harmadik fél szolgáltatónak (eIDAS-tanúsítvánnyal) érhető el. Az Enable Banking engedélyes számlainformációs szolgáltató; a **saját, összekapcsolt számlákhoz** („restricted” mód) díjmentes.
+- A hozzájárulás legfeljebb 180 napig él; lejárat előtt 14 nappal figyelmeztet, utána a Beállításokban „Hozzájárulás megújítása” (George-jóváhagyás).
+
+**Beállítás (egyszer):**
+1. Regisztráció: [enablebanking.com](https://enablebanking.com) → Control Panel → *Applications* → új alkalmazás, környezet: **Production**. Redirect URL: `https://mm-erp.onrender.com/api/bank/callback`. A böngésző letölti a privát kulcsot (`<app-id>.pem`) – ezt őrizd meg.
+2. Az alkalmazásnál *Activate by linking accounts* → Erste Bank (Magyarország) → jóváhagyás a George-ban. Ezzel aktív lesz „restricted” módban (csak ezek a számlák érhetők el).
+3. Render → Environment: `EB_APP_ID` = az alkalmazás azonosítója, `EB_PRIVATE_KEY` = a `.pem` teljes tartalma, `APP_URL` = `https://mm-erp.onrender.com`.
+4. ERP: Beérkező bizonylatok → Beállítások → **Bank** → Összekapcsolás a bankkal → George-jóváhagyás. Kezdőnap: amitől még nincs könyvelve banki tétel.
+5. GitHub: az `ERP_URL` és `CRON_SECRET` titok már megvan (napi összefoglaló) – más nem kell. Kézi futtatás: Actions → *Napi banki letöltés* → Run workflow, vagy a Beállításokban „Letöltés most”.
+
 ## v3.9.8 – E-mail küldés HTTPS-en (Gmail-továbbító)
 
 - A Render ingyenes csomagja 2025 szeptembere óta tiltja a kimenő SMTP-t, ezért a Próba és a napi küldés „connection timeout”-tal elakadt. Új küldési mód: a saját Gmail-fiókból egy Google Apps Script web app küld (`scripts/gmail-relay.gs`, beállítás a fájl elején); az ERP HTTPS-en adja át neki a levelet (`MAIL_RELAY_URL`, `MAIL_RELAY_SECRET`). Ha nincs beállítva, marad az SMTP – időtúllépésnél érthető hibaüzenettel.

@@ -835,6 +835,24 @@ export type InboxSettings = {
   since?: string | null;
   /** Automatikus könyvelés, ha minden ellenőrzés rendben (különben minden a jóváhagyási listába kerül). */
   autoPost?: boolean;
+  /** v3.10.0: közvetlen banki kapcsolat (Enable Banking / PSD2) – napi automatikus tranzakció-letöltés. */
+  bank?: BankLink | null;
+};
+
+export type BankLink = {
+  provider: "enablebanking";
+  aspsp: { name: string; country: string };
+  psuType: "business" | "personal";
+  sessionId: string;
+  /** A hozzájárulás lejárata (ISO) – utána újra jóvá kell hagyni a bank appjában. */
+  validUntil: string | null;
+  accounts: Array<{ uid: string; iban: string | null; name: string | null; currency: string; enabled: boolean }>;
+  /** Ennél korábbi napokat nem tölt le (alapértelmezés: az összekapcsolás napja). */
+  since: string;
+  connectedAt: string;
+  lastRunAt?: string | null;
+  lastResult?: string | null;
+  lastError?: string | null;
 };
 
 export const inboxSettings = pgTable("inbox_settings", {
