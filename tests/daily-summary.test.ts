@@ -3,15 +3,18 @@ vi.mock("server-only", () => ({}));
 import { money, renderCompanyMail, renderHoldingMail } from "@/lib/daily-summary/render";
 import { shouldRunNow, journalCsv } from "@/lib/daily-summary/send";
 import { pezcar, holding } from "./fixtures/daily-summary";
+import { ft0, mFt2 } from "@/lib/daily-summary/format";
 
 vi.mock("@/db", () => ({ db: {}, schema: {} }));
 
 describe("pénz formázás", () => {
   it("M / e / Ft", () => {
-    expect(money(2_310_000)).toBe("2,31 M Ft");
+    expect(money(2_310_000)).toBe("2,31 mFt");
     expect(money(612_400, true)).toBe("+612 e Ft");
     expect(money(-84_000, true)).toBe("−84 e Ft");
     expect(money(840)).toBe("840 Ft");
+    expect(ft0(-0.3)).toBe("0 Ft"); // v3.9.9: nincs „-0 Ft”
+    expect(mFt2(4_720_000)).toBe("4,72 mFt");
   });
 });
 
@@ -78,5 +81,14 @@ describe("v3.9.3 kapcsolók", () => {
     expect(companyEnabled(base, 1)).toBe(true);
     expect(companyEnabled(base, 2)).toBe(false);
     expect(companyEnabled({ ...base, enabled: false }, 1)).toBe(false);
+  });
+});
+
+describe("v3.9.9 – napi e-mail fejléc", () => {
+  it("tegnapi bevétel alatt az előző 30 nap, a készletnél nincs medián-sor", () => {
+    const m = renderCompanyMail(pezcar, "ceo");
+    expect(m.html).toContain("előző 30 nap: 2,75 mFt");
+    expect(m.html).not.toContain("medián bruttó fedezettel");
+    expect(m.html).not.toContain(" M Ft");
   });
 });
