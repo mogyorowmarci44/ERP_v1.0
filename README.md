@@ -39,6 +39,27 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.3.0 – A napi összefoglaló és a Forecast éves eredménye egyezik
+
+- A Forecast oldal alapból a **Teljes üzleti év** nézetben nyílik; a fő csempe itt a **Várható éves eredmény (tény + terv − HIPA)**, alatta a bontás és az adózás utáni összeg – pontosan az, amit a napi összefoglaló „Várható éves eredmény” sora mutat.
+- A „Forecast időszak” és a „Kezdettől” nézet csempéje jelzi, hogy HIPA nélküli összeg.
+- Napi összefoglaló: a várható éves eredmény alatt a bontás (tény + terv − HIPA · TAO · adózás után); az „Idén eddig” naptári üzleti évnél a Forecast „tény” része, a havi / negyedéves / éves eredmény a 89 (társasági adó) nélkül, a Forecasttal azonos módon.
+- Az összefoglaló a Forecast folyó üzleti évét veszi (nem a naptári évet keresi).
+
+## v4.2.0 – Napi összefoglaló: készpénz Ft és EUR külön
+
+- A „Pénztár” csempe helyett két csempe: **Készpénz Ft** és **Készpénz EUR** (mai árfolyamon Ft-ban, alatta az euróösszeg), mindkettőnél a készpénzen belüli arány.
+- Az „Összes pénz” csík háromszínű: Ft-készpénz · EUR-készpénz · bank.
+- A rács 2 × 3: Készpénz Ft | Készpénz EUR, Bankszámla | Tegnapi bevétel, Készlet értéke | Eladó autó (átlagos állásidővel).
+- A szöveges változat is bontja: készpénz Ft · készpénz EUR · bank.
+
+## v4.1.0 – ERP-térkép a cégválasztó oldalon
+
+- Új oldal: **/terkep**, a Cégeim oldal fejlécéből („ERP-térkép”), még cég vagy egység kiválasztása előtt. Az ERP 28 modulja metrótérképként: négy vonal (Bizonylat, Pénz, Készlet, Zárás és bér), a Napló a fő átszállóhely.
+- Állomásra kattintva: leírás, funkciók, honnan kap adatot és hová adja tovább (kattintható), melyik verzióban jött, és „Megnyitás” gomb a felhasználó saját cégeihez (a vendégház modul az adószámos magánszemély egységekhez).
+- Vonal kiemelése, „Egy használt autó útja” hatlépéses léptető lejátszással, kereshető modullista; mobilon oldalra húzható térkép.
+- Bejelentkezéshez kötött; a sablon: `src/app/terkep/terkep.html` (önálló HTML, a cégek listája szerveroldalon kerül bele).
+
 ## v4.0.0 – Diagramok: adatok kiírása bárhol a diagram fölött
 
 - Minden idősoros diagramon (Tervezés forgatókönyv-görbe, Pénz és bank egyenleg-görbék, tagi kölcsön egyenleg és lejárati ütemezés, vendégház vonaldiagramok) közös hover-réteg (`ChartHover`): a diagram **bármely pontja fölött** a legközelebbi időpontra ugrik – szaggatott függőleges vonal, kiemelt pontok (oszlopdiagramnál / lépcsős vonalnál a teljes sáv), és egy kártya az adott időpont összes értékével (forgatókönyvenként a hónap legalacsonyabb egyenlegével, tagi kölcsönnél az előző állapothoz képesti változással).
