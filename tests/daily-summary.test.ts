@@ -93,15 +93,19 @@ describe("v3.9.9 – napi e-mail fejléc", () => {
   });
 });
 
-describe("v3.9.10 – C elrendezés: kiemelt összes pénz, pénztár + bank", () => {
-  it("külön bankszámla csempe, arányokkal, a pénztár + bank = összes pénz", () => {
+describe("v4.2.0 – készpénz Ft / EUR külön csempén", () => {
+  it("két készpénz-csempe a készpénzen belüli aránnyal, a bank külön, a kettő + bank = összes pénz", () => {
     const r = renderCompanyMail(pezcar, "ceo");
     const m = { html: r.html.replace(/[\u00a0\u202f]/g, " "), text: r.text.replace(/[\u00a0\u202f]/g, " ") };
-    expect(m.html).toContain("Bankszámla");
+    expect(m.html).toContain("Készpénz Ft");
+    expect(m.html).toContain("Készpénz EUR");
+    expect(m.html).toContain("297,5 e Ft"); // Ft-pénztár
+    expect(m.html).toContain("115,0 e Ft"); // EUR-pénztár mai árfolyamon
+    expect(m.html).toContain("a készpénz 72%-a · forintpénztár");
+    expect(m.html).toContain("290 € · a készpénz 28%-a");
     expect(m.html).toContain("1 943,5 e Ft"); // bank
-    expect(m.html).toContain("412,5 e Ft"); // pénztár = 2 356 000 − 1 943 500
-    expect(m.html).toContain("18% · forintpénztár");
     expect(m.html).toContain("82% · mai árfolyamon");
-    expect(m.text).toContain("bank 1,94 m Ft");
+    expect(m.html).toContain("Eladó autó");
+    expect(m.text).toContain("készpénz EUR 115 e Ft · bank 1,94 m Ft");
   });
 });

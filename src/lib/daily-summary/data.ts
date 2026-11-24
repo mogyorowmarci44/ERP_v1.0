@@ -43,7 +43,7 @@ export type CompanySnapshot = {
   date: string; // a küldés napja
   day: string; // a „tegnap”
   headline: string;
-  kpi: { cash: number; cashHuf: number; liquidity: number; revenueDay: number; revenue30: number; bank: number; stock: number | null; lateReceivable: number; lateReceivableCount: number; latePayable: number; latePayableCount: number };
+  kpi: { cash: number; cashHuf: number; /** v4.2.0 – EUR-pénztár mai árfolyamon (Ft) és euróban. */ cashEur: number; cashEurFx: number; liquidity: number; revenueDay: number; revenue30: number; bank: number; stock: number | null; lateReceivable: number; lateReceivableCount: number; latePayable: number; latePayableCount: number };
   /** v3.9.5 – a készlet értéke: beszerzési ár × (1 + medián bruttó fedezet %). */
   stockValue: { purchase: number; value: number; pct: number | null; count: number } | null;
   /** v3.9.4 – eredmények: folyó hó / negyedév / év (tény) és teljes év a Forecast alapján. */
@@ -315,6 +315,9 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
     kpi: {
       cash: cashTotal,
       cashHuf: cash.find((c) => c.key === "cashHuf")?.huf ?? 0,
+      // a pénztár mai árfolyamon (összes − bank) mínusz a forintpénztár = az EUR-pénztár forintértéke
+      cashEur: liquidity - bank - (cash.find((c) => c.key === "cashHuf")?.huf ?? 0),
+      cashEurFx: cash.find((c) => c.key === "cashEur")?.fx ?? 0,
       liquidity,
       revenueDay: revenueOf(tbDay),
       revenue30: revenueOf(tb30),

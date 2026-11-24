@@ -79,37 +79,52 @@ function companyHtml(s: CompanySnapshot, v: Variant): string {
   // vezércikk
   rows.push(`<tr><td style="padding:22px 0 18px">${kick("Összefoglaló")}
     <div style="${SERIF}font-size:27px;line-height:1.25;color:${K.ink};padding-top:8px">${esc(s.headline)}</div></td></tr>`);
-  const sv = s.stockValue;
-  // v3.9.10 – „C” elrendezés: kiemelt összes pénz + pénztár/bank arány-csík, alatta 2 × 2 szimmetrikus rács, középre zárva
+  // v4.2.0 – kiemelt összes pénz + háromszínű arány-csík (Ft-készpénz / EUR-készpénz / bank),
+  // alatta 2 × 3 rács: Készpénz Ft | Készpénz EUR, Bankszámla | Tegnapi bevétel, Készlet értéke | Eladó autó
   const liq = s.kpi.liquidity;
   const bank = s.kpi.bank;
-  const till = liq - bank;
-  const share = (x: number) => (liq > 0.5 && x > 0 ? Math.round((x / liq) * 100) : 0);
-  const tillPct = share(till);
-  const bankPct = till > 0 && bank > 0 ? 100 - tillPct : share(bank);
-  const bar = tillPct + bankPct > 0
-    ? `<table role="presentation" width="300" align="center" cellspacing="0" cellpadding="0" style="margin:9px auto 4px;width:300px;max-width:80%"><tr>${tillPct ? `<td width="${tillPct}%" height="6" style="height:6px;line-height:6px;font-size:0;background:${K.accent}">&nbsp;</td>` : ""}${bankPct ? `<td width="${bankPct}%" height="6" style="height:6px;line-height:6px;font-size:0;background:${K.hair}">&nbsp;</td>` : ""}</tr></table>`
+  const cashFt = s.kpi.cashHuf;
+  const cashEur = s.kpi.cashEur;
+  const till = cashFt + cashEur;
+  const share = (x: number, of: number) => (of > 0.5 && x > 0 ? Math.round((x / of) * 100) : 0);
+  const segs = [
+    { pct: share(cashFt, liq), color: K.accent },
+    { pct: share(cashEur, liq), color: "#5f9c86" },
+    { pct: share(bank, liq), color: K.hair },
+  ].filter((x) => x.pct > 0);
+  // kerekítési maradék a legnagyobb szeletre, hogy a csík pontosan 100% legyen
+  if (segs.length) segs.reduce((m, x) => (x.pct > m.pct ? x : m)).pct += 100 - segs.reduce((t, x) => t + x.pct, 0);
+  const bar = segs.length
+    ? `<table role="presentation" width="300" align="center" cellspacing="0" cellpadding="0" style="margin:9px auto 4px;width:300px;max-width:80%"><tr>${segs.map((x) => `<td width="${x.pct}%" height="6" style="height:6px;line-height:6px;font-size:0;background:${x.color}">&nbsp;</td>`).join("")}</tr></table>`
     : "";
   rows.push(`<tr><td align="center" style="padding:18px 0 14px;border-top:1px solid ${K.hair};text-align:center">
     <div style="${SANS}font-size:11px;color:${K.accent};text-transform:uppercase;letter-spacing:.08em;font-weight:700">Összes pénz</div>
     <div style="${SERIF}font-size:36px;font-weight:700;color:${K.ink};line-height:1.15;padding-top:3px;white-space:nowrap">${eFt1(liq)}</div>
-    ${bar}<div style="${SANS}font-size:12px;font-weight:300;color:${K.mute}">pénztár + bank, mai árfolyamon</div></td></tr>`);
-  const pct0 = (p: number) => (liq > 0.5 ? `${p}% · ` : "");
-  const tillNote = pct0(tillPct) + (Math.abs(till - s.kpi.cashHuf) > 0.5 ? `ebből Ft-pénztár ${money(s.kpi.cashHuf)}` : "forintpénztár");
-  const bankNote = pct0(bankPct) + "mai árfolyamon";
-  const sq = (lbl: string, val: string, note: string) => `<div style="text-align:center"><div style="${SANS}font-size:11px;color:${K.accent};text-transform:uppercase;letter-spacing:.08em;font-weight:700">${esc(lbl)}</div>
+    ${bar}<div style="${SANS}font-size:12px;font-weight:300;color:${K.mute}">Ft-készpénz · EUR-készpénz · bank, mai árfolyamon</div></td></tr>`);
+  const sq = (lbl: string, val: string, note: string, dot = "") => `<div style="text-align:center"><div style="${SANS}font-size:11px;color:${K.accent};text-transform:uppercase;letter-spacing:.08em;font-weight:700">${dot ? `<span style="color:${dot}">&#9679;</span> ` : ""}${esc(lbl)}</div>
       <div style="${SERIF}font-size:24px;font-weight:700;color:${K.ink};line-height:1.15;padding-top:3px;white-space:nowrap">${val}</div>
       <div style="${SANS}font-size:12px;font-weight:300;color:${K.mute};padding-top:3px">${note || "&nbsp;"}</div></div>`;
-  rows.push(`<tr><td style="padding:12px 0;border-top:1px dotted ${K.hair}">${vrule([
-    sq("Pénztár", eFt1(till), tillNote),
-    sq("Bankszámla", eFt1(bank), bankNote),
+  const tillShare = (x: number) => (till > 0.5 ? `a készpénz ${share(x, till)}%-a` : "");
+  const eur = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0, useGrouping: "always" }).format(Math.round(s.kpi.cashEurFx));
+  const cell = `padding:12px 0;border-top:1px dotted ${K.hair}`;
+  rows.push(`<tr><td style="${cell}">${vrule([
+    sq("Készpénz Ft", eFt1(cashFt), [tillShare(cashFt), "forintpénztár"].filter(Boolean).join(" · "), K.accent),
+    sq("Készpénz EUR", eFt1(cashEur), [`${eur} €`, tillShare(cashEur)].filter(Boolean).join(" · "), "#5f9c86"),
   ])}</td></tr>`);
-  const stockCell = sv ? sq("Készlet értéke", mFt2(sv.value), `beszerzési ár: ${mFt2(sv.purchase)}`) : sq("Eladó autó", `${s.kpi.stock ?? "–"} db`, "");
-  rows.push(`<tr><td style="padding:12px 0 16px;border-top:1px dotted ${K.hair};border-bottom:1px solid ${K.hair}">${vrule([
+  const sv = s.stockValue;
+  const lastRow = !s.private;
+  rows.push(`<tr><td style="${cell}${lastRow ? "" : `;padding-bottom:16px;border-bottom:1px solid ${K.hair}`}">${vrule([
+    sq("Bankszámla", eFt1(bank), `${liq > 0.5 ? `${share(bank, liq)}% · ` : ""}mai árfolyamon`),
     sq("Tegnapi bevétel", ft0(s.kpi.revenueDay), `${shortD(s.day)} · előző 30 nap: ${money(s.kpi.revenue30)}`),
-    stockCell,
   ])}</td></tr>`);
-  rows.push(`<tr><td style="padding:10px 0 0;${SANS}font-size:12.5px;color:${K.mute}">Eladó autó: <b style="color:${K.ink}">${s.kpi.stock ?? "–"} db</b> &nbsp;·&nbsp; Lejárt vevői tartozás: <b style="color:${s.kpi.lateReceivableCount ? K.red : K.ink}">${s.kpi.lateReceivableCount ? money(s.kpi.lateReceivable) : "nincs"}</b> &nbsp;·&nbsp; Lejárt szállítói tartozás: <b style="color:${s.kpi.latePayableCount ? K.red : K.ink}">${s.kpi.latePayableCount ? money(s.kpi.latePayable) : "nincs"}</b></td></tr>`);
+  if (lastRow) {
+    const avg = s.cars?.avgDays;
+    rows.push(`<tr><td style="${cell};padding-bottom:16px;border-bottom:1px solid ${K.hair}">${vrule([
+      sv ? sq("Készlet értéke", mFt2(sv.value), `beszerzési ár: ${mFt2(sv.purchase)}`) : sq("Készlet értéke", "–", ""),
+      sq("Eladó autó", `${s.kpi.stock ?? "–"} db`, avg != null ? `átlagosan ${avg} napja áll` : ""),
+    ])}</td></tr>`);
+  }
+  rows.push(`<tr><td style="padding:10px 0 0;${SANS}font-size:12.5px;color:${K.mute}">Lejárt vevői tartozás: <b style="color:${s.kpi.lateReceivableCount ? K.red : K.ink}">${s.kpi.lateReceivableCount ? money(s.kpi.lateReceivable) : "nincs"}</b> &nbsp;·&nbsp; Lejárt szállítói tartozás: <b style="color:${s.kpi.latePayableCount ? K.red : K.ink}">${s.kpi.latePayableCount ? money(s.kpi.latePayable) : "nincs"}</b></td></tr>`);
 
   // eredmény-rovat
   const r = s.results;
@@ -282,7 +297,7 @@ export function renderCompanyMail(s: CompanySnapshot, v: Variant): Mail {
   const html = companyHtml(s, v);
   const b = BLOCKS[v];
   const L: string[] = [`${s.name} – napi összefoglaló, ${dayLabel(s.date)}`, "", s.headline, "",
-    `Összes pénz: ${money(s.kpi.liquidity)} (pénztár ${money(s.kpi.liquidity - s.kpi.bank)} · bank ${money(s.kpi.bank)}) · Tegnapi bevétel: ${money(s.kpi.revenueDay)} (előző 30 nap: ${money(s.kpi.revenue30)})`,
+    `Összes pénz: ${money(s.kpi.liquidity)} (készpénz Ft ${money(s.kpi.cashHuf)} · készpénz EUR ${money(s.kpi.cashEur)} · bank ${money(s.kpi.bank)}) · Tegnapi bevétel: ${money(s.kpi.revenueDay)} (előző 30 nap: ${money(s.kpi.revenue30)})`,
     `Eredmény – ebben a hónapban: ${money(s.results.month, true)}, ebben a negyedévben: ${money(s.results.quarter, true)}, idén eddig: ${money(s.results.year, true)}${s.results.yearForecast != null ? `, várható éves: ${money(s.results.yearForecast, true)}` : ""}`,
     `Határidők – ÁFA: ${s.deadlines.vat ? shortD(s.deadlines.vat.date) : "–"}, járulék: ${s.deadlines.payroll ? shortD(s.deadlines.payroll.date) : "–"}`, "", "TEENDŐK"];
   for (const t of openTodos(s)) L.push(`- ${t.text}`);

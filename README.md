@@ -39,6 +39,13 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.2.0 – Napi összefoglaló: készpénz Ft és EUR külön
+
+- A „Pénztár” csempe helyett két csempe: **Készpénz Ft** és **Készpénz EUR** (mai árfolyamon Ft-ban, alatta az euróösszeg), mindkettőnél a készpénzen belüli arány.
+- Az „Összes pénz” csík háromszínű: Ft-készpénz · EUR-készpénz · bank.
+- A rács 2 × 3: Készpénz Ft | Készpénz EUR, Bankszámla | Tegnapi bevétel, Készlet értéke | Eladó autó (átlagos állásidővel).
+- A szöveges változat is bontja: készpénz Ft · készpénz EUR · bank.
+
 ## v4.1.0 – ERP-térkép a cégválasztó oldalon
 
 - Új oldal: **/terkep**, a Cégeim oldal fejlécéből („ERP-térkép”), még cég vagy egység kiválasztása előtt. Az ERP 28 modulja metrótérképként: négy vonal (Bizonylat, Pénz, Készlet, Zárás és bér), a Napló a fő átszállóhely.
