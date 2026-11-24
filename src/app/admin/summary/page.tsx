@@ -7,7 +7,7 @@ import { ConfirmButton } from "@/components/ConfirmButton";
 import { APP_VERSION } from "@/lib/version";
 import { holdingSnapshot } from "@/lib/daily-summary/data";
 import { renderHoldingMail } from "@/lib/daily-summary/render";
-import { getSummarySettings, recipientsByCompany, smtpConfigured } from "@/lib/daily-summary/send";
+import { getSummarySettings, recipientsByCompany, summaryWarnings } from "@/lib/daily-summary/send";
 import { saveHoldingAction, testHoldingAction, runNowAction, toggleSummaryAction } from "./actions";
 import { SummarySwitch } from "@/components/SummarySwitch";
 import { asc } from "drizzle-orm";
@@ -19,10 +19,11 @@ export const dynamic = "force-dynamic";
 export default async function AdminSummaryPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
   const sp = await searchParams;
-  const [st, byCompany, companies] = await Promise.all([
+  const [st, byCompany, companies, warnings] = await Promise.all([
     getSummarySettings(),
     recipientsByCompany(),
     db.select().from(schema.companies).orderBy(asc(schema.companies.name)),
+    summaryWarnings(),
   ]);
   const companyRecipients = [...byCompany.values()].reduce((s, l) => s + l.length, 0);
   let preview = "", previewError = "";
@@ -43,7 +44,7 @@ export default async function AdminSummaryPage({ searchParams }: { searchParams:
         <div className="row"><Link href="/admin">← Admin</Link><Link href="/">Cégeim</Link></div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
-      {!smtpConfigured() && <div className="flash error">Az e-mail küldés nincs beállítva: a Renderen add meg az SMTP_USER (Gmail cím) és SMTP_PASS (Gmail alkalmazásjelszó) változót.</div>}
+      {warnings.map((w) => <div key={w} className="flash error">{w}</div>)}
 
       <div className={`card sum-master${st.enabled ? "" : " off"}`} style={{ marginBottom: 16 }}>
         <div>

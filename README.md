@@ -39,6 +39,13 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v3.9.8 – E-mail küldés HTTPS-en (Gmail-továbbító)
+
+- A Render ingyenes csomagja 2025 szeptembere óta tiltja a kimenő SMTP-t, ezért a Próba és a napi küldés „connection timeout”-tal elakadt. Új küldési mód: a saját Gmail-fiókból egy Google Apps Script web app küld (`scripts/gmail-relay.gs`, beállítás a fájl elején); az ERP HTTPS-en adja át neki a levelet (`MAIL_RELAY_URL`, `MAIL_RELAY_SECRET`). Ha nincs beállítva, marad az SMTP – időtúllépésnél érthető hibaüzenettel.
+- Ütemezett futásnál csak az a nap számít elvégzettnek, amelyen legalább egy levél kiment (hiba vagy üres címzettlista esetén a következő hívás újrapróbálja).
+- A beállító oldalak figyelmeztetnek: nincs küldési mód / SMTP a Renderen / a cégnek van címzettje, de szünetel / egyetlen levél sem menne ki.
+- Benne van a v3.9.7 (az `xlsx` csomag kivezetése) is, amely a main ágra eddig nem került be.
+
 ## v3.9.7 – Az `xlsx` csomag kivezetése
 
 - A HIPA-szabályok (Kincstár HAKKA) beolvasása az ismert biztonsági hibás `xlsx` 0.18.5 helyett a már meglévő `exceljs`-szel (xlsx), illetve saját CSV-olvasóval (pontosvessző / vessző / tab, idézőjeles mezők, Windows-1250) történik. A zip és az xml változatlan.
@@ -86,7 +93,7 @@ Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Air
 - **Holding jelentés** (Admin › Napi összefoglaló): minden cég egyben – összesítő számok, cégenkénti tábla, 14 napos fedezettség (pénz vs. 46x adótartozás + esedékes szállítók), összes teendő cégnévvel, autók sávonként, tagi kölcsönök, vendégház. Címzettek csak itt állíthatók.
 - Teendők: be nem küldött / esedékes ÁFA- és járulékbevallás, negatív pénztár, lejárt vevők / szállítók, beérkező bizonylatok, piszkozatok, le nem zárt ÁFA-időszak, elhatárolás, következő ÁFA-határidő.
 - Küldés SMTP-n (alapból Gmail alkalmazásjelszóval). Ütemezés: GitHub Actions (`.github/workflows/daily-summary.yml`, 04:59 és 05:59 UTC) hívja a `/api/daily-summary` végpontot `CRON_SECRET`-tel; az ERP naponta egyszer küld, 6:45 és 12:00 között az első hívásra.
-- Beállítás: Render → `SMTP_USER`, `SMTP_PASS`, `CRON_SECRET`; GitHub → Actions secrets: `ERP_URL`, `CRON_SECRET`.
+- Beállítás: Render → `MAIL_RELAY_URL`, `MAIL_RELAY_SECRET` (Gmail-továbbító, lásd `scripts/gmail-relay.gs`), `CRON_SECRET`; GitHub → Actions secrets: `ERP_URL`, `CRON_SECRET`. Az `SMTP_USER` / `SMTP_PASS` csak fizetős Render-csomagon működik (az ingyenes tiltja a kimenő SMTP-t).
 
 ## v3.9.1 – Dinamikus időszakválasztó
 

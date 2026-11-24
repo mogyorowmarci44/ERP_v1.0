@@ -15,7 +15,12 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
-      # v3.9.2 – napi összefoglaló e-mail (Gmail alkalmazásjelszó) és az ütemező titkos kulcsa
+      # v3.9.8 – napi összefoglaló e-mail: Gmail-továbbító HTTPS-en (scripts/gmail-relay.gs) – az ingyenes Render tiltja az SMTP-t
+      - key: MAIL_RELAY_URL
+        sync: false
+      - key: MAIL_RELAY_SECRET
+        sync: false
+      # v3.9.2 – SMTP (csak fizetős Render-csomagon működik) és az ütemező titkos kulcsa
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS
