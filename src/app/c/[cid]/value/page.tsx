@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 const eFtFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0, useGrouping: "always" });
 const eFt = (n: number) => `${eFtFmt.format(Math.round(n / 1000) || 0)} eFt`;
-const M = (n: number) => `${(Math.round(n / 100000) / 10).toLocaleString("hu-HU", { minimumFractionDigits: 1 })} M Ft`;
+const M = (n: number) => `${(Math.round(n / 100000) / 10).toLocaleString("hu-HU", { minimumFractionDigits: 1 })} m Ft`;
 
 function Calc({ lines, total, totalLabel }: { lines: Array<{ label: string; amount: number; hint?: string }>; total: number; totalLabel: string }) {
   return (

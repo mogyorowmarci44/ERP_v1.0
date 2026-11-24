@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 const ft = (n: number | null | undefined) => (n == null ? "–" : `${n < 0 ? "−" : ""}${fmtHuf(Math.abs(Math.round(n)))} Ft`);
 const sft = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${fmtHuf(Math.abs(Math.round(n)))} Ft`;
-const mft = (n: number) => `${n < 0 ? "−" : ""}${(Math.abs(n) / 1e6).toFixed(2).replace(".", ",")} M Ft`;
+const mft = (n: number) => `${n < 0 ? "−" : ""}${(Math.abs(n) / 1e6).toFixed(2).replace(".", ",")} m Ft`;
 const pct = (x: number) => `${(x * 100).toFixed(1).replace(".", ",")} %`;
 const STATUS: Record<KmStatus, { title: string; hint: string }> = {
   red: { title: "Beavatkozni", hint: "nullszaldó alatt vagy közel" },

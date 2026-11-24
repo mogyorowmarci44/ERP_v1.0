@@ -383,7 +383,7 @@ export function runForecast(
     if (amount > 0) {
       vatCarry = 0;
       if (due <= horizonEnd) events.push({ date: due, channel: "bank", amount: -amount, kind: "vat", note: "ÁFA befizetés" });
-    } else vatCarry = amount; // visszaigénylés helyett továbbvitel (a 1 M Ft-os küszöb alatt)
+    } else vatCarry = amount; // visszaigénylés helyett továbbvitel (a 1 m Ft-os küszöb alatt)
   }
 
   // Éves adók (TAO + HIPA): a folyó év tény + terv, befizetés a következő év május 31-ig

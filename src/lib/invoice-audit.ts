@@ -81,7 +81,7 @@ export async function invoiceAudit(companyId: number, opts: { from?: string; to?
     a.flags = flagsFor(a, t);
     return a;
   });
-  // Készpénzkorlát vállalkozások között (havi 1,5 M Ft partnerenként)
+  // Készpénzkorlát vállalkozások között (havi 1,5 m Ft partnerenként)
   const cashByPartnerMonth = new Map<string, number>();
   for (const a of out) {
     if (a.partnerPrivate || !a.partnerTax) continue;
@@ -94,7 +94,7 @@ export async function invoiceAudit(companyId: number, opts: { from?: string; to?
     const months = new Set(a.payments.filter((p) => !p.reversed && p.accountCode.startsWith("381")).map((p) => p.date.slice(0, 7)));
     for (const m of months) {
       const sum = cashByPartnerMonth.get(`${a.inv.partnerId}|${m}`) ?? 0;
-      if (sum > CASH_LIMIT) a.flags.push({ code: "cash_limit", level: "warn", text: `Készpénzes fizetés ${m}-ban ezzel a vállalkozással ${fmtNum(Math.round(sum))} Ft (havi korlát 1,5 M Ft)` });
+      if (sum > CASH_LIMIT) a.flags.push({ code: "cash_limit", level: "warn", text: `Készpénzes fizetés ${m}-ban ezzel a vállalkozással ${fmtNum(Math.round(sum))} Ft (havi korlát 1,5 m Ft)` });
     }
   }
   return out;

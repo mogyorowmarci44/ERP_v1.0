@@ -89,7 +89,7 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
                 <tbody>
                   <tr><td>Nettó árbevétel (91–93)</td><td className="num">{ft(row.hipa.revenue)}</td></tr>
                   <tr><td className="indent-1">− Eladott áruk beszerzési értéke (811, 814) + közvetített szolgáltatások (815)</td><td className="num">−{ft(row.hipa.cogsDeducted)}</td></tr>
-                  {row.hipa.cogsCap != null && <tr className="k-check"><td>500 M Ft feletti árbevétel: ELÁBÉ + közvetített szolgáltatás sávosan levonható (felső határ {ft(row.hipa.cogsCap)}; teljes {ft(row.hipa.cogsMediated)})</td><td /></tr>}
+                  {row.hipa.cogsCap != null && <tr className="k-check"><td>500 m Ft feletti árbevétel: ELÁBÉ + közvetített szolgáltatás sávosan levonható (felső határ {ft(row.hipa.cogsCap)}; teljes {ft(row.hipa.cogsMediated)})</td><td /></tr>}
                   <tr><td className="indent-1">− Anyagköltség (51)</td><td className="num">−{ft(row.hipa.materials)}</td></tr>
                   <tr><td className="indent-1">− Alvállalkozói teljesítések (kézi)</td><td className="num">−{ft(row.hipa.subcontract)}</td></tr>
                   {row.hipa.rnd > 0 && <tr><td className="indent-1">− Kutatás-fejlesztés közvetlen költsége (kézi)</td><td className="num">−{ft(row.hipa.rnd)}</td></tr>}
@@ -112,7 +112,7 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
               </table>
               <p className="muted" style={{ fontSize: 12.5 }}>
                 A HIPA alapja nem az eredmény, ezért veszteség mellett is lehet adó. Előleg: a következő két félévi részlet (márc. 15., szept. 15.) egyenként az éves adó fele;
-                100 M Ft feletti árbevételnél december 20-ig feltöltés. Főkönyv: 867 (adók, illetékek – HIPA és egyéb) {row.fig.fy}. évi forgalma {ft(row.fig.taxes867)}.
+                100 m Ft feletti árbevételnél december 20-ig feltöltés. Főkönyv: 867 (adók, illetékek – HIPA és egyéb) {row.fig.fy}. évi forgalma {ft(row.fig.taxes867)}.
               </p>
             </div>
 
@@ -133,7 +133,7 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
               </table>
               <p className="muted" style={{ fontSize: 12.5 }}>
                 Továbbvihető veszteség az év végén: {row.tao.lossesAfter.length ? row.tao.lossesAfter.map((l) => `${l.year}: ${ft(l.amount)}`).join(" · ") : "nincs"}.
-                Főkönyv: 891 (társasági adó) {row.fig.fy}. évi forgalma {ft(row.fig.taoBooked)}. Előleg: az éves adó alapján negyedévente (5 M Ft felett havonta), 100 M Ft feletti árbevételnél december 20-ig feltöltés.
+                Főkönyv: 891 (társasági adó) {row.fig.fy}. évi forgalma {ft(row.fig.taoBooked)}. Előleg: az éves adó alapján negyedévente (5 m Ft felett havonta), 100 m Ft feletti árbevételnél december 20-ig feltöltés.
               </p>
               {canWrite && (
                 <form action={saveTaxAdjustmentsAction} className="form-grid" style={{ marginTop: 10 }}>
@@ -216,7 +216,7 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
         <p style={{ marginTop: 0 }}>
           {tax.storeInfo
             ? <>Betöltve: <strong>{tax.storeInfo.count} önkormányzat</strong> · {tax.storeInfo.source} · {new Date(tax.storeInfo.fetchedAt).toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</>
-            : <>Még nincs letöltve – addig beépített szabály csak Mórra van (2%, mentes 2,5 M Ft adóalap alatt); a többi településen 2%, mentesség nélkül.</>}
+            : <>Még nincs letöltve – addig beépített szabály csak Mórra van (2%, mentes 2,5 m Ft adóalap alatt); a többi településen 2%, mentesség nélkül.</>}
         </p>
         {canWrite && (
           <div className="row" style={{ alignItems: "flex-end" }}>

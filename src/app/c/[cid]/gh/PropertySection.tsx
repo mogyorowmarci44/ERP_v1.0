@@ -17,7 +17,7 @@ import { fmtNum, fmtPct } from "@/lib/gh-view";
 import { savePropertyAction, setValuationMethodAction } from "./actions";
 
 type PR = NonNullable<ReturnType<typeof propertyReturn>>;
-const M = (x: number) => `${fmtNum(x / 1e6, 2)} M Ft`;
+const M = (x: number) => `${fmtNum(x / 1e6, 2)} m Ft`;
 const sign = (x: number) => (x >= 0 ? "+" : "−") + fmtNum(Math.abs(x) / 1e6, 2);
 
 export function PropertySection({ cid, view, pr, base, t0, asOf }: { cid: number; view: string; pr: PR; base: number; t0: string; asOf: string }) {
@@ -70,13 +70,13 @@ export function PropertySection({ cid, view, pr, base, t0, asOf }: { cid: number
       <div className="grid cols-4">
         <div className="card kpi">
           <div className="label">Nettó eladási bevétel (költségek és SZJA után)</div>
-          <div className="value">{fmtNum(sale.net / 1e6, 1)}<small>M Ft</small></div>
+          <div className="value">{fmtNum(sale.net / 1e6, 1)}<small>m Ft</small></div>
           <div className="hint">eladási ár {M(sale.price)}</div>
         </div>
         <div className="card kpi">
           <div className="label">Teljes nyereség a vásárlás óta</div>
-          <div className={`value ${pr.totalNominal < 0 ? "neg" : "pos"}`}>{sign(pr.totalNominal)}<small>M Ft</small></div>
-          <div className="hint">reálértéken (2021. szept. forintban): {sign(pr.totalReal)} M Ft</div>
+          <div className={`value ${pr.totalNominal < 0 ? "neg" : "pos"}`}>{sign(pr.totalNominal)}<small>m Ft</small></div>
+          <div className="hint">reálértéken (2021. szept. forintban): {sign(pr.totalReal)} m Ft</div>
         </div>
         <div className="card kpi">
           <div className="label">Visszakapott / befektetett</div>
