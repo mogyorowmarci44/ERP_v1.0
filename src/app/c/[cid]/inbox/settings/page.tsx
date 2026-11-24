@@ -6,7 +6,10 @@ import { getInboxSettings } from "@/lib/inbox/service";
 import { extractionAvailable, EXTRACT_MODEL } from "@/lib/inbox/extract";
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
-import { saveSettingsAction, newSecretAction, testConnectionAction } from "../actions";
+import { saveSettingsAction, newSecretAction, testConnectionAction, connectBankAction, bankSyncNowAction, saveBankAction, disconnectBankAction } from "../actions";
+import { ebConfigured } from "@/lib/bank/enable-banking";
+import { consentWarning } from "@/lib/bank/sync";
+import { today } from "@/lib/dates";
 
 function scriptSource() {
   try { return readFileSync(path.join(process.cwd(), "tools/apps-script/mm-erp-inbox.gs"), "utf8"); } catch { return "// A szkript a repóban: tools/apps-script/mm-erp-inbox.gs"; }
@@ -79,6 +82,61 @@ export default async function InboxSettingsPage({ params, searchParams }: { para
           <form action={testConnectionAction}><input type="hidden" name="cid" value={cid} /><SubmitButton pendingText="Kapcsolódás…">Kapcsolat tesztelése</SubmitButton></form>
         </div>
       )}
+
+      <h2 id="bank">Bank – automatikus napi letöltés</h2>
+      <div className="card" style={{ marginBottom: 14 }}>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Minden reggel letölti az előző napig könyvelt banki tételeket, és kivonatként a Beérkező bizonylatok közé teszi: a rendszer párosítja őket a nyitott számlákkal,
+          az egyértelműeket lekönyveli, a többi jóváhagyásra vár. A már könyvelt pénzmozgásokat kihagyja. A kapcsolat az Enable Banking engedélyes számlainformációs
+          szolgáltatón keresztül megy (az Erste API-ja közvetlenül csak engedélyes szolgáltatónak érhető el); a hozzájárulás legfeljebb 180 napig él, utána a bank appjában újra jóvá kell hagyni.
+        </p>
+        {!ebConfigured() ? (
+          <p className="neg" style={{ marginBottom: 0 }}>A szerveren nincs beállítva: add hozzá a Renderen az <code>EB_APP_ID</code>, <code>EB_PRIVATE_KEY</code> és <code>APP_URL</code> változót (lépések a README „v3.10.0” részében).</p>
+        ) : s.bank ? (
+          <>
+            <p style={{ margin: "0 0 6px" }}>
+              <strong>{s.bank.aspsp.name}</strong> ({s.bank.psuType === "business" ? "céges" : "lakossági"}) · összekapcsolva {s.bank.connectedAt.slice(0, 10)} ·
+              hozzájárulás érvényes: <strong>{s.bank.validUntil?.slice(0, 10) ?? "?"}</strong>
+              {s.bank.lastRunAt && <> · utolsó letöltés: {s.bank.lastRunAt.slice(0, 16).replace("T", " ")} – {s.bank.lastResult}</>}
+            </p>
+            {(s.bank.lastError || consentWarning(s.bank)) && <p className="neg" style={{ margin: "0 0 6px" }}>{s.bank.lastError || consentWarning(s.bank)}</p>}
+            <form action={saveBankAction} className="form-grid">
+              <input type="hidden" name="cid" value={cid} />
+              <div style={{ gridColumn: "1 / -1" }}>
+                {s.bank.accounts.map((a) => (
+                  <label key={a.uid} className="check"><input type="checkbox" name="acc" value={a.uid} defaultChecked={a.enabled} disabled={!canWrite} /> {a.iban ?? a.uid} · {a.currency}{a.name ? ` · ${a.name}` : ""} → {a.currency === "EUR" ? "3841" : "384"}</label>
+                ))}
+              </div>
+              <label>Ettől a naptól töltse le
+                <input type="date" name="bankSince" defaultValue={s.bank.since} disabled={!canWrite} />
+              </label>
+              {canWrite && <div style={{ alignSelf: "end" }}><button>Mentés</button></div>}
+            </form>
+            {canWrite && (
+              <div className="row" style={{ marginTop: 10 }}>
+                <form action={bankSyncNowAction}><input type="hidden" name="cid" value={cid} /><SubmitButton pendingText="Letöltés…">Letöltés most</SubmitButton></form>
+                <form action={connectBankAction}>
+                  <input type="hidden" name="cid" value={cid} /><input type="hidden" name="aspsp" value={s.bank.aspsp.name} /><input type="hidden" name="country" value={s.bank.aspsp.country} />
+                  <input type="hidden" name="psuType" value={s.bank.psuType} /><input type="hidden" name="bankSince" value={s.bank.since} />
+                  <button>Hozzájárulás megújítása</button>
+                </form>
+                <form action={disconnectBankAction}><input type="hidden" name="cid" value={cid} /><button className="danger">Leválasztás</button></form>
+              </div>
+            )}
+          </>
+        ) : canWrite ? (
+          <form action={connectBankAction} className="form-grid">
+            <input type="hidden" name="cid" value={cid} />
+            <label>Bank neve<input name="aspsp" defaultValue="Erste" /></label>
+            <label>Ország<input name="country" defaultValue="HU" maxLength={2} /></label>
+            <label>Számla típusa
+              <select name="psuType" defaultValue="business"><option value="business">céges</option><option value="personal">lakossági</option></select>
+            </label>
+            <label>Ettől a naptól töltse le<input type="date" name="bankSince" defaultValue={today()} /></label>
+            <div style={{ alignSelf: "end" }}><button className="primary">Összekapcsolás a bankkal →</button></div>
+          </form>
+        ) : <p className="muted">Nincs banki kapcsolat.</p>}
+      </div>
 
       <h2>Telepítés a Google-fiókba (egyszer, cégenként)</h2>
       <ol className="setup-steps">

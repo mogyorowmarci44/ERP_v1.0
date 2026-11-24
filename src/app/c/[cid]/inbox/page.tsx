@@ -115,7 +115,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                 <tr key={r.id}>
                   {paperTab && <td className="nowrap">{binder?.get(r.id) ? <><strong>{binder.get(r.id)!.month}</strong> · {binder.get(r.id)!.pos}.</> : "–"}</td>}
                   <td className="nowrap">{fmtDate((r.emailDate ?? r.createdAt).toISOString().slice(0, 10))}</td>
-                  <td>{r.source === "gmail" ? "Gmail" : r.source === "drive" ? "Drive" : "feltöltés"}{r.kind === "statement" ? " · kivonat" : ""}</td>
+                  <td>{r.source === "gmail" ? "Gmail" : r.source === "drive" ? "Drive" : r.source === "bank" ? "Bank (API)" : "feltöltés"}{r.kind === "statement" ? " · kivonat" : ""}</td>
                   <td>
                     {r.filingNo && <span className="badge filing">{r.filingNo}</span>}{" "}
                     <Link href={`/c/${cid}/inbox/${r.id}`}>{x?.invoiceNumber ?? x?.statement?.number ?? r.filename}</Link>
