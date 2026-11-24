@@ -1115,3 +1115,23 @@ tbody tr.att-row:hover td { background: var(--surface-2); }
 .sw.on .sw-knob::after { left: 19px; }
 .sum-master { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .sum-master.off { border-color: color-mix(in srgb, var(--neg) 40%, var(--line)); background: color-mix(in srgb, var(--neg) 5%, var(--surface)); }
+
+/* v4.0.0 – közös diagram-hover (ChartHover / ChartTip) */
+.ch { position: relative; touch-action: pan-y; outline: none; -webkit-tap-highlight-color: transparent; }
+.ch:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 6px; }
+.ch-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.ch-cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: .7; }
+.ch-band { fill: var(--ink); opacity: .05; }
+.ch-mark { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.ch-mark.neg { fill: var(--neg); }
+.ch-tip { position: absolute; z-index: 5; pointer-events: none; min-width: 170px; max-width: 420px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+.ch-tip strong { display: block; font-weight: 600; margin-bottom: 2px; }
+.ch-row { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); }
+.ch-row > span:first-child { white-space: nowrap; }
+.ch-row.ch-sub { font-size: 11.5px; padding-left: 15px; }
+.ch-row > span:last-child { color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ch-row i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.ch-row .ch-neg { color: var(--neg); }
+.ch-row .ch-pos { color: var(--pos); }
+.ch-row .ch-muted { color: var(--muted); }
+.sk-wrap { position: relative; }

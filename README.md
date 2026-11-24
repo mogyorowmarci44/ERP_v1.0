@@ -39,6 +39,14 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.0.0 – Diagramok: adatok kiírása bárhol a diagram fölött
+
+- Minden idősoros diagramon (Tervezés forgatókönyv-görbe, Pénz és bank egyenleg-görbék, tagi kölcsön egyenleg és lejárati ütemezés, vendégház vonaldiagramok) közös hover-réteg (`ChartHover`): a diagram **bármely pontja fölött** a legközelebbi időpontra ugrik – szaggatott függőleges vonal, kiemelt pontok (oszlopdiagramnál / lépcsős vonalnál a teljes sáv), és egy kártya az adott időpont összes értékével (forgatókönyvenként a hónap legalacsonyabb egyenlegével, tagi kölcsönnél az előző állapothoz képesti változással).
+- Azonnal megjelenik (nem a böngésző kb. 1 másodperces súgója), a kártya mindig a kurzor felőli oldalra kerül, nem takarja ki az adatot.
+- Telefonon koppintásra / húzásra is működik (a kártya felengedés után is látszik, máshová koppintva tűnik el); billentyűzettel a diagramra lépve ← → léptet, Esc bezár.
+- Sankey (eredmény-folyam): a csomópontok és szalagok fölött ugyanilyen kártya – összeg, arány az árbevételből, kibontási tipp.
+- A régi SVG `<title>` súgók kikerültek (nem jelenik meg két tooltip egyszerre); nyomtatásban a hover-réteg nem látszik.
+
 ## v3.10.0 – Napi automatikus banki letöltés (Erste, PSD2)
 
 - Minden reggel 6:30-kor (GitHub Actions, `.github/workflows/bank-sync.yml` → `/api/bank-sync`) letölti az összekapcsolt bankszámlák **előző napig könyvelt** tételeit, és számlánként, naponként egy kivonatként a Beérkező bizonylatok közé teszi (forrás: „Bank (API)”). Innen ugyanaz a lánc fut, mint a feltöltött CSV / Excel kivonatnál: nyitott számla párosítás, bankköltség (532), pénztárból befizetés (381 → 389 → 384), a már könyvelt pénzmozgások kihagyása, az egyértelműek könyvelése, a többi jóváhagyásra vár. HUF számla → 384, EUR → 3841.

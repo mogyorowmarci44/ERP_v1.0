@@ -1,6 +1,7 @@
 /** v2.0 – Vendégház elemzés: közös UI elemek (szerver komponensek). */
 import Link from "next/link";
 import { fmtHuf } from "@/lib/money";
+import { ChartHover } from "../ChartHover";
 import { PNL_INCLUDE_LABEL, type PnlTaxInclude } from "@/lib/entity";
 import { delta } from "@/lib/gh-view";
 import { setPnlTaxIncludeAction } from "@/app/c/[cid]/actions";
@@ -157,7 +158,6 @@ export function LineChart({ series, base, baseLabel, title, height = 220 }: { se
   const labels = series[0].points.map((p) => p.label);
   const every = Math.ceil(n / 8);
   const fmtAxis = (v: number) => (Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(Math.abs(v) % 1e6 ? 1 : 0).replace(".", ",")} m` : Math.abs(v) >= 1e3 ? `${Math.round(v / 1e3)} e` : String(Math.round(v)));
-  const colW = (W - L - R) / Math.max(1, n - 1);
   return (
     <figure style={{ margin: 0 }}>
       {series.length > 1 || base !== undefined ? (
@@ -166,6 +166,15 @@ export function LineChart({ series, base, baseLabel, title, height = 220 }: { se
           {base !== undefined ? <span><i style={{ background: "transparent", border: "1.5px dashed var(--muted)" }} />{baseLabel}</span> : null}
         </div>
       ) : null}
+      <ChartHover width={W} height={H} top={T} bottom={B} label={title} cols={labels.map((lb, i) => ({
+        x: x(i),
+        title: lb,
+        rows: [
+          ...series.filter((s) => s.points[i]).map((s) => ({ label: s.name, value: `${fmtHuf(s.points[i].value)} Ft`, color: s.color, tone: s.points[i].value < 0 ? ("neg" as const) : undefined })),
+          ...(base !== undefined ? [{ label: baseLabel ?? "Cél", value: `${fmtHuf(base)} Ft`, tone: "muted" as const }] : []),
+        ],
+        marks: series.filter((s) => s.points[i]).map((s) => ({ y: y(s.points[i].value), color: s.color })),
+      }))}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title} style={{ width: "100%", height: "auto", display: "block" }}>
         {Array.from({ length: ticks + 1 }, (_, i) => min + i * step).map((v, i) => (
           <g key={i}>
@@ -181,15 +190,9 @@ export function LineChart({ series, base, baseLabel, title, height = 220 }: { se
           const last = s.points[s.points.length - 1];
           return last ? <circle key={s.name} cx={x(s.points.length - 1)} cy={y(last.value)} r={4} fill={s.color} stroke="var(--surface)" strokeWidth={2} /> : null;
         })}
-        {labels.map((lb, i) => (
-          <g key={i}>
-            <rect x={x(i) - colW / 2} y={T} width={Math.max(colW, 4)} height={H - T - B} className="lc-hit">
-              <title>{`${lb}\n${series.map((s) => `${s.name}: ${fmtHuf(s.points[i]?.value ?? 0)} Ft`).join("\n")}`}</title>
-            </rect>
-            {(i % every === 0 && n - 1 - i >= every) || i === n - 1 ? <text x={x(i)} y={H - 7} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} className="lc-axis">{lb}</text> : null}
-          </g>
-        ))}
+        {labels.map((lb, i) => ((i % every === 0 && n - 1 - i >= every) || i === n - 1 ? <text key={i} x={x(i)} y={H - 7} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} className="lc-axis">{lb}</text> : null))}
       </svg>
+      </ChartHover>
     </figure>
   );
 }
