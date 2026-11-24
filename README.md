@@ -39,6 +39,10 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.3.1 – EUR-pénztár naptár euróban
+
+- Devizás pénztár- és bankjelentés naptárában a napi csempéken a nettó mozgás devizában (pl. „+700 €”, „−1,3 e €”), a színezés is ebből; a buborékban a deviza és a forintérték is.
+
 ## v4.3.0 – A napi összefoglaló és a Forecast éves eredménye egyezik
 
 - A Forecast oldal alapból a **Teljes üzleti év** nézetben nyílik; a fő csempe itt a **Várható éves eredmény (tény + terv − HIPA)**, alatta a bontás és az adózás utáni összeg – pontosan az, amit a napi összefoglaló „Várható éves eredmény” sora mutat.

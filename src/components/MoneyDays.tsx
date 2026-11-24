@@ -23,10 +23,21 @@ const short = (v: number) => {
   return `${v > 0 ? "+" : "−"}${t}`;
 };
 
-/** Havi naptár: minden nap színe a nettó pénzmozgás (kék be, narancs ki; sötétebb = nagyobb összeg). */
-function MoneyCalendar({ days, from, to, open, onPick }: { days: MoneyDay[]; from: string; to: string; open: Set<string>; onPick: (d: string) => void }) {
+/** v4.3.1 – devizás számlán a nap nettó mozgása devizában (a tételek előjeles devizaösszegéből). */
+export const netFxOf = (d: MoneyDay) => d.lines.reduce((s, l) => s + (l.amountFx ? (l.debit ? 1 : -1) * Math.abs(l.amountFx) : 0), 0);
+const SYM: Record<string, string> = { EUR: "€", USD: "$", GBP: "£", CHF: "CHF" };
+export const shortFx = (v: number, currency: string) => {
+  const a = Math.abs(v), sym = SYM[currency] ?? currency;
+  const t = a >= 1e4 ? `${Math.round(a / 1e3)}\u00a0e` : a >= 1e3 ? `${(a / 1e3).toFixed(1).replace(".", ",")}\u00a0e` : `${Math.round(a)}`;
+  return `${v > 0 ? "+" : "−"}${t}\u00a0${sym}`;
+};
+
+/** Havi naptár: minden nap színe a nettó pénzmozgás (kék be, narancs ki; sötétebb = nagyobb összeg). Devizás számlán devizában. */
+function MoneyCalendar({ days, from, to, open, onPick, currency }: { days: MoneyDay[]; from: string; to: string; open: Set<string>; onPick: (d: string) => void; currency: string }) {
+  const fx = currency !== "HUF";
+  const netOf = (d: MoneyDay) => (fx ? netFxOf(d) : d.inflow - d.outflow);
   const byDate = new Map(days.map((d) => [d.date, d]));
-  const maxNet = Math.max(1, ...days.map((d) => Math.abs(d.inflow - d.outflow)));
+  const maxNet = Math.max(1, ...days.map((d) => Math.abs(netOf(d))));
   const months: string[] = [];
   for (let m = from.slice(0, 7); m <= to.slice(0, 7); ) {
     months.push(m);
@@ -52,16 +63,16 @@ function MoneyCalendar({ days, from, to, open, onPick }: { days: MoneyDay[]; fro
                 const day = byDate.get(d);
                 const inRange = d >= from && d <= to;
                 if (!day) return <span key={d} className={`mc-cell empty${inRange ? "" : " out"}`}><b>{Number(d.slice(8))}</b></span>;
-                const net = day.inflow - day.outflow;
+                const net = netOf(day);
                 const t = Math.abs(net) / maxNet;
                 const light = Math.round(93 - t * 50);
                 const bg = net >= 0 ? `hsl(221 71% ${light}%)` : `hsl(21 75% ${light}%)`;
                 return (
                   <button key={d} type="button" className={`mc-cell${open.has(d) ? " on" : ""}`} style={{ background: bg, color: light < 62 ? "#fff" : "#17202b" }}
-                    onClick={() => onPick(d)} title={`${fmtDate(d)}: be ${fmtHuf(day.inflow)} · ki ${fmtHuf(day.outflow)} · záró ${fmtHuf(day.close)} Ft`}
-                    aria-label={`${fmtDate(d)}, nettó ${fmtHuf(net)} Ft, ${day.lines.length} tétel`} aria-pressed={open.has(d)}>
+                    onClick={() => onPick(d)} title={`${fmtDate(d)}: ${fx ? `nettó ${fmtMoney(net, currency)} · ` : ""}be ${fmtHuf(day.inflow)} · ki ${fmtHuf(day.outflow)} · záró ${fmtHuf(day.close)} Ft`}
+                    aria-label={`${fmtDate(d)}, nettó ${fx ? fmtMoney(net, currency) : `${fmtHuf(net)} Ft`}, ${day.lines.length} tétel`} aria-pressed={open.has(d)}>
                     <b>{Number(d.slice(8))}</b>
-                    <span>{Math.abs(net) < 0.5 ? "±0" : short(net)}</span>
+                    <span>{fx ? (Math.abs(net) < 0.005 ? `±0\u00a0${SYM[currency] ?? currency}` : shortFx(net, currency)) : Math.abs(net) < 0.5 ? "±0" : short(net)}</span>
                   </button>
                 );
               })}
@@ -81,7 +92,7 @@ export function MoneyDays({ days, cid, currency, initialOpen, from, to }: { days
   return (
     <>
       <div className="md-layout no-print">
-        <MoneyCalendar days={days} from={from} to={to} open={new Set(sel ? [sel] : [])} onPick={setSel} />
+        <MoneyCalendar days={days} from={from} to={to} open={new Set(sel ? [sel] : [])} onPick={setSel} currency={currency} />
         <aside className="md-panel card" aria-live="polite">
           {!day && <p className="muted">{days.length ? "Kattints egy színes napra a naptárban." : "Nincs mozgás az időszakban."}</p>}
           {day && (
