@@ -10,9 +10,11 @@ import { LoanBalanceChart, MaturityChart } from "@/components/LoanCharts";
 import { fmtHuf, fmtMoney, fmtNum } from "@/lib/money";
 import { fmtDate, today, addDaysIso } from "@/lib/dates";
 import { loanAge } from "@/lib/loan-age";
+import { LoanOverview, type OverviewRow } from "@/components/LoanOverview";
+import { amendmentKey, contractKey, repaymentKey } from "@/lib/loan-doc-keys";
 
 const statusClass: Record<string, string> = { "Lejárt": "overdue", "Hamarosan lejár": "soon", "Nyitott": "reserved", "Rendezve": "posted" };
-const VIEWS = { open: "Nyitott", overdue: "Lejárt", all: "Minden mozgás" } as const;
+const VIEWS = { open: "Nyitott", overdue: "Lejárt", all: "Áttekintés" } as const;
 type View = keyof typeof VIEWS;
 
 function Amount({ r }: { r: LoanRow }) {
@@ -22,6 +24,37 @@ function Amount({ r }: { r: LoanRow }) {
       {r.currency && r.kind !== "reval" && <div className="muted small">{fmtMoney(r.amountFx, r.currency)}</div>}
     </>
   );
+}
+
+/** v4.5.1 – Áttekintés: a táblázat sorai (szerializálható, a kliens komponensnek). */
+function overviewRows(cid: number, rows: LoanRow[], t: string): OverviewRow[] {
+  const short = (from: string, to: string) => (from.slice(0, 4) === to.slice(0, 4) ? fmtDate(from).slice(5) : fmtDate(from));
+  return rows.map((r) => {
+    const docs: OverviewRow["docs"] = [];
+    if (r.kind === "loan" && r.dueDate) {
+      docs.push({ key: contractKey(r.entryId), label: "TK", title: `${r.contractNo} – szerződés` });
+      for (const e of r.extensions) docs.push({ key: amendmentKey(r.entryId, e.seq), label: `M${e.seq}`, title: `${e.docNo} – ${e.seq}. módosítás (+${e.days} nap)` });
+    }
+    if (r.kind === "repayment" && r.docNo) docs.push({ key: repaymentKey(r.entryId), label: "TKV", title: `${r.docNo} – visszafizetési bizonylat` });
+    const age = r.kind === "loan" ? loanAge(r.dueDate, r.status, t) : null;
+    const from = r.originalDueDate ?? r.dueDate;
+    return {
+      entryId: r.entryId,
+      kind: r.kind,
+      ref: r.kind === "loan" ? r.contractNo ?? r.number : r.kind === "repayment" ? r.docNo ?? r.number : r.number,
+      refHref: r.kind === "reval" ? null : `/c/${cid}/member-loans/${r.entryId}`,
+      sub: r.kind === "loan" && r.repaidBy.length ? `← ${r.repaidBy.map((x) => x.docNo).join(", ")}` : null,
+      date: fmtDate(r.date),
+      amount: fmtHuf(r.kind === "reval" ? r.signed : r.kind === "repayment" ? -r.amount : r.amount),
+      amountFx: r.currency && r.kind !== "reval" ? fmtMoney(r.amountFx, r.currency) : null,
+      due: r.kind === "loan" ? { from: from && r.dueDate && r.extensions.length ? short(from, r.dueDate) : null, to: r.dueDate ? fmtDate(r.dueDate) : null, mods: r.extensions.length, age: age && { label: age.label, level: age.level } } : null,
+      note: r.kind === "repayment" && r.allocations.length ? `→ ${r.allocations.map((a) => a.contractNo).join(", ")}` : r.kind === "reval" ? r.description : null,
+      open: r.kind === "loan" ? fmtHuf(r.open) : null,
+      openFx: r.kind === "loan" && r.currency ? fmtMoney(r.openFx, r.currency) : null,
+      balance: fmtHuf(r.balance),
+      docs,
+    };
+  });
 }
 
 export default async function MemberLoansPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -103,13 +136,13 @@ export default async function MemberLoansPage({ params, searchParams }: { params
               {m.name} <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>· befizetve {fmtHuf(m.received)} Ft · visszafizetve {fmtHuf(m.repaid)} Ft{m.revaluation ? ` · átértékelés ${fmtHuf(m.revaluation)} Ft` : ""} · <strong>tartozás {fmtHuf(m.balance)} Ft</strong></span>
               {" "}<Link className="small no-print" href={`/c/${cid}/member-loans/statement?partner=${m.partnerId}`}>egyenlegközlő</Link>
             </h3>
+            {view === "all" ? <LoanOverview cid={cid} rows={overviewRows(cid, rows, t)} /> : (
             <div className="table-wrap">
               <table className="ml-table">
                 <thead>
                   <tr>
                     <th>Szerződés</th><th>Dátum</th><th>Típus</th><th className="num">Összeg (Ft)</th>
                     <th>Eredeti lejárat</th><th>Jelenlegi lejárat</th><th className="num">Nyitott</th><th>Állapot</th>
-                    {view === "all" && <th className="num">Egyenleg</th>}
                     {canWrite && <th className="no-print">Hosszabbítás (nap)</th>}
                   </tr>
                 </thead>
@@ -145,7 +178,6 @@ export default async function MemberLoansPage({ params, searchParams }: { params
                       </td>
                       <td className="num">{r.kind === "loan" ? <>{fmtHuf(r.open)}{r.currency && <div className="muted small">{fmtMoney(r.openFx, r.currency)}</div>}</> : ""}</td>
                       <td>{r.status && <span className={`badge ${statusClass[r.status]}`}>{r.status}</span>}</td>
-                      {view === "all" && <td className="num">{fmtHuf(r.balance)}</td>}
                       {canWrite && (
                         <td className="no-print">
                           {r.kind === "loan" && r.status !== "Rendezve" && !r.dueDate && (
@@ -182,6 +214,7 @@ export default async function MemberLoansPage({ params, searchParams }: { params
                 </tbody>
               </table>
             </div>
+            )}
           </section>
         );
       })}

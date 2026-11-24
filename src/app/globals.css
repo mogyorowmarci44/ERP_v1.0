@@ -1153,3 +1153,24 @@ tbody tr.att-row:hover td { background: var(--surface-2); }
 .cm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
 .cm-wide { grid-column: 1 / -1; }
 @media (max-width: 900px) { .cm-layout.open { grid-template-columns: minmax(0, 1fr); } }
+
+/* v4.5.1 – Tagi kölcsön › Áttekintés: görgetés nélkül, pipával és nyomtatással */
+.lo-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 12px; margin: 0 0 8px; border: 1px solid var(--line); border-radius: var(--r-lg, 10px); background: var(--surface); }
+.lo-table { table-layout: fixed; width: 100%; font-size: 13px; }
+.lo-table th, .lo-table td { padding: 7px 8px; vertical-align: top; overflow-wrap: break-word; }
+.lo-table .num { white-space: nowrap; }
+.lo-table col.lo-c0 { width: 34px; } .lo-table col.lo-c1 { width: 16%; } .lo-table col.lo-c2 { width: 11%; } .lo-table col.lo-c3 { width: 10%; }
+.lo-table col.lo-c4 { width: 13%; } .lo-table col.lo-c5 { width: 22%; } .lo-table col.lo-c6 { width: 12%; } .lo-table col.lo-c7 { width: 13%; }
+.lo-table tr.sel td { background: var(--accent-soft); }
+.lo-docs { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.lo-doc { font-size: 11px; line-height: 1.5; padding: 0 7px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.lo-doc.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.lo-type { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.lo-type.in { background: var(--accent-soft); color: var(--accent); }
+.lo-type.out { background: color-mix(in srgb, var(--pos) 12%, transparent); color: var(--pos); }
+.lo-type.rv { background: var(--surface-2); color: var(--muted); }
+@media (max-width: 760px) {
+  .lo-table col.lo-c2, .lo-table col.lo-c7 { width: 0; }
+  .lo-table th:nth-child(3), .lo-table td:nth-child(3), .lo-table th:nth-child(8), .lo-table td:nth-child(8) { display: none; }
+  .lo-table col.lo-c1 { width: 24%; } .lo-table col.lo-c5 { width: 26%; }
+}
