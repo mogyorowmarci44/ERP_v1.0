@@ -39,6 +39,12 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.5.1 – Tagi kölcsön: Áttekintés fül, kijelölés és nyomtatás
+
+- A „Minden mozgás” fül neve **Áttekintés**; a táblázat görgetés nélkül elfér (8 oszlop, a két lejárat egy oszlopban „régi → új”, a hosszabbító űrlap a Nyitott fülön marad).
+- Soronkénti pipa: befizetésnél a szerződés (TK) és a módosítások (M1, M2…), visszafizetésnél a TKV; a címkék egyenként is kapcsolhatók, fölül „mind”.
+- **Nyomtatás (N)** gomb: a kijelölt okiratok egyben, oldalanként (`/member-loans/print?d=…`).
+
 ## v4.5.0 – Tagok és tisztségviselők
 
 - Beállítások › **Tagok és tisztségviselők**: táblázat (név, jogviszony, tulajdonrész, kitöltöttség) és oldalpanel három szakasszal – jogviszony (tag / ügyvezető, tulajdonrész, törzsbetét, kezdete–vége, képviselet), személyes adatok (születési hely és idő, anyja neve, lakcím, adóazonosító jel), kapcsolatok (tagi kölcsön partner). A tulajdonrészek összege legfeljebb 100%.
