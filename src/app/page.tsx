@@ -40,6 +40,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           <ErpLogo size={32} />
           <h1>Cégeim</h1>
           <span className="version-tag">v{APP_VERSION}</span>
+          {/* v4.1.0 – ERP-térkép: a modulok és kapcsolataik, cégválasztás előtt is */}
+          <a className="btn" href="/terkep">ERP-térkép</a>
         </div>
         <form action={logoutAction} className="row">
           {user.isAdmin && <Link href="/admin">Admin – hozzáférések</Link>}

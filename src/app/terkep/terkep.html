@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERP-térkép – mogyorosi.erp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: precíz, magabiztos rendszerismertető – egy könyvelő-fejlesztő saját térképe
+   IDEA: metrótérkép – a modulok állomások, az adatfolyamok vonalak, a Napló a fő átszállóhely
+   PICTURE: nagy, kattintható hálózat 45°-os törésekkel; mellette az állomás részletei
+   COLOUR and TYPE: fehér / éjjel #0e1116, vonalszínek piros-kék-sárga-zöld, fekete tinta; Figtree 800 + Figtree
+   LAYOUT: cím és vonaljelmagyarázat felül, térkép + panel, alatta az „autó útja” léptető és a modullista */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0e1116);--ink:light-dark(#101418,#eef0f3);--sub:light-dark(#5b6470,#9aa3ae);--line:light-dark(#e4e7eb,#232831);--card:light-dark(#f6f7f9,#161a21);--st:light-dark(#ffffff,#0e1116);--red:#e6261f;--blue:#0a5cff;--amber:#ffb400;--green:#00a05a;--gray:light-dark(#8a929c,#6b7480)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Figtree,system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(20px,3.5vw,48px) max(4vw,16px)}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font:800 clamp(30px,4.4vw,48px)/1.05 Figtree,sans-serif;margin:0 0 10px;text-wrap:balance;letter-spacing:-.01em}
+.back{display:inline-flex;align-items:center;min-height:44px;margin-bottom:8px;color:var(--sub);text-decoration:none;font-weight:600}.back:hover{color:var(--ink)}
+.lede{color:var(--sub);max-width:68ch;margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
+.chip{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:6px 14px;border:1.5px solid var(--line);border-radius:999px;background:var(--bg);color:var(--ink);font:500 14px Figtree,sans-serif;cursor:pointer}
+.chip i{width:22px;height:6px;border-radius:3px;display:inline-block}
+.chip[aria-pressed=true]{border-color:var(--ink)}
+.chip:focus-visible,button:focus-visible,input:focus-visible,.mod:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+.mapbox{overflow-x:auto;border:1.5px solid var(--line);border-radius:14px;background:var(--bg)}
+.mapbox svg{display:block;width:100%;min-width:860px;height:auto}
+.trk{fill:none;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;transition:opacity .25s}
+.stn{cursor:pointer}
+.stn circle,.stn rect{fill:var(--st);stroke-width:5;transition:r .15s}
+.stn text{font:700 22px Figtree,sans-serif;fill:var(--ink);paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round}
+.stn text.s{font:400 12.5px Figtree,sans-serif;fill:var(--sub)}
+.stn:hover circle{r:13}.stn.on circle,.stn.on rect{fill:var(--ink)}
+.dim .trk.off,.dim .stn.off{opacity:.14}
+.panel{border:1.5px solid var(--line);border-radius:14px;padding:20px;background:var(--card);position:sticky;top:16px}
+.panel h2{font:800 26px/1.1 Figtree,sans-serif;margin:6px 0 8px}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font:600 12.5px Figtree,sans-serif;padding:3px 10px;border-radius:999px;color:#fff}
+.pill.amber{color:#2a1c00}
+.panel ul{margin:12px 0;padding-left:18px}.panel li{margin:4px 0}
+.rel{margin-top:12px;font-size:14px;color:var(--sub)}
+.rel button{font:500 14px Figtree,sans-serif;background:none;border:0;padding:4px 0;color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px;cursor:pointer;min-height:32px}
+.opens{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.go{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:10px;background:var(--ink);color:var(--bg);font-weight:600;text-decoration:none}
+.meta{font-size:13px;color:var(--sub)}
+.journey{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:14px}
+.step{text-align:left;min-height:64px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:500 14px/1.3 Figtree,sans-serif;cursor:pointer}
+.step b{display:block;font-weight:800;font-size:12px;color:var(--sub)}
+.step[aria-pressed=true]{border-color:var(--amber);background:color-mix(in srgb,var(--amber) 14%,var(--bg))}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;margin-top:26px}
+.bar h3,.list h3{font:800 20px Figtree,sans-serif;margin:0}
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1.5px solid var(--ink);background:var(--bg);color:var(--ink);font:600 14px Figtree,sans-serif;cursor:pointer}
+.jtext{color:var(--sub);margin:10px 0 0;min-height:1.6em}
+.list{margin-top:10px}
+.search{width:min(100%,360px);min-height:44px;padding:0 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:16px Figtree,sans-serif}
+.groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:14px}
+.grp{border-top:6px solid var(--gray);padding-top:10px}
+.grp h4{margin:0 0 6px;font:800 15px Figtree,sans-serif}
+.mod{display:block;width:100%;text-align:left;padding:8px 10px;margin:4px 0;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:600 14.5px Figtree,sans-serif;cursor:pointer}
+.mod span{display:block;font-weight:400;font-size:13px;color:var(--sub)}
+.mod.hide{display:none}
+.hint{display:none;margin:6px 0 0;font-size:13px;color:var(--sub)}
+.foot{color:var(--sub);font-size:13px;margin-top:22px}
+@media(max-width:980px){.stage{grid-template-columns:1fr}.panel{position:static}.journey{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:860px){.hint{display:block}}
+@media(max-width:560px){.journey{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<section class="band"><div class="wrap">
+  <a class="back" href="/">← Cégeim</a>
+  <h1>Az ERP 28 állomása, négy vonalon, egy átszállóhellyel</h1>
+  <p class="lede">Minden bizonylat, pénzmozgás, autó és bérköltség végül a Naplóba fut be, és onnan lesz belőle ÁFA-bevallás, kimutatás és beszámoló. Kattints egy állomásra a részletekért, egy vonalra a kiemeléshez, vagy kövesd végig egy autó útját.</p>
+  <div class="legend" id="legend" role="group" aria-label="Vonalak"></div>
+</div></section>
+
+<section class="band" style="padding-top:0"><div class="wrap">
+  <div class="stage">
+    <div><div class="mapbox" id="mapbox"><svg id="map" viewBox="0 0 1240 740" role="img" aria-label="Az ERP moduljai metrótérképként"></svg></div><p class="hint">A térkép oldalra húzható.</p></div>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+
+  <div class="bar"><h3>Egy használt autó útja a rendszerben</h3><button class="btn" id="play" type="button">Lejátszás</button></div>
+  <div class="journey" id="journey"></div>
+  <p class="jtext" id="jtext">Válassz egy lépést: a térképen kiemelődnek az érintett modulok.</p>
+
+  <div class="list">
+    <div class="bar"><h3>Minden modul</h3><input class="search" id="q" type="search" placeholder="Keresés: ÁFA, bank, 2608, EPR…" aria-label="Modul keresése"></div>
+    <div class="groups" id="groups"></div>
+  </div>
+  <p class="foot">mogyorosi.erp v__VERSION__. A „Megnyitás” gombok a kiválasztott cég megfelelő oldalát nyitják meg.</p>
+</div></section>
+
+<script>
+{
+const COMPANIES = __COMPANIES__; // { id, name, entityType }[] – a bejelentkezett felhasználó cégei
+const LINES = {
+  red:   { name: 'Bizonylat', color: 'var(--red)',   d: 'M90,170 H466 L692,396 H1150' },
+  blue:  { name: 'Pénz',      color: 'var(--blue)',  d: 'M90,630 H470 L700,400 L930,170 H1170' },
+  amber: { name: 'Készlet',   color: 'var(--amber)', d: 'M90,404 H960' },
+  green: { name: 'Zárás és bér', color: 'var(--green)', d: 'M700,690 V140 L780,60 H1060' },
+};
+// x, y, címke helye (dx, dy, igazítás)
+const M = [
+  { id:'gmail', n:'Gmail és Drive', s:'források', l:['red'], x:90,y:170, lx:0,ly:-26,a:'middle', p:'inbox/settings', v:'3.1',
+    d:'A beérkező számlák és kivonatok forrása: egy Google Apps Script a cég Gmailjéből és két Drive-mappából (bejövő számlák, bankkivonatok) adja át a fájlokat.',
+    f:['Gmail-keresés szabható (számla, invoice, díjbekérő…)','Drive: Bejövő számlák és Bankkivonatok mappa','Szkennelt / fotózott papír: ingyenes Google OCR','Kulcsos, csak olvasó kapcsolat'], to:['inbox'] },
+  { id:'inbox', n:'Beérkező bizonylatok', s:'beolvasás, könyvelés', l:['red'], x:280,y:170, lx:0,ly:42,a:'middle', p:'inbox', v:'3.1',
+    d:'Egy gombnyomásra (vagy naponta) beolvassa az új bizonylatokat, kiolvassa őket, javaslatot ad és az egyértelműeket lekönyveli.',
+    f:['PDF-szöveg, CSV / Excel kivonat, OCR; opcionálisan Claude','Partner, ÁFA-kód, főkönyvi szám a korábbi könyvelésből','Iktatószám papír bizonylatra (P-ÉÉÉÉ-0001), lefűzési hely','Ellenőrzés: adószám, ÁFA-matek, lezárt időszak','Kivonatsorok párosítása nyitott számlákkal'], to:['invoices','money'] },
+  { id:'invoices', n:'Számlák', s:'vevő és szállító', l:['red'], x:430,y:170, lx:0,ly:-26,a:'middle', p:'invoices?dir=in', v:'1.0',
+    d:'Vevő- és szállítói számlák piszkozattól a könyvelésig, devizában is, helyesbítéssel, sztornóval, beszámítással.',
+    f:['Devizás számla MNB-árfolyamon (Áfa tv. 80. §)','Különbözeti, AM, TAH, fordított ÁFA, KBB, export','Sztornó, helyesbítő, rontott számla','Párosítás meglévő banki tétellel, beszámítás','Új partner közvetlenül a számlán'], to:['journal','vehicles','margin'] },
+  { id:'journal', n:'Napló', s:'fő átszállóhely', l:['red','blue','amber','green'], x:700,y:400, lx:18,ly:48,a:'start', p:'journal', v:'1.0', hub:true,
+    d:'A kettős könyvvitel magja: minden modul ide könyvel, és minden kimutatás innen olvas.',
+    f:['Naplók: VE, SZ, BA, PE, VN','Piros sztornó, helyben javítás változásnaplóval','Ellenőrzött-jelölés, időszakzárás','Számlakarton, főkönyvi kivonat'], to:['vat','statements','closing','consistency','forecast'] },
+  { id:'vat', n:'ÁFA analitika', s:'és ÁFA-zárás', l:['red','amber'], x:960,y:400, lx:0,ly:42,a:'middle', p:'reports/vat', v:'1.0', hub:true,
+    d:'Havi ÁFA-összesítő és tételes különbözeti analitika, ÁFA-zárás a 468-ra.',
+    f:['Összesítő kódonként, tételes különbözeti lista','M-lap ellenőrzés partnerenként','ÁFA-zárás és újraszámolás','Kézi 466 / 467 tételek is'], to:['anyk'] },
+  { id:'anyk', n:'NAV-bevallások', s:'ÁNYK', l:['red'], x:1150,y:396, lx:0,ly:-26,a:'end', p:'filings', v:'3.6–3.8',
+    d:'Bevallások nyilvántartása határidőkkel, ÁNYK-export az ERP adataiból, önellenőrzéssel.',
+    f:['2665 ÁFA-bevallás M-lapokkal','Önellenőrzés: jelleg O, pótlék számítása','2608 járulékbevallás a bérből','Határidő-naptár, „Beküldve” jelölés'], to:[] },
+
+  { id:'bankapi', n:'Banki API', s:'Erste, PSD2', l:['blue'], x:90,y:630, lx:0,ly:42,a:'middle', p:'inbox/settings', v:'3.10',
+    d:'Naponta 6:30-kor letölti az előző napig könyvelt banki tételeket az Enable Bankingen keresztül.',
+    f:['Napi GitHub Actions ütemezés','Duplikáció-szűrés banki azonosítóval','180 napos hozzájárulás, lejárati figyelmeztetés','HUF → 384, EUR → 3841'], to:['inbox','money'] },
+  { id:'money', n:'Pénztár és bank', s:'HUF és EUR', l:['blue'], x:280,y:630, lx:0,ly:42,a:'middle', p:'money', v:'1.0',
+    d:'Pénzeszközök egyenlege és mozgása, forint és deviza, kerekítéssel.',
+    f:['Pénztár (381, 3811) és bank (384)','Deviza átlagárfolyamon, realizált árfolyam-különbözet','5 Ft-os kerekítés 979 / 879','Egyenleg-görbék hover-adatokkal'], to:['journal'] },
+  { id:'loans', n:'Tagi kölcsön', s:'szerződések', l:['blue'], x:450,y:630, lx:0,ly:42,a:'middle', p:'member-loans', v:'2.2',
+    d:'Tagi kölcsönök szerződésszámmal, lejárattal, visszafizetéssel.',
+    f:['TK-ÉÉÉÉ-NNN szerződésszámok','Lejárati ütemezés, hosszabbítás','Egyenleg- és lejárati diagram','Export dokumentumokhoz'], to:['journal'] },
+  { id:'statements', n:'Kimutatások', s:'P&L, cash-flow, mérleg', l:['blue'], x:815,y:285, lx:18,ly:7,a:'start', p:'reports/statements', v:'1.0',
+    d:'Eredménykimutatás, cash-flow és mérleg napi-éves bontásban, Sankey-ábrával.',
+    f:['Összköltség eljárás, Szt. szerkezet','Napi / heti / havi / negyedéves / éves','Interaktív Sankey (kibontható)','Főkönyvi egyezőség-ellenőrzés'], to:['kpi','closing','summary'] },
+  { id:'kpi', n:'KPI-Dashboard', s:'mutatók', l:['blue'], x:960,y:170, lx:0,ly:-26,a:'middle', p:'reports/kpi', v:'2.2',
+    d:'A cég fő mutatói egy képernyőn.',
+    f:['Lekötött pénz költsége','Forgási idő, fedezet','Készlet értéke','Eladás-számláló'], to:['summary'] },
+  { id:'forecast', n:'Forecast', s:'3 forgatókönyv', l:['blue'], x:1080,y:170, lx:0,ly:42,a:'middle', p:'forecast', v:'2.0',
+    d:'Pénzügyi terv alap, pesszimista és optimista forgatókönyvvel.',
+    f:['Készlet- és eladási terv','Költségek, bérfizetési nap','Tény + terv nézet','Pénzeszköz-görbe forgatókönyvenként'], to:['taxes'] },
+  { id:'summary', n:'Napi e-mail', s:'6:59', l:['blue'], x:1170,y:170, lx:0,ly:-26,a:'end', p:'summary', v:'3.9',
+    d:'Reggeli napilap stílusú összefoglaló: számok, teendők, tegnapi események.',
+    f:['Ügyvezetői / pénzügyes / teljes változat','Gmail-továbbító HTTPS-en','Egyezőségi hibák a teendők között','Be- / kikapcsolható cégenként'], to:[] },
+
+  { id:'arsugo', n:'ÁrSugó', s:'árajánló', l:['amber'], x:90,y:404, lx:0,ly:42,a:'middle', p:'arsugo', v:'3.2',
+    d:'Beszerzési ár és tervezett költségek alapján javasolt eladási ár.',
+    f:['Színes csúszka a fedezethez','Hajtás szerinti beállítás','Tartási költség a könyvelésből','Gomb a készletből'], to:['vehicles'] },
+  { id:'vehicles', n:'Gépkocsi készlet', s:'egyedi nyilvántartás', l:['amber'], x:250,y:404, lx:0,ly:-26,a:'middle', p:'vehicles', v:'1.0',
+    d:'Minden autó külön kartonon a beszerzéstől az eladásig.',
+    f:['Beszerzés + felújítás a 261-re','Eladáskor automatikus ELÁBÉ (T 814 / K 261)','Fedezet autónként','Alvázszám, rendszám, hajtás'], to:['automerleg','margin','epr'] },
+  { id:'automerleg', n:'AutóMérleg', s:'és KészletMérleg', l:['amber'], x:410,y:404, lx:0,ly:42,a:'middle', p:'vehicles/merleg', v:'3.4–3.5',
+    d:'Egy autó, illetve a teljes készlet mérlege: minden költség, tartás, árrés.',
+    f:['Bruttó és nettó fedezet','Tartási költség javaslat (12 hónap)','Összes autó egy táblában','Ugyanaz a számoló mindenhol'], to:['arsugo'] },
+  { id:'epr', n:'EPR', s:'gyártói felelősség', l:['amber'], x:560,y:404, lx:0,ly:-26,a:'middle', p:'vehicles/epr', v:'2.1',
+    d:'EPR-karton autónként és negyedéves összesítő az OKIR-hez.',
+    f:['Csak külföldről behozott, belföldön eladott autó','Tételes 36 Ft/kg vagy átalány','Tömeg, kategória, hajtás','Határidő: negyedévet követő hó 20.'], to:[] },
+  { id:'margin', n:'Különbözeti karton', s:'árrés × 27/127', l:['amber'], x:850,y:404, lx:0,ly:-26,a:'middle', p:'vehicles/kartonok', v:'1.0',
+    d:'Autónkénti különbözeti ÁFA-számítás.',
+    f:['Bruttó eladási ár − beszerzési ár','Negatív árrésnél 0','Helyesbítő számlák kezelése','ÁFA-analitikába összesít'], to:['vat'] },
+
+  { id:'payroll', n:'Bérszámfejtés', s:'jelenléti naptár', l:['green'], x:700,y:690, lx:18,ly:7,a:'start', p:'payroll', v:'2.2–3.0',
+    d:'Havi bértábla jelenléti naptárral, járulékokkal, könyveléssel.',
+    f:['Szabadság, betegszabadság 70%, táppénz','Pótlékok, távollét-levonás','Járulékok, könyvelés a 54–56-ra','2608 bevallás export'], to:['journal','anyk'] },
+  { id:'assets', n:'Tárgyi eszközök', s:'értékcsökkenés', l:['green'], x:700,y:560, lx:18,ly:7,a:'start', p:'assets', v:'2.0',
+    d:'Eszköznyilvántartás és értékcsökkenési terv.',
+    f:['Aktiválás, értékcsökkenés','Kivezetés, eladás','Terv évekre bontva'], to:['journal'] },
+  { id:'consistency', n:'Egyezőség', s:'10 ellenőrzés', l:['green'], x:700,y:230, lx:-18,ly:7,a:'end', p:'reports/consistency', v:'3.9.6',
+    d:'Automatikus ellenőrzések a teljes könyvelésen, javító gombokkal.',
+    f:['Tételek egyensúlya, számla ↔ főkönyv','Nyitott tételek ↔ 31x / 45x','Pénztár: fillér, negatív egyenleg','Partner-összevonás, ÁFA-zárás újraszámolása'], to:['summary'] },
+  { id:'closing', n:'Évzárás', s:'zárás, beszámoló', l:['green'], x:700,y:140, lx:-18,ly:7,a:'end', p:'closing', v:'2.2',
+    d:'Év végi zárás lépésről lépésre, éves beszámolóval.',
+    f:['Zárótételek, eredmény átvezetése','Éves beszámoló (mérleg, EK, szöveg)','Időszakok lezárása'], to:['taxes','valuation'] },
+  { id:'taxes', n:'TAO és HIPA', s:'települési szabályok', l:['green'], x:880,y:60, lx:0,ly:42,a:'middle', p:'closing/taxes', v:'3.3.3',
+    d:'Társasági adó és helyi iparűzési adó tény vagy tény + terv alapon.',
+    f:['HIPA-alap: árbevétel − ELÁBÉ − közv. szolg. − anyag','Települési szabályok a Kincstártól','Székhely, telephelyek megosztása','Tény + Forecast nézet'], to:[] },
+  { id:'valuation', n:'Cégérték', s:'és beszámoló', l:['green'], x:1060,y:60, lx:0,ly:42,a:'middle', p:'value', v:'2.2',
+    d:'A cég becsült értéke és az éves beszámoló adatai.',
+    f:['Saját tőke, készlet piaci értéken','Hozam alapú becslés','Éves összevetés'], to:[] },
+];
+const DEPOT = [
+  { id:'fx', n:'MNB árfolyamok', s:'automatikus', p:'fx', v:'1.0', d:'Hivatalos MNB-árfolyam letöltése, árfolyam-nap a jogszabály szerint.', f:['Napi letöltés','Áfa tv. 80. § / 63. § szerinti nap','Kézi árfolyam is'], to:['invoices','money'] },
+  { id:'master', n:'Törzsadatok', s:'partnerek, számlatükör', p:'partners', v:'1.0', d:'Partnerek, számlatükör, ÁFA-kódok.', f:['Partner-összevonás duplikátumoknál','Magyar alap számlatükör, bővíthető','Mérleg / EK sor-hozzárendelés'], to:['invoices'] },
+  { id:'system', n:'Rendszer', s:'cégek, jogok, 2FA', p:'settings', v:'2.2', d:'Több cég egy appban, szerepkörök, kétlépcsős azonosítás, megjelenés, import / export.', f:['Tulajdonos / könyvelő / CEO szerepkör','Kötelező 2FA tartalékkódokkal','12 téma, céglogó','Adatimport egy tranzakcióban'], to:[] },
+  { id:'gh', n:'Vendégház', s:'magánszemély', p:'gh/pnl', v:'2.0', d:'Külön üzemmód adószámos magánszemélynek: szálláshely-kiadás.', f:['P&L, cash flow, megtérülés','Foglalások, értékelések','IFA, tételes adó, alanyi mentesség','Bevételi-kiadási nyilvántartás'], to:[] },
+];
+const ALL = [...M, ...DEPOT];
+const byId = Object.fromEntries(ALL.map(m => [m.id, m]));
+ALL.forEach(m => m.from = ALL.filter(o => (o.to || []).includes(m.id)).map(o => o.id));
+const STEPS = [
+  { t:'Árazás', d:'Az ÁrSugó a beszerzési árból és a tervezett költségekből javasolt eladási árat ad.', m:['arsugo','vehicles','automerleg'] },
+  { t:'Beszerzés', d:'Adásvételi szerződés, kifizetés az EUR-pénztárból, az autó felkerül a készletre.', m:['invoices','money','fx','vehicles'] },
+  { t:'Felújítás', d:'A fényezés, alkatrész és szállítás számlái a Beérkező bizonylatokon át érkeznek.', m:['gmail','inbox','invoices','automerleg'] },
+  { t:'Eladás', d:'Vevőszámla, különbözeti ÁFA az árrésből, automatikus ELÁBÉ, EPR-díj, ha import.', m:['invoices','margin','money','epr','vehicles'] },
+  { t:'Havi ÁFA', d:'Az árrés ÁFÁ-ja bekerül az analitikába, majd a 2665-ös bevallásba.', m:['vat','anyk','consistency','journal'] },
+  { t:'Év vége', d:'Kimutatások, TAO és HIPA, évzárás és beszámoló.', m:['statements','closing','taxes','valuation'] },
+];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const map = document.getElementById('map'), panel = document.getElementById('panel');
+let lineOn = null, sel = 'journal', stepOn = null;
+
+function drawMap() {
+  const tr = Object.entries(LINES).map(([k, L]) => `<path class="trk" data-l="${k}" d="${L.d}" stroke="${L.color}"/>`).join('');
+  const st = M.map(m => {
+    const c = LINES[m.l[0]].color;
+    const mark = m.hub
+      ? `<rect x="${m.x - 17}" y="${m.y - 17}" width="34" height="34" rx="11" stroke="var(--ink)"/>`
+      : `<circle cx="${m.x}" cy="${m.y}" r="10" stroke="${c}"/>`;
+    const tx = m.x + m.lx, ty = m.y + m.ly;
+    return `<g class="stn" data-id="${m.id}" tabindex="0" role="button" aria-label="${esc(m.n)}">${mark}<text x="${tx}" y="${ty}" text-anchor="${m.a}">${esc(m.n)}</text><title>${esc(m.n + ' – ' + m.s)}</title></g>`;
+  }).join('');
+  map.innerHTML = tr + st;
+}
+function legend() {
+  document.getElementById('legend').innerHTML = Object.entries(LINES).map(([k, L]) =>
+    `<button class="chip" type="button" data-l="${k}" aria-pressed="false"><i style="background:${L.color}"></i>${esc(L.name)}</button>`).join('');
+}
+function applyDim() {
+  const ids = stepOn !== null ? new Set(STEPS[stepOn].m) : lineOn ? new Set(M.filter(m => m.l.includes(lineOn)).map(m => m.id)) : null;
+  map.classList.toggle('dim', !!ids);
+  map.querySelectorAll('.stn').forEach(g => {
+    g.classList.toggle('off', !!ids && !ids.has(g.dataset.id));
+    g.classList.toggle('on', g.dataset.id === sel);
+  });
+  map.querySelectorAll('.trk').forEach(p => p.classList.toggle('off', !!ids && (lineOn ? p.dataset.l !== lineOn : true)));
+  document.querySelectorAll('.chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.l === lineOn)));
+  document.querySelectorAll('.step').forEach((b, i) => b.setAttribute('aria-pressed', String(i === stepOn)));
+}
+function show(id) {
+  const m = byId[id]; if (!m) return;
+  sel = id;
+  const pills = (m.l || []).map(k => `<span class="pill ${k === 'amber' ? 'amber' : ''}" style="background:${LINES[k].color}">${esc(LINES[k].name)}</span>`).join('') || '<span class="pill" style="background:var(--gray)">háttér</span>';
+  const rel = (lab, arr) => arr.length ? `<div class="rel">${lab}: ${arr.map(r => `<button type="button" data-go="${r}">${esc(byId[r].n)}</button>`).join(', ')}</div>` : '';
+  panel.innerHTML = `<div class="pills">${pills}</div><h2>${esc(m.n)}</h2><p style="margin:0">${esc(m.d)}</p>
+    <ul>${m.f.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    ${rel('Ide érkezik', m.from)}${rel('Innen megy tovább', m.to || [])}
+    <div class="meta" style="margin-top:12px">Bevezetve: v${esc(m.v)}</div>
+    ${open(m)}`;
+  applyDim();
+}
+function open(m) {
+  if (!m.p) return '';
+  const kind = m.id === 'gh' ? 'private_taxpayer' : 'company';
+  const cs = COMPANIES.filter(c => c.entityType === kind);
+  if (!cs.length) return `<div class="meta" style="margin-top:12px">${kind === 'company' ? 'Nincs még céged, ahol ez megnyitható.' : 'Nincs adószámos magánszemély egységed.'}</div>`;
+  return `<div class="opens">${cs.map(c => `<a class="go" href="/c/${encodeURIComponent(c.id)}/${m.p}">${cs.length > 1 ? 'Megnyitás: ' + esc(c.name) : 'Megnyitás az ERP-ben'}</a>`).join('')}</div>`;
+}
+function journey() {
+  document.getElementById('journey').innerHTML = STEPS.map((s, i) => `<button class="step" type="button" data-s="${i}" aria-pressed="false"><b>${i + 1}. lépés</b>${esc(s.t)}</button>`).join('');
+}
+function setStep(i) {
+  stepOn = i; lineOn = null;
+  document.getElementById('jtext').textContent = i === null ? 'Válassz egy lépést: a térképen kiemelődnek az érintett modulok.' : STEPS[i].d;
+  if (i !== null) show(STEPS[i].m[0]); else applyDim();
+}
+function groups() {
+  const G = [...Object.entries(LINES).map(([k, L]) => ({ k, name: L.name, color: L.color, items: M.filter(m => m.l[0] === k || (m.hub && k === 'red')) })),
+    { k: 'depot', name: 'Háttér', color: 'var(--gray)', items: DEPOT }];
+  document.getElementById('groups').innerHTML = G.map(g => `<div class="grp" style="border-color:${g.color}"><h4>${esc(g.name)}</h4>${g.items.map(m =>
+    `<button class="mod" type="button" data-go="${m.id}" data-q="${esc((m.n + ' ' + m.s + ' ' + m.d + ' ' + m.f.join(' ')).toLowerCase())}">${esc(m.n)}<span>${esc(m.s)}</span></button>`).join('')}</div>`).join('');
+}
+
+drawMap(); legend(); journey(); groups(); show('journal');
+const mb = document.getElementById('mapbox');
+if (mb.scrollWidth > mb.clientWidth) mb.scrollLeft = (mb.scrollWidth - mb.clientWidth) * 0.55;
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-go],.stn,.chip,.step');
+  if (!t) return;
+  if (t.dataset.go) { show(t.dataset.go); if (!t.closest('.panel')) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  else if (t.classList.contains('stn')) show(t.dataset.id);
+  else if (t.classList.contains('chip')) { stepOn = null; lineOn = lineOn === t.dataset.l ? null : t.dataset.l; document.getElementById('jtext').textContent = 'Válassz egy lépést: a térképen kiemelődnek az érintett modulok.'; applyDim(); }
+  else if (t.classList.contains('step')) { const i = +t.dataset.s; setStep(stepOn === i ? null : i); }
+});
+map.addEventListener('keydown', e => { const g = e.target.closest('.stn'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); show(g.dataset.id); } });
+let timer = null;
+document.getElementById('play').addEventListener('click', e => {
+  if (timer) { clearInterval(timer); timer = null; e.target.textContent = 'Lejátszás'; return; }
+  let i = 0; setStep(0); e.target.textContent = 'Megállítás';
+  timer = setInterval(() => { i++; if (i >= STEPS.length) { clearInterval(timer); timer = null; e.target.textContent = 'Lejátszás'; return; } setStep(i); }, 2600);
+});
+document.getElementById('q').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('.mod').forEach(b => b.classList.toggle('hide', !!q && !b.dataset.q.includes(q)));
+});
+}
+</script>
+</body>
+</html>

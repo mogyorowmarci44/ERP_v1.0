@@ -39,6 +39,13 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.1.0 – ERP-térkép a cégválasztó oldalon
+
+- Új oldal: **/terkep**, a Cégeim oldal fejlécéből („ERP-térkép”), még cég vagy egység kiválasztása előtt. Az ERP 28 modulja metrótérképként: négy vonal (Bizonylat, Pénz, Készlet, Zárás és bér), a Napló a fő átszállóhely.
+- Állomásra kattintva: leírás, funkciók, honnan kap adatot és hová adja tovább (kattintható), melyik verzióban jött, és „Megnyitás” gomb a felhasználó saját cégeihez (a vendégház modul az adószámos magánszemély egységekhez).
+- Vonal kiemelése, „Egy használt autó útja” hatlépéses léptető lejátszással, kereshető modullista; mobilon oldalra húzható térkép.
+- Bejelentkezéshez kötött; a sablon: `src/app/terkep/terkep.html` (önálló HTML, a cégek listája szerveroldalon kerül bele).
+
 ## v4.0.0 – Diagramok: adatok kiírása bárhol a diagram fölött
 
 - Minden idősoros diagramon (Tervezés forgatókönyv-görbe, Pénz és bank egyenleg-görbék, tagi kölcsön egyenleg és lejárati ütemezés, vendégház vonaldiagramok) közös hover-réteg (`ChartHover`): a diagram **bármely pontja fölött** a legközelebbi időpontra ugrik – szaggatott függőleges vonal, kiemelt pontok (oszlopdiagramnál / lépcsős vonalnál a teljes sáv), és egy kártya az adott időpont összes értékével (forgatókönyvenként a hónap legalacsonyabb egyenlegével, tagi kölcsönnél az előző állapothoz képesti változással).
