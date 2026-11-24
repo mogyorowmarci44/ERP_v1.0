@@ -3,8 +3,9 @@
  * Interaktív eredmény-Sankey. Alapból a tömör nézet látszik; egy kibontható csomópontra kattintva megjelennek
  * a részletei (főkönyvi számla / gépkocsi / partner), dupla kattintással visszazárul.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { fmtHuf } from "@/lib/money";
+import { ChartTip, type HoverRow } from "./ChartHover";
 import type { Node, Role, SankeyModel } from "./Sankey";
 
 const NODE_W = 14;
@@ -21,6 +22,22 @@ function layout(cols: number) {
 export function SankeyChart({ model, title }: { model: SankeyModel; title: string }) {
   const { revenue, result } = model;
   const [open, setOpen] = useState<Set<string>>(new Set());
+  // v4.0.0 – azonnali tooltip (a böngésző késleltetett súgója helyett), egérrel és érintéssel is
+  const wrap = useRef<HTMLDivElement>(null);
+  const [tip, setTip] = useState<{ x: number; y: number; w: number; title: string; rows: HoverRow[] } | null>(null);
+  const showTip = (e: RPointerEvent, title: string, rows: HoverRow[]) => {
+    const el = wrap.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setTip({ x: e.clientX - r.left + el.scrollLeft, y: e.clientY - r.top, w: el.scrollLeft * 2 + el.clientWidth, title, rows });
+  };
+  const hideTip = (e: RPointerEvent) => { if (e.pointerType === "mouse") setTip(null); };
+  useEffect(() => {
+    if (!tip) return;
+    const off = (e: PointerEvent) => { if (wrap.current && !(e.target instanceof Element && e.target.closest(".sk-link, .sk-click, .sk-node"))) setTip(null); };
+    document.addEventListener("pointerdown", off);
+    return () => document.removeEventListener("pointerdown", off);
+  }, [tip]);
   const hasChildren = useMemo(() => new Set(model.nodes.filter((n) => n.parent).map((n) => n.parent!)), [model]);
 
   // Látható csomópontok: alapnézet + azok a részletek, amelyeknek minden őse ki van nyitva
@@ -96,9 +113,14 @@ export function SankeyChart({ model, title }: { model: SankeyModel; title: strin
     const xm = (x0 + x1) / 2;
     const d = `M${x0},${y0} C${xm},${y0} ${xm},${y1} ${x1},${y1} L${x1},${y1 + h} C${xm},${y1 + h} ${xm},${y0 + h} ${x0},${y0 + h} Z`;
     return (
-      <path key={i} d={d} className="sk-link" fill={color[l.role]}>
-        <title>{`${byId.get(l.from)!.label} → ${byId.get(l.to)!.label}: ${fmtHuf(l.value)} Ft${revenue > 0 ? ` (${ratio(l.value)})` : ""}`}</title>
-      </path>
+      <path
+        key={i} d={d} className="sk-link" fill={color[l.role]}
+        onPointerMove={(e) => showTip(e, `${byId.get(l.from)!.label} → ${byId.get(l.to)!.label}`, [
+          { label: "Összeg", value: `${fmtHuf(l.value)} Ft`, color: color[l.role] },
+          ...(revenue > 0 ? [{ label: "Az árbevételből", value: share(l.value), tone: "muted" as const }] : []),
+        ])}
+        onPointerLeave={hideTip}
+      />
     );
   });
 
@@ -110,7 +132,7 @@ export function SankeyChart({ model, title }: { model: SankeyModel; title: strin
           {result < 0 ? "Veszteség" : "Adózott eredmény"}: {fmtHuf(result)} Ft{revenue > 0 ? ` (${ratio(result)})` : ""}
         </span>
       </figcaption>
-      <div style={{ overflowX: W > 1120 ? "auto" : undefined }}>
+      <div ref={wrap} className="sk-wrap" style={{ overflowX: W > 1120 ? "auto" : undefined }}>
       {/* széles (sokszintű) nézetben nem zsugorodik: vízszintesen görgethető, a betűméret marad */}
       <svg viewBox={`0 -8 ${W} ${H + 16}`} role="img" aria-label={`${title}: bevételek és ráfordítások megoszlása`} style={W > 1120 ? { width: W, height: "auto", maxWidth: "none" } : { width: "100%", height: "auto" }}>
         {paths}
@@ -129,10 +151,14 @@ export function SankeyChart({ model, title }: { model: SankeyModel; title: strin
               className={can || n.parent ? "sk-click" : undefined}
               onClick={() => expand(n)}
               onDoubleClick={() => collapse(n)}
+              onPointerMove={(e) => showTip(e, n.label, [
+                { label: "Összeg", value: `${fmtHuf(n.value)} Ft`, color: color[n.role] },
+                ...(revenue > 0 ? [{ label: "Az árbevételből", value: share(n.value), tone: "muted" as const }] : []),
+                ...(can ? [{ label: isOpen ? "Dupla kattintás: visszazárás" : "Kattintás: kibontás", value: "", tone: "muted" as const }] : []),
+              ])}
+              onPointerLeave={hideTip}
             >
-              <rect x={g.x} y={g.y} width={NODE_W} height={g.h} rx={3} fill={color[n.role]} className="sk-node">
-                <title>{`${n.label}: ${fmtHuf(n.value)} Ft${revenue > 0 ? ` (${ratio(n.value)})` : ""}${can ? (isOpen ? " – dupla kattintás: visszazárás" : " – kattintás: kibontás") : ""}`}</title>
-              </rect>
+              <rect x={g.x} y={g.y} width={NODE_W} height={g.h} rx={3} fill={color[n.role]} className="sk-node" />
               <text x={tx} y={ty - 2} textAnchor={left ? "end" : "start"} className="sk-label">
                 {can && <tspan className="sk-toggle">{isOpen ? "▾ " : "▸ "}</tspan>}
                 {label}
@@ -144,6 +170,7 @@ export function SankeyChart({ model, title }: { model: SankeyModel; title: strin
           );
         })}
       </svg>
+      {tip ? <ChartTip title={tip.title} rows={tip.rows} style={{ left: tip.x > tip.w / 2 ? tip.x - 14 : tip.x + 14, top: tip.y + 12, transform: tip.x > tip.w / 2 ? "translateX(-100%)" : undefined }} /> : null}
       </div>
       <p className="muted no-print" style={{ margin: "4px 0 0", fontSize: 12.5 }}>
         A ▸ jelű csomópontra kattintva kibontod (főkönyvi számla → szállító → számla; ELÁBÉ: autó → szállító → számla), dupla kattintással visszazárod.

@@ -2,6 +2,7 @@
 import { fmtShort, niceTicks } from "./Forecast";
 import { fmtHuf } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
+import { ChartHover } from "./ChartHover";
 
 const HU_MONTH = ["jan.", "febr.", "márc.", "ápr.", "máj.", "jún.", "júl.", "aug.", "szept.", "okt.", "nov.", "dec."];
 const t = (d: string) => Date.parse(d + "T00:00:00Z");
@@ -30,6 +31,20 @@ export function LoanBalanceChart({ points, until }: { points: Array<{ date: stri
   return (
     <figure className="sc-chart">
       <figcaption className="muted">Tagok felé fennálló tartozás alakulása (Ft)</figcaption>
+      <ChartHover width={W} height={H} top={T} bottom={B} crosshair={false} label="Tagi kölcsön egyenleg időben" cols={points.map((p, i) => {
+        const x1 = x(p.date), x2 = i + 1 < points.length ? x(points[i + 1].date) : W - R;
+        const delta = i ? p.value - points[i - 1].value : 0;
+        return {
+          x: x1,
+          band: { x0: x1, x1: Math.max(x1 + 2, x2) },
+          title: i + 1 < points.length ? `${fmtDate(p.date)} – ${fmtDate(points[i + 1].date)}` : `${fmtDate(p.date)} óta`,
+          rows: [
+            { label: "Tartozás a tagok felé", value: `${fmtHuf(p.value)} Ft` },
+            ...(i ? [{ label: delta >= 0 ? "Új kölcsön" : "Visszafizetés", value: `${delta >= 0 ? "+" : "−"}${fmtHuf(Math.abs(delta))} Ft`, tone: delta >= 0 ? ("muted" as const) : ("pos" as const) }] : []),
+          ],
+          marks: [{ y: y(p.value) }],
+        };
+      })}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Tagi kölcsön egyenleg időben" style={{ width: "100%", height: "auto", display: "block" }}>
         {ticks.map((v) => (
           <g key={v}>
@@ -41,17 +56,10 @@ export function LoanBalanceChart({ points, until }: { points: Array<{ date: stri
           <text key={m} x={x(m)} y={H - 8} textAnchor="middle" className="ml-axis">{m.slice(5, 7) === "01" ? m.slice(0, 4) : HU_MONTH[Number(m.slice(5, 7)) - 1]}</text>
         ))}
         <path d={d} className="ml-line" />
-        {points.map((p, i) => {
-          const x1 = x(p.date), x2 = i + 1 < points.length ? x(points[i + 1].date) : W - R;
-          return (
-            <g key={p.date}>
-              <rect x={x1} y={T} width={Math.max(2, x2 - x1)} height={H - T - B} className="ml-hit"><title>{`${fmtDate(p.date)}: ${fmtHuf(p.value)} Ft`}</title></rect>
-              <circle cx={x1} cy={y(p.value)} r={3} className="ml-dot" pointerEvents="none" />
-            </g>
-          );
-        })}
+        {points.map((p) => <circle key={p.date} cx={x(p.date)} cy={y(p.value)} r={3} className="ml-dot" />)}
         <text x={W - R + 6} y={y(last.value) + 4} className="ml-last">{fmtShort(last.value)}</text>
       </svg>
+      </ChartHover>
     </figure>
   );
 }
@@ -67,6 +75,15 @@ export function MaturityChart({ ladder }: { ladder: Array<{ month: string; amoun
   return (
     <figure className="sc-chart">
       <figcaption className="muted">Nyitott kölcsönök a lejárat hónapja szerint (Ft)</figcaption>
+      <ChartHover width={W} height={H} top={T} bottom={B} crosshair={false} label="Lejárati ütemezés" cols={ladder.map((l, i) => {
+        const cx = L + slot * i + slot / 2;
+        return {
+          x: cx,
+          band: { x0: L + slot * i, x1: L + slot * (i + 1) },
+          title: l.month === "lejárt" ? "Lejárt, még nem rendezett" : `Lejár: ${label(l.month)}`,
+          rows: [{ label: "Nyitott kölcsön", value: `${fmtHuf(l.amount)} Ft`, tone: l.month === "lejárt" ? ("neg" as const) : undefined }],
+        };
+      })}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Lejárati ütemezés" style={{ width: "100%", height: "auto", display: "block" }}>
         <line x1={L} x2={W - R} y1={y(0)} y2={y(0)} className="sc-grid" />
         {ladder.map((l, i) => {
@@ -74,13 +91,14 @@ export function MaturityChart({ ladder }: { ladder: Array<{ month: string; amoun
           const over = l.month === "lejárt";
           return (
             <g key={l.month}>
-              <path d={`M${cx - bw / 2},${y(0)} V${y(l.amount) + 4} q0,-4 4,-4 H${cx + bw / 2 - 4} q4,0 4,4 V${y(0)} Z`} className={over ? "lc-bar over" : "lc-bar"}><title>{`${label(l.month)}: ${fmtHuf(l.amount)} Ft`}</title></path>
+              <path d={`M${cx - bw / 2},${y(0)} V${y(l.amount) + 4} q0,-4 4,-4 H${cx + bw / 2 - 4} q4,0 4,4 V${y(0)} Z`} className={over ? "lc-bar over" : "lc-bar"} />
               <text x={cx} y={y(l.amount) - 5} textAnchor="middle" className="ml-axis lc-val">{fmtShort(l.amount)}</text>
               <text x={cx} y={H - 9} textAnchor="middle" className={over ? "ml-axis lc-over" : "ml-axis"}>{over ? "⚠ lejárt" : label(l.month)}</text>
             </g>
           );
         })}
       </svg>
+      </ChartHover>
     </figure>
   );
 }

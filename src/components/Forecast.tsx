@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { fmtHuf, fmtNum } from "@/lib/money";
 import { SCENARIO_LABEL, SCENARIOS, type Scenario } from "@/lib/forecast";
+import { ChartHover } from "./ChartHover";
 
 const TABS = [
   ["", "Kimutatás"],
@@ -46,7 +47,6 @@ export function ScenarioChart({ series, caption = "Pénztár + bank időszak vé
   const x = (i: number) => L + (n === 1 ? (W - L - R) / 2 : (i * (W - L - R)) / (n - 1));
   const y = (v: number) => T + ((max - v) * (H - T - B)) / (max - min);
   const ticks = niceTicks(min, max, 4);
-  const step = (W - L - R) / Math.max(1, n - 1);
   const labelEvery = Math.ceil(n / 8);
   // közvetlen címkék ütközés nélkül
   const ends = series.map((s) => ({ sc: s.scenario, v: s.points[n - 1].value, yy: y(s.points[n - 1].value) })).sort((a, b) => a.yy - b.yy);
@@ -57,6 +57,15 @@ export function ScenarioChart({ series, caption = "Pénztár + bank időszak vé
       <div className="sc-legend">
         {series.map((s) => <span key={s.scenario} className={`sc-${s.scenario}`}><span className="sc-dot" aria-hidden />{SCENARIO_LABEL[s.scenario]}</span>)}
       </div>
+      <ChartHover width={W} height={H} top={T} bottom={B} label="Pénzeszközök egyenlege forgatókönyvenként" cols={series[0].points.map((p, i) => ({
+        x: x(i),
+        title: `${p.label}${splitIndex !== undefined && splitIndex > 0 ? (i < splitIndex ? " · tény" : " · terv") : ""}`,
+        rows: series.flatMap((s) => [
+          { label: SCENARIO_LABEL[s.scenario], value: `${fmtHuf(s.points[i].value)} Ft`, color: `var(--sc-${s.scenario})`, tone: s.points[i].value < 0 ? ("neg" as const) : undefined },
+          ...(s.points[i].min < s.points[i].value ? [{ label: "legalacsonyabb a hónapban", value: `${fmtHuf(s.points[i].min)} Ft`, sub: true, tone: s.points[i].min < 0 ? ("neg" as const) : ("muted" as const) }] : []),
+        ]),
+        marks: series.map((s) => ({ y: y(s.points[i].value), color: `var(--sc-${s.scenario})`, neg: s.points[i].value < 0 })),
+      }))}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Pénzeszközök egyenlege forgatókönyvenként" style={{ width: "100%", height: "auto", display: "block" }}>
         {ticks.map((t) => (
           <g key={t}>
@@ -76,19 +85,12 @@ export function ScenarioChart({ series, caption = "Pénztár + bank időszak vé
           <path key={s.scenario} className={`sc-line sc-${s.scenario}${highlight && highlight !== s.scenario ? " dim" : ""}`} d={s.points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ")} />
         ))}
         {series.map((s) => s.points.map((p, i) => p.min < 0 && <circle key={`${s.scenario}${i}`} cx={x(i)} cy={y(p.value)} r={4} className="ml-neg" />))}
-        {series[0].points.map((p, i) => (
-          <g key={i} className="sc-hover">
-            <line x1={x(i)} x2={x(i)} y1={T} y2={H - B} className="sc-cross" />
-            <rect x={x(i) - step / 2} y={T} width={Math.max(step, 8)} height={H - T - B} className="ml-hit">
-              <title>{`${p.label}\n${series.map((s) => `${SCENARIO_LABEL[s.scenario]}: ${fmtHuf(s.points[i].value)} Ft (legalacsonyabb ${fmtHuf(s.points[i].min)})`).join("\n")}`}</title>
-            </rect>
-            {i % labelEvery === 0 && <text x={x(i)} y={H - 7} textAnchor="middle" className="ml-axis">{p.label}</text>}
-          </g>
-        ))}
+        {series[0].points.map((p, i) => i % labelEvery === 0 && <text key={i} x={x(i)} y={H - 7} textAnchor="middle" className="ml-axis">{p.label}</text>)}
         {ends.map((e) => (
           <text key={e.sc} x={W - R + 8} y={e.yy + 4} className="sc-end">{SCENARIO_LABEL[e.sc]} {fmtShort(e.v)}</text>
         ))}
       </svg>
+      </ChartHover>
     </figure>
   );
 }
