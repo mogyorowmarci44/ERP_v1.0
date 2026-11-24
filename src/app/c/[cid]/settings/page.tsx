@@ -7,6 +7,9 @@ import { ENTITY_LABEL, isPrivate } from "@/lib/entity";
 import { addMemberAction } from "@/app/auth-actions";
 import { Flash } from "@/components/Flash";
 import { today } from "@/lib/dates";
+import { CompanyMembers } from "@/components/CompanyMembers";
+import { listMembers } from "@/lib/company-members";
+import { sql } from "drizzle-orm";
 
 export default async function SettingsPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
@@ -19,6 +22,11 @@ export default async function SettingsPage({ params, searchParams }: { params: P
     .from(schema.memberships)
     .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
     .where(eq(schema.memberships.companyId, cid));
+  // v4.5.0 – Tagok és tisztségviselők (cégeknél)
+  const people = priv ? [] : await listMembers(cid);
+  const loanPartners = priv ? [] : ((await db.execute(sql`select distinct p.id, p.name from partners p
+    where p.company_id = ${cid} and (p.id in (select l.partner_id from journal_lines l join accounts a on a.id = l.account_id where l.company_id = ${cid} and a.code like '479%')
+      or p.id in (select partner_id from company_members where company_id = ${cid} and partner_id is not null)) order by p.name`)) as unknown as Array<{ id: number; name: string }>);
   return (
     <>
       <h1>Beállítások</h1>
@@ -39,7 +47,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
         {!priv && <label>Üzleti év kezdő hónapja<input name="fiscalYearStartMonth" type="number" min={1} max={12} defaultValue={company.fiscalYearStartMonth} /></label>}
         {!priv && (
           <>
-            <label>Képviselő (szerződésekhez)<input name="representative" defaultValue={company.settings.representative ?? ""} placeholder="pl. Gálos Kristóf" /></label>
+            <label title="Ha a Tagok és tisztségviselők között van ügyvezető, az okiratokon ő szerepel.">Képviselő (szerződésekhez)<input name="representative" defaultValue={company.settings.representative ?? ""} placeholder="pl. Gálos Kristóf" /></label>
             <label>Beosztás<input name="representativeTitle" defaultValue={company.settings.representativeTitle ?? "ügyvezető"} /></label>
             <label>Szerződéskötés helye<input name="signPlace" defaultValue={company.settings.signPlace ?? ""} placeholder="pl. Mór" /></label>
             <label className="row" title="80/2023. Korm. r. 20. § (3a) – a választás egész naptári évre szól; tartalmazza az alkatrészek és a csomagolás díját is.">
@@ -66,6 +74,8 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           </form>
         </>
       )}
+
+      {!priv && <CompanyMembers cid={cid} list={people} selected={sp.member ?? null} partners={loanPartners} canWrite={role !== "viewer"} />}
 
       <h2>Időszak zárás</h2>
       <p className="muted">Lezárt hónapba (pl. beadott ÁFA bevallás után) nem lehet könyvelni. Visszanyitni csak tulajdonos tud.</p>

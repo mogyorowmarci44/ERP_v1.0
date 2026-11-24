@@ -39,6 +39,14 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.5.0 – Tagok és tisztségviselők
+
+- Beállítások › **Tagok és tisztségviselők**: táblázat (név, jogviszony, tulajdonrész, kitöltöttség) és oldalpanel három szakasszal – jogviszony (tag / ügyvezető, tulajdonrész, törzsbetét, kezdete–vége, képviselet), személyes adatok (születési hely és idő, anyja neve, lakcím, adóazonosító jel), kapcsolatok (tagi kölcsön partner). A tulajdonrészek összege legfeljebb 100%.
+- A tagi kölcsön okiratok (szerződés, módosítás, visszafizetés, egyenlegközlő) innen töltődnek ki; a tag az összekötött partner, különben név szerint kerül elő – így az is működik, ha az ügyvezető maga ad tagi kölcsönt (tagként és ügyvezetőként is ő ír alá).
+- Aláírósor: bal oldalon „<név>, tag”, jobb oldalon „<ügyvezető neve>, <Cég> Kft. ügyvezető”.
+- Hosszabbítás: a módosítás kelte alapból a jelenlegi lejárat napja.
+- Új tábla: `company_members` (migráció: `0029_v4_5_company_members.sql`).
+
 ## v4.4.0 – Tagi kölcsön: hány napja járt le
 
 - A „Jelenlegi lejárat” alatt jelvény: „lejárt · N napja” – 1–30 nap sárga, 31–180 nap halványpiros, 180 nap felett telt piros; 30 napon belül lejárónál szürke „N nap múlva jár le”.

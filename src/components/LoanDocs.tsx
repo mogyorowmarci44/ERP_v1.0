@@ -6,7 +6,7 @@ import { numberToHungarian } from "@/lib/hu-words";
 import { DocMark } from "@/components/Brand";
 
 export type DocCompany = { name: string; address: string | null; registrationNumber: string | null; taxNumber: string | null; representative: string | null; representativeTitle: string | null; signPlace: string | null };
-export type DocMember = { name: string; address: string | null; taxNumber: string | null };
+export type DocMember = { name: string; address: string | null; taxNumber: string | null; birthPlace?: string | null; birthDate?: string | null; motherName?: string | null };
 
 const CUR_HU: Record<string, string> = { EUR: "euró", USD: "amerikai dollár", CHF: "svájci frank", GBP: "angol font" };
 const longDate = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("hu-HU", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
@@ -15,6 +15,9 @@ const val = (s: string | null | undefined, w?: number) => (s && s.trim() ? s : <
 const money = (huf: number, cur?: string | null, fx?: number | null) => (cur ? <>{fmtMoney(fx, cur)}<div className="mc-sub">{fmtHuf(huf)} Ft könyv szerinti érték</div></> : <>{fmtHuf(huf)} Ft</>);
 const inWords = (huf: number, cur?: string | null, fx?: number | null) => (cur ? `${numberToHungarian(fx!)} ${CUR_HU[cur] ?? cur}` : `${numberToHungarian(huf)} forint`);
 const repName = (c: DocCompany) => `${c.representative ?? "……………………"}, ${c.representativeTitle ?? "ügyvezető"}`;
+/** v4.5.0 – „PezCar Kft.” – a cégforma rövidítése ponttal. */
+const coName = (n: string) => n.replace(/\b(Kft|Bt|Zrt|Nyrt|Kkt)$/, "$1.");
+const birth = (m: DocMember) => [m.birthPlace?.trim(), m.birthDate ? longDate(m.birthDate) : null].filter(Boolean).join(", ");
 
 function Head({ company, title, sub }: { company: DocCompany; title: string; sub: React.ReactNode }) {
   return (
@@ -38,8 +41,8 @@ function Parties({ company, member }: { company: DocCompany; member: DocMember }
       <tbody>
         <tr><td><strong>{member.name}</strong></td><td><strong>{company.name}</strong></td></tr>
         <tr><td>Lakcím: {val(member.address, 200)}</td><td>Székhely: {val(company.address, 200)}</td></tr>
-        <tr><td>Születési hely, idő: <Blank w={170} /></td><td>Cégjegyzékszám: {val(company.registrationNumber, 120)}</td></tr>
-        <tr><td>Anyja neve: <Blank w={200} /></td><td>Adószám: {val(company.taxNumber, 120)}</td></tr>
+        <tr><td>Születési hely, idő: {val(birth(member), 170)}</td><td>Cégjegyzékszám: {val(company.registrationNumber, 120)}</td></tr>
+        <tr><td>Anyja neve: {val(member.motherName, 200)}</td><td>Adószám: {val(company.taxNumber, 120)}</td></tr>
         <tr><td>Adóazonosító jel: {val(member.taxNumber, 120)}</td><td>Képviseli: {repName(company)}</td></tr>
       </tbody>
     </table>
@@ -52,7 +55,7 @@ function Foot({ left, company, place, date, docId }: { left: [string, string]; c
       <p className="ld-kelt">Kelt: {place ? place : <Blank w={110} />}, {longDate(date)}</p>
       <footer className="mc-foot">
         <div className="mc-sign">{left[0]}, {left[1]}</div>
-        <div className="mc-sign">{company.name}, {company.representativeTitle ?? "ügyvezető"}</div>
+        <div className="mc-sign">{company.representative ? `${company.representative}, ${coName(company.name)} ${company.representativeTitle ?? "ügyvezető"}` : `${coName(company.name)}, ${company.representativeTitle ?? "ügyvezető"}`}</div>
         <div className="mc-meta">{docId} · készült a mogyorosi.erp rendszerben</div>
       </footer>
     </>
@@ -87,7 +90,7 @@ export function ContractSheet({ company, member, loan, moneyKind }: { company: D
         <li><strong>Hosszabbítás.</strong> A lejárat a Felek írásbeli megállapodásával (sorszámozott szerződésmódosítás) meghosszabbítható; a módosítás a szerződés elválaszthatatlan része.</li>
         <li><strong>Egyéb.</strong> A szerződésben nem szabályozott kérdésekben a Polgári Törvénykönyvről szóló 2013. évi V. törvény kölcsönszerződésre vonatkozó rendelkezései az irányadók. A szerződés két egyező példányban készült.</li>
       </ol>
-      <Foot left={[member.name, "kölcsönadó"]} company={company} place={company.signPlace} date={loan.date} docId={loan.contractNo ?? ""} />
+      <Foot left={[member.name, "tag"]} company={company} place={company.signPlace} date={loan.date} docId={loan.contractNo ?? ""} />
       <DocMark />
     </article>
   );
@@ -130,7 +133,7 @@ export function AmendmentSheet({ company, member, loan, ext }: { company: DocCom
           ))}
         </tbody>
       </table>
-      <Foot left={[member.name, "kölcsönadó"]} company={company} place={company.signPlace} date={ext.extendedOn} docId={ext.docNo} />
+      <Foot left={[member.name, "tag"]} company={company} place={company.signPlace} date={ext.extendedOn} docId={ext.docNo} />
       <DocMark />
     </article>
   );
@@ -187,7 +190,7 @@ export function RepaymentSheet({ company, member, rep, loans, moneyKind }: { com
         Alulírott {member.name} igazolom, hogy a(z) {company.name}-tól {longDate(rep.date)} napján {rep.currency ? fmtMoney(rep.amountFx, rep.currency) : `${fmtHuf(rep.amount)} Ft`}, azaz {inWords(rep.amount, rep.currency, rep.amountFx)} összeget
         {moneyKind === "cash" ? " készpénzben átvettem" : " átutalással megkaptam"} a fenti tagi kölcsön(ök) visszafizetéseként.
       </p>
-      <Foot left={[member.name, "kölcsönadó"]} company={company} place={company.signPlace} date={rep.date} docId={rep.docNo ?? ""} />
+      <Foot left={[member.name, "tag"]} company={company} place={company.signPlace} date={rep.date} docId={rep.docNo ?? ""} />
       <DocMark />
     </article>
   );

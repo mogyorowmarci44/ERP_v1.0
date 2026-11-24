@@ -645,6 +645,30 @@ export const payments = pgTable(
 );
 
 /** Tagi kölcsön befizetések lejárata (a tételek maguk a főkönyvben, a 4791-es számlán vannak). */
+/** v4.5.0 – Tagok és tisztségviselők: jogviszony, tulajdonrész, személyes adatok (a tagi kölcsön okiratokhoz). */
+export const companyMembers = pgTable("company_members", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  /** A tagi kölcsönök partnere (479x). */
+  partnerId: integer("partner_id").references(() => partners.id, { onDelete: "set null" }),
+  isMember: boolean("is_member").notNull().default(true),
+  isCeo: boolean("is_ceo").notNull().default(false),
+  sharePct: numeric("share_pct", { precision: 7, scale: 4, mode: "number" }),
+  capital: money("capital"),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  /** önálló | együttes */
+  representation: varchar("representation", { length: 12 }),
+  birthPlace: varchar("birth_place", { length: 120 }),
+  birthDate: date("birth_date"),
+  motherName: varchar("mother_name", { length: 255 }),
+  address: text("address"),
+  taxId: varchar("tax_id", { length: 20 }),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("company_members_company").on(t.companyId)]);
+
 export const memberLoanTerms = pgTable("member_loan_terms", {
   entryId: integer("entry_id").primaryKey().references(() => journalEntries.id, { onDelete: "cascade" }),
   companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
