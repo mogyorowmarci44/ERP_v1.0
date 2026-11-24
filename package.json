@@ -1,6 +1,6 @@
 {
   "name": "mm-erp",
-  "version": "3.9.6",
+  "version": "3.9.8",
   "private": true,
   "description": "MM ERP – többcéges kettős könyvviteli rendszer (számlák, ÁFA, főkönyv, készlet, beszámoló)",
   "engines": {
@@ -40,7 +40,6 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "unpdf": "^1.9.1",
-    "xlsx": "^0.18.5",
     "zod": "^4.6.7"
   },
   "devDependencies": {

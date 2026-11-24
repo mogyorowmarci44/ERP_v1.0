@@ -6,7 +6,7 @@ import { requireCompany } from "@/lib/auth";
 import { Flash } from "@/components/Flash";
 import { companySnapshot } from "@/lib/daily-summary/data";
 import { renderCompanyMail, VARIANT_LABEL, type Variant } from "@/lib/daily-summary/render";
-import { companyEnabled, getSummarySettings, smtpConfigured } from "@/lib/daily-summary/send";
+import { companyEnabled, getSummarySettings, summaryWarnings } from "@/lib/daily-summary/send";
 import { addRecipientAction, updateRecipientAction, testRecipientAction, toggleCompanySummaryAction, saveSummaryExcludeAction } from "./actions";
 import { inArray } from "drizzle-orm";
 import { isPrivate } from "@/lib/entity";
@@ -20,9 +20,10 @@ export default async function SummaryPage({ params, searchParams }: { params: Pr
   const sp = await searchParams;
   const { company, role, user } = await requireCompany(cid);
   const canWrite = role !== "viewer";
-  const [list, st] = await Promise.all([
+  const [list, st, warnings] = await Promise.all([
     db.select().from(schema.summaryRecipients).where(eq(schema.summaryRecipients.companyId, cid)).orderBy(asc(schema.summaryRecipients.name)),
     getSummarySettings(),
+    summaryWarnings(),
   ]);
   const stockCars = isPrivate(company) ? [] : await db.select().from(schema.vehicles)
     .where(and(eq(schema.vehicles.companyId, cid), inArray(schema.vehicles.status, ["in_stock", "reserved"]))).orderBy(asc(schema.vehicles.make), asc(schema.vehicles.model));
@@ -46,9 +47,7 @@ export default async function SummaryPage({ params, searchParams }: { params: Pr
         </div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
-      {!smtpConfigured() && (
-        <div className="flash error">Az e-mail küldés még nincs beállítva: a Renderen kell megadni az SMTP_USER (Gmail cím) és SMTP_PASS (alkalmazásjelszó) változót. Addig az előnézet működik, a küldés nem.</div>
-      )}
+      {warnings.map((w) => <div key={w} className="flash error">{w}</div>)}
       <div className={`card sum-master${companyEnabled(st, cid) ? "" : " off"}`} style={{ marginBottom: 12 }}>
         <div>
           <strong>{company.name} napi összefoglalója</strong>
