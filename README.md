@@ -39,6 +39,11 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.4.0 – Tagi kölcsön: hány napja járt le
+
+- A „Jelenlegi lejárat” alatt jelvény: „lejárt · N napja” – 1–30 nap sárga, 31–180 nap halványpiros, 180 nap felett telt piros; 30 napon belül lejárónál szürke „N nap múlva jár le”.
+- A „Lejárt, vissza nem fizetett” csempén a legrégebbi lejárt kölcsön kora („legrégebbi: N napja”).
+
 ## v4.3.1 – EUR-pénztár naptár euróban
 
 - Devizás pénztár- és bankjelentés naptárában a napi csempéken a nettó mozgás devizában (pl. „+700 €”, „−1,3 e €”), a színezés is ebből; a buborékban a deviza és a forintérték is.

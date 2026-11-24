@@ -9,6 +9,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { LoanBalanceChart, MaturityChart } from "@/components/LoanCharts";
 import { fmtHuf, fmtMoney, fmtNum } from "@/lib/money";
 import { fmtDate, today, addDaysIso } from "@/lib/dates";
+import { loanAge } from "@/lib/loan-age";
 
 const statusClass: Record<string, string> = { "Lejárt": "overdue", "Hamarosan lejár": "soon", "Nyitott": "reserved", "Rendezve": "posted" };
 const VIEWS = { open: "Nyitott", overdue: "Lejárt", all: "Minden mozgás" } as const;
@@ -39,6 +40,11 @@ export default async function MemberLoansPage({ params, searchParams }: { params
   const fxPools = data.members.flatMap((m) => m.fx.filter((f) => Math.abs(f.balanceFx) > 0.004).map((f) => ({ ...f, member: m.name })));
   const qs = (o: Record<string, string>) => new URLSearchParams({ ...(who ? { member: who } : {}), view, ...o }).toString();
   const yearEnd = `${Number(t.slice(0, 4)) - (t.slice(5) < "12-31" ? 1 : 0)}-12-31`;
+  // v4.4.0 – a legrégebben lejárt, még nyitott kölcsön
+  const oldest = data.members.flatMap((mb) => mb.rows).reduce<number | null>((m, r) => {
+    const a = r.kind === "loan" ? loanAge(r.dueDate, r.status, t) : null;
+    return a?.kind === "over" && (m == null || a.days > m) ? a.days : m;
+  }, null);
   const showRow = (r: LoanRow) => view === "all" || (r.kind === "loan" && (view === "open" ? r.status !== "Rendezve" : r.status === "Lejárt"));
 
   return (
@@ -54,7 +60,7 @@ export default async function MemberLoansPage({ params, searchParams }: { params
 
       <div className="grid cols-4">
         <div className="card stat primary"><div className="label">Tagok felé fennálló tartozás</div><div className="value">{fmtHuf(data.total)}<small>Ft</small></div></div>
-        <div className="card stat"><div className="label">Lejárt, vissza nem fizetett</div><div className={`value${data.overdue > 0 ? " neg" : ""}`}>{fmtHuf(data.overdue)}<small>Ft</small></div></div>
+        <div className="card stat"><div className="label">Lejárt, vissza nem fizetett</div><div className={`value${data.overdue > 0 ? " neg" : ""}`}>{fmtHuf(data.overdue)}<small>Ft</small></div>{oldest != null && <div className="muted small">legrégebbi: {oldest} napja</div>}</div>
         <div className="card stat"><div className="label">30 napon belül lejár</div><div className="value">{fmtHuf(data.dueSoon)}<small>Ft</small></div></div>
         <div className="card stat"><div className="label">Devizás kölcsön</div><div className="value">{fxPools.length ? fxPools.map((f) => <span key={f.member + f.currency}>{fmtMoney(f.balanceFx, f.currency)} </span>) : <span className="muted">–</span>}</div></div>
       </div>
@@ -123,6 +129,10 @@ export default async function MemberLoansPage({ params, searchParams }: { params
                         {r.kind === "loan" && (
                           <>
                             <strong>{fmtDate(r.dueDate) || <span className="muted">nincs megadva</span>}</strong>
+                            {(() => {
+                              const a = loanAge(r.dueDate, r.status, t);
+                              return a && <div><span className={`loan-age ${a.level}`}>{a.label}</span></div>;
+                            })()}
                             {r.extensions.length > 0 && (
                               <div className="small muted">
                                 {r.extensions.map((e) => (
