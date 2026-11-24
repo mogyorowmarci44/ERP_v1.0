@@ -86,14 +86,14 @@ function companyHtml(s: CompanySnapshot, v: Variant): string {
       <div style="${SANS}font-size:12px;font-weight:300;color:${K.mute};padding-top:3px">${note1}</div>
       ${note2 ? `<div style="${SANS}font-size:11px;font-weight:300;color:${K.mute};padding-top:1px">${note2}</div>` : ""}`;
   const svCell = sv
-    ? kpiCell("Készlet értéke", mFt2(sv.value), `beszerzési ár: ${mFt2(sv.purchase)}`, sv.pct != null ? `${sv.count} autó · +${Math.round(sv.pct * 100)}% medián bruttó fedezettel` : `${sv.count} autó · még nincs eladás a mediánhoz`)
+    ? kpiCell("Készlet értéke", mFt2(sv.value), `beszerzési ár: ${mFt2(sv.purchase)}`)
     : kpiCell("Eladó autó", `${s.kpi.stock ?? "–"} db`, "");
   rows.push(`<tr><td style="padding:16px 0 14px;border-top:1px solid ${K.hair}">${vrule([
     kpiCell("Pénztár (Ft)", eFt1(s.kpi.cashHuf), "forintpénztár egyenlege"),
     kpiCell("Összes pénz", eFt1(s.kpi.liquidity), "pénztár + bank, mai árfolyamon"),
   ])}</td></tr>`);
   rows.push(`<tr><td style="padding:14px 0 16px;border-top:1px dotted ${K.hair};border-bottom:1px solid ${K.hair}">${vrule([
-    kpiCell("Tegnapi bevétel", ft0(s.kpi.revenueDay), shortD(s.day)),
+    kpiCell("Tegnapi bevétel", ft0(s.kpi.revenueDay), shortD(s.day), `előző 30 nap: ${money(s.kpi.revenue30)}`),
     svCell,
   ])}</td></tr>`);
   rows.push(`<tr><td style="padding:10px 0 0;${SANS}font-size:12.5px;color:${K.mute}">Eladó autó: <b style="color:${K.ink}">${s.kpi.stock ?? "–"} db</b> &nbsp;·&nbsp; Lejárt vevői tartozás: <b style="color:${s.kpi.lateReceivableCount ? K.red : K.ink}">${s.kpi.lateReceivableCount ? money(s.kpi.lateReceivable) : "nincs"}</b> &nbsp;·&nbsp; Lejárt szállítói tartozás: <b style="color:${s.kpi.latePayableCount ? K.red : K.ink}">${s.kpi.latePayableCount ? money(s.kpi.latePayable) : "nincs"}</b></td></tr>`);
@@ -269,7 +269,7 @@ export function renderCompanyMail(s: CompanySnapshot, v: Variant): Mail {
   const html = companyHtml(s, v);
   const b = BLOCKS[v];
   const L: string[] = [`${s.name} – napi összefoglaló, ${dayLabel(s.date)}`, "", s.headline, "",
-    `Pénztár (Ft): ${money(s.kpi.cashHuf)} · Összes pénz: ${money(s.kpi.liquidity)} · Tegnapi bevétel: ${money(s.kpi.revenueDay)}`,
+    `Pénztár (Ft): ${money(s.kpi.cashHuf)} · Összes pénz: ${money(s.kpi.liquidity)} · Tegnapi bevétel: ${money(s.kpi.revenueDay)} (előző 30 nap: ${money(s.kpi.revenue30)})`,
     `Eredmény – ebben a hónapban: ${money(s.results.month, true)}, ebben a negyedévben: ${money(s.results.quarter, true)}, idén eddig: ${money(s.results.year, true)}${s.results.yearForecast != null ? `, várható éves: ${money(s.results.yearForecast, true)}` : ""}`,
     `Határidők – ÁFA: ${s.deadlines.vat ? shortD(s.deadlines.vat.date) : "–"}, járulék: ${s.deadlines.payroll ? shortD(s.deadlines.payroll.date) : "–"}`, "", "TEENDŐK"];
   for (const t of openTodos(s)) L.push(`- ${t.text}`);

@@ -43,7 +43,7 @@ export type CompanySnapshot = {
   date: string; // a küldés napja
   day: string; // a „tegnap”
   headline: string;
-  kpi: { cash: number; cashHuf: number; liquidity: number; revenueDay: number; stock: number | null; lateReceivable: number; lateReceivableCount: number; latePayable: number; latePayableCount: number };
+  kpi: { cash: number; cashHuf: number; liquidity: number; revenueDay: number; revenue30: number; stock: number | null; lateReceivable: number; lateReceivableCount: number; latePayable: number; latePayableCount: number };
   /** v3.9.5 – a készlet értéke: beszerzési ár × (1 + medián bruttó fedezet %). */
   stockValue: { purchase: number; value: number; pct: number | null; count: number } | null;
   /** v3.9.4 – eredmények: folyó hó / negyedév / év (tény) és teljes év a Forecast alapján. */
@@ -117,7 +117,7 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
   const qs = `${t.slice(0, 5)}${String(Math.floor((Number(t.slice(5, 7)) - 1) / 3) * 3 + 1).padStart(2, "0")}-01`;
   const settings = company.settings as { summaryExcludeVehicles?: number[] | null };
   const excluded = new Set(settings?.summaryExcludeVehicles ?? []);
-  const [tbDay, tbMtd, tbPrev, tbYtd, tbNow, recv, pay, cash, vat, [inbox], drafts, tbQtd] = await Promise.all([
+  const [tbDay, tbMtd, tbPrev, tbYtd, tbNow, recv, pay, cash, vat, [inbox], drafts, tbQtd, tb30] = await Promise.all([
     trialBalance(cid, day, day),
     trialBalance(cid, ms, t),
     trialBalance(cid, monthStart(pt), pt),
@@ -130,6 +130,8 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
     db.select({ n: count() }).from(schema.inboxDocuments).where(and(eq(schema.inboxDocuments.companyId, cid), inArray(schema.inboxDocuments.status, INBOX_TODO))),
     draftCounts(cid),
     trialBalance(cid, qs, t),
+    // v3.9.9 – csúszó 30 nap: a tegnappal záruló 30 nap (nem naptári hónap)
+    trialBalance(cid, addDaysIso(day, -29), day),
   ]);
   const cashTotal = sum(cash.map((c) => c.huf));
   const recvLate = recv.filter((r) => r.dueDate && r.dueDate < t);
@@ -312,6 +314,7 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
       cashHuf: cash.find((c) => c.key === "cashHuf")?.huf ?? 0,
       liquidity,
       revenueDay: revenueOf(tbDay),
+      revenue30: revenueOf(tb30),
       stock: cars ? cars.lanes.red.count + cars.lanes.yellow.count + cars.lanes.green.count : null,
       lateReceivable: sum(recvLate.map(toHuf)),
       lateReceivableCount: recvLate.length,
