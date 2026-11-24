@@ -162,7 +162,7 @@ export default async function MemberLoansPage({ params, searchParams }: { params
                                 <input type="hidden" name="cid" value={cid} />
                                 <input type="hidden" name="entryId" value={r.entryId} />
                                 <input type="number" name="days" min={1} max={3650} defaultValue={60} required aria-label="Hosszabbítás napokban" title="Hány nappal" />
-                                <input type="date" name="extendedOn" defaultValue={t} aria-label="A módosítás kelte" title="A módosítás kelte" />
+                                <input type="date" name="extendedOn" defaultValue={r.dueDate ?? t} aria-label="A módosítás kelte" title="A módosítás kelte (alapból a jelenlegi lejárat napja)" />
                                 <SubmitButton>+ nap</SubmitButton>
                               </form>
                               {r.extensions.length > 0 && (

@@ -4,6 +4,7 @@ import { db, schema, type Tx } from "@/db";
 import { manualEntry, accountIdByCode, fxAccountBalance } from "./ledger";
 import { today as todayFn, addDaysIso } from "./dates";
 import { getMnbRate } from "./fx-service";
+import { activeCeo, listMembers } from "./company-members";
 import { assignContractNos, buildLoanBook, fxRepaymentSplit, nextContractNo, revaluationDiff, type LoanSourceRow } from "./member-loan-book";
 
 export { type LoanRow, type MemberBook, type LoanExtension } from "./member-loan-book";
@@ -264,12 +265,29 @@ export async function loanMoneyKind(companyId: number, entryId: number): Promise
   return r?.code.startsWith("381") ? "cash" : "bank";
 }
 
-/** Okiratokhoz: a cég és a tag adatai. */
+/** Okiratokhoz: a cég és a tag adatai (v4.5.0: a Tagok és tisztségviselők nyilvántartásból, különben a partnertörzsből). */
 export async function docParties(companyId: number, partnerId: number | null) {
   const [c] = await db.select().from(schema.companies).where(eq(schema.companies.id, companyId));
   const [p] = partnerId ? await db.select().from(partners).where(eq(partners.id, partnerId)) : [];
+  const people = await listMembers(companyId);
+  const ceo = activeCeo(people);
+  // összekötött partner, különben név szerint (pl. ha Kristóf is befizet tagi kölcsönt)
+  const norm = (x: string) => x.toLocaleLowerCase("hu").replace(/\s+/g, " ").trim();
+  const m = partnerId ? people.find((x) => x.partnerId === partnerId) ?? (p ? people.find((x) => norm(x.name) === norm(p.name)) : undefined) : undefined;
   return {
-    company: { name: c.name, address: c.address, registrationNumber: c.registrationNumber, taxNumber: c.taxNumber, representative: c.settings.representative ?? null, representativeTitle: c.settings.representativeTitle ?? null, signPlace: c.settings.signPlace ?? null },
-    member: { name: p?.name ?? "", address: p?.address ?? null, taxNumber: p?.taxNumber ?? null },
+    company: {
+      name: c.name, address: c.address, registrationNumber: c.registrationNumber, taxNumber: c.taxNumber,
+      representative: ceo?.name ?? c.settings.representative ?? null,
+      representativeTitle: ceo ? "ügyvezető" : c.settings.representativeTitle ?? null,
+      signPlace: c.settings.signPlace ?? null,
+    },
+    member: {
+      name: m?.name ?? p?.name ?? "",
+      address: m?.address || p?.address || null,
+      taxNumber: m?.taxId || p?.taxNumber || null,
+      birthPlace: m?.birthPlace ?? null,
+      birthDate: m?.birthDate ?? null,
+      motherName: m?.motherName ?? null,
+    },
   };
 }

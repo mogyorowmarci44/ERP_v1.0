@@ -1142,3 +1142,14 @@ tbody tr.att-row:hover td { background: var(--surface-2); }
 .ch-row .ch-pos { color: var(--pos); }
 .ch-row .ch-muted { color: var(--muted); }
 .sk-wrap { position: relative; }
+
+/* v4.5.0 – Tagok és tisztségviselők: táblázat + oldalpanel */
+.cm-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; margin-bottom: 8px; }
+.cm-layout.open { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.cm-table tr.on td { background: var(--accent-soft); }
+.cm-panel { display: grid; gap: 8px; }
+.cm-panel h3 { margin: 10px 0 2px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: none; }
+.cm-panel-head { display: flex; justify-content: space-between; align-items: baseline; }
+.cm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+.cm-wide { grid-column: 1 / -1; }
+@media (max-width: 900px) { .cm-layout.open { grid-template-columns: minmax(0, 1fr); } }

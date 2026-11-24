@@ -28,6 +28,7 @@ import { getMnbRate, storeRates, fetchMnbRates } from "@/lib/fx-service";
 import { addDays } from "@/lib/fx";
 import { PRESETS, isHex } from "@/lib/themes";
 import { importBundle, importLoanTermsOnly, wipeCompanyData, type ImportBundle, type ImportReport } from "@/lib/importer";
+import { saveMember, deleteMember } from "@/lib/company-members";
 import { extendLoan, recordMemberLoan, revalueMemberLoans, setLoanDueDate, undoLastExtension } from "@/lib/member-loans";
 import { invoiceAudit } from "@/lib/invoice-audit";
 import { updateEntryMeta, renameInvoiceLine, setEntryChecked, updateManualEntry, reopenInvoice, logInvoiceRepost, editPayment, type EntryLineInput } from "@/lib/journal-edit";
@@ -702,9 +703,11 @@ export async function extendLoanAction(fd: FormData) {
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/member-loans`, async () => {
     const days = Number(str(fd, "days"));
-    const on = str(fd, "extendedOn") || today();
-    if (!isDate(on)) throw new Error("Hibás dátum.");
     const entryId = Number(fd.get("entryId"));
+    // v4.5.0 – a módosítás kelte alapból a jelenlegi lejárat napja
+    const [term] = await db.select({ due: schema.memberLoanTerms.dueDate }).from(schema.memberLoanTerms).where(and(eq(schema.memberLoanTerms.entryId, entryId), eq(schema.memberLoanTerms.companyId, cid)));
+    const on = str(fd, "extendedOn") || term?.due || today();
+    if (!isDate(on)) throw new Error("Hibás dátum.");
     const r = await extendLoan(cid, entryId, { days, extendedOn: on, note: optStr(fd, "note") });
     revalidatePath(`/c/${cid}`, "layout");
     // az automatikusan elkészült szerződésmódosítás
@@ -805,5 +808,46 @@ export async function saveInvoiceCheckNoteAction(fd: FormData) {
     await db.insert(schema.invoiceChecks).values({ invoiceId: id, ...values }).onConflictDoUpdate({ target: schema.invoiceChecks.invoiceId, set: values });
     revalidatePath(`/c/${cid}/invoices`, "layout");
     return `${back}?ok=${encodeURIComponent("Ellenőrzési adatok mentve.")}`;
+  });
+}
+
+// --- v4.5.0 – Tagok és tisztségviselők ---------------------------------------------------------
+
+export async function saveCompanyMemberAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/settings?member=${str(fd, "id") || "new"}#tagok`, async () => {
+    const num = (k: string) => { const v = str(fd, k); return v === "" ? null : parseNumber(v); };
+    const date = (k: string) => { const v = str(fd, k); if (v && !isDate(v)) throw new Error("Hibás dátum."); return v || null; };
+    const rep = str(fd, "representation");
+    const id = await saveMember(cid, intOrNull(fd, "id"), {
+      name: str(fd, "name"),
+      partnerId: intOrNull(fd, "partnerId"),
+      isMember: fd.get("isMember") === "on",
+      isCeo: fd.get("isCeo") === "on",
+      sharePct: num("sharePct"),
+      capital: num("capital"),
+      startDate: date("startDate"),
+      endDate: date("endDate"),
+      representation: rep === "önálló" || rep === "együttes" ? rep : null,
+      birthPlace: optStr(fd, "birthPlace"),
+      birthDate: date("birthDate"),
+      motherName: optStr(fd, "motherName"),
+      address: optStr(fd, "address"),
+      taxId: optStr(fd, "taxId"),
+      note: optStr(fd, "note"),
+    });
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/settings?member=${id}&ok=${encodeURIComponent("Mentve")}#tagok`;
+  });
+}
+
+export async function deleteCompanyMemberAction(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/settings#tagok`, async () => {
+    await deleteMember(cid, Number(fd.get("id")));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/settings?ok=${encodeURIComponent("Törölve")}#tagok`;
   });
 }
