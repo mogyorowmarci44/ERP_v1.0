@@ -7,7 +7,7 @@ export const pezcar: CompanySnapshot = {
   headline: "Tegnap eladtunk egy autót, 486 e Ft nettó fedezettel. Két dolog vár rád, az egyik sürgős.",
   kpi: { cash: 2_310_000, cashHuf: 297_500, cashEur: 115_000, cashEurFx: 290, liquidity: 2_356_000, revenueDay: 2_748_000, revenue30: 3_520_000, bank: 1_943_500, stock: 4, lateReceivable: 0, lateReceivableCount: 0, latePayable: 0, latePayableCount: 0 },
   stockValue: { purchase: 9_850_000, value: 11_620_000, pct: 0.18, count: 4 },
-  results: { month: -73_000, quarter: 0, year: 1_840_000, yearForecast: 2_350_000, yearForecastAfterTax: 2_130_000, forecastPartial: false },
+  results: { month: -73_000, quarter: 0, year: 1_840_000, yearForecast: 2_350_000, yearForecastAfterTax: 2_130_000, forecastPartial: false, yearBreakdown: { actual: 1_840_000, plan: 560_000, hipa: 50_000, tao: 220_000 } },
   deadlines: { vat: { date: "2026-12-21", days: 27 }, payroll: { date: "2026-12-14", days: 20 } },
   todos: [
     { level: "red", text: "Az októberi járulékbevallás még nincs beadva", path: "/c/1/filings" },

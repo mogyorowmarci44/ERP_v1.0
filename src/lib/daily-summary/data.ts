@@ -47,7 +47,8 @@ export type CompanySnapshot = {
   /** v3.9.5 – a készlet értéke: beszerzési ár × (1 + medián bruttó fedezet %). */
   stockValue: { purchase: number; value: number; pct: number | null; count: number } | null;
   /** v3.9.4 – eredmények: folyó hó / negyedév / év (tény) és teljes év a Forecast alapján. */
-  results: { month: number; quarter: number; year: number; yearForecast: number | null; yearForecastAfterTax: number | null; forecastPartial: boolean };
+  results: { month: number; quarter: number; year: number; yearForecast: number | null; yearForecastAfterTax: number | null; forecastPartial: boolean;
+    /** v4.3.0 – a Forecast évi bontása: tény + terv − HIPA = yearForecast. */ yearBreakdown?: { actual: number; plan: number; hipa: number; tao: number } | null };
   /** v3.9.4 – következő bevallási határidők. */
   deadlines: { vat: { date: string; days: number } | null; payroll: { date: string; days: number } | null };
   todos: Todo[];
@@ -84,7 +85,8 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const balOf = (tb: TrialBalanceRow[], pred: (c: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
 const periodOf = (tb: TrialBalanceRow[], pred: (c: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.periodDebit - r.periodCredit, 0);
 /** Eredmény az időszak forgalmából: bevétel (9) − ráfordítás (5, 8). */
-const resultOf = (tb: TrialBalanceRow[]) => -periodOf(tb, (c) => c.startsWith("9")) - periodOf(tb, (c) => c.startsWith("5") || c.startsWith("8"));
+// v4.3.0 – a 89 (társasági adó) nélkül, pontosan úgy, mint a Forecast „tény” része
+const resultOf = (tb: TrialBalanceRow[]) => -periodOf(tb, (c) => c.startsWith("9")) - periodOf(tb, (c) => c.startsWith("5") || (c.startsWith("8") && !c.startsWith("89")));
 const revenueOf = (tb: TrialBalanceRow[]) => -periodOf(tb, (c) => c.startsWith("9"));
 const toHuf = (r: { currency: string; openFx: number; grossHuf: string | number; grossFx: string | number }) =>
   r.currency === "HUF" ? r.openFx : (r.openFx * Number(r.grossHuf)) / Number(r.grossFx || 1);
@@ -244,12 +246,12 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
     };
   });
   let cashIn30: number | null = null;
-  let yearFc: { preTax: number; afterTax: number; partial: boolean } | null = null;
+  let yearFc: { preTax: number; afterTax: number; partial: boolean; actual: number; plan: number; hipa: number; tao: number } | null = null;
   if (!priv) {
     try {
       const fc = runForecast(await loadForecastInput(cid), "base", "week");
-      const fy = fc.years.find((y) => y.year === t.slice(0, 4));
-      if (fy) yearFc = { preTax: fy.preTax, afterTax: fy.afterTax, partial: fy.partial };
+      const fy = fc.years[0]; // a Forecast oldal is ezt mutatja (folyó üzleti év)
+      if (fy) yearFc = { preTax: fy.preTax, afterTax: fy.afterTax, partial: fy.partial, actual: fy.actualPreTax, plan: fy.forecastPreTax, hipa: fy.hipa, tao: fy.tao };
       const target = addDaysIso(t, 30);
       const w = fc.months.find((m) => m.start <= target && m.end >= target) ?? fc.months.at(-1);
       cashIn30 = w ? w.endCash + w.endBank : null;
@@ -332,10 +334,12 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
     results: {
       month: resultOf(tbMtd),
       quarter: resultOf(tbQtd),
-      year: resultOf(tbYtd),
+      // naptári üzleti évnél a Forecast „tény” része, hogy a kettő garantáltan egyezzen
+      year: yearFc && company.fiscalYearStartMonth === 1 ? yearFc.actual : resultOf(tbYtd),
       yearForecast: yearFc?.preTax ?? null,
       yearForecastAfterTax: yearFc?.afterTax ?? null,
       forecastPartial: yearFc?.partial ?? false,
+      yearBreakdown: yearFc ? { actual: yearFc.actual, plan: yearFc.plan, hipa: yearFc.hipa, tao: yearFc.tao } : null,
     },
     deadlines: { vat: vatDeadline, payroll: payrollDeadline },
     todos,

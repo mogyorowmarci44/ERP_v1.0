@@ -109,3 +109,13 @@ describe("v4.2.0 – készpénz Ft / EUR külön csempén", () => {
     expect(m.text).toContain("készpénz EUR 115 e Ft · bank 1,94 m Ft");
   });
 });
+
+describe("v4.3.0 – a várható éves eredmény bontása egyezik a Forecasttal", () => {
+  it("tény + terv − HIPA = várható éves eredmény, a tény = idén eddig", () => {
+    const html = renderCompanyMail(pezcar, "ceo").html.replace(/[  ]/g, " ");
+    const b = pezcar.results.yearBreakdown!;
+    expect(b.actual + b.plan - b.hipa).toBe(pezcar.results.yearForecast);
+    expect(b.actual).toBe(pezcar.results.year);
+    expect(html).toContain("= tény +1,84 m Ft + terv +560 e Ft − HIPA 50 e Ft · TAO 220 e Ft · adózás után +2,13 m Ft");
+  });
+});

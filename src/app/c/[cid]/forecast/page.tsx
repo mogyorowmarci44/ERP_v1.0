@@ -87,7 +87,8 @@ export default async function ForecastPage({ params, searchParams }: { params: P
   const view = sp.view === "compare" ? "compare" : "single";
   const sc: Scenario = (SCENARIOS as string[]).includes(sp.sc) ? (sp.sc as Scenario) : "base";
   const gran: Granularity = sp.gran === "week" || sp.gran === "quarter" ? sp.gran : "month";
-  const scope: Scope = sp.scope === "fy" || sp.scope === "ltd" ? sp.scope : "forecast";
+  // v4.3.0 – alapból a teljes üzleti év (tény + terv), ugyanaz, mint a napi összefoglaló
+  const scope: Scope = sp.scope === "forecast" || sp.scope === "ltd" ? sp.scope : "fy";
   const input = await loadForecastInput(cid);
   const raw = Object.fromEntries(SCENARIOS.map((s) => [s, runForecast(input, s, gran)])) as Record<Scenario, FcResult>;
   // Hatókör: csak terv / teljes üzleti év (tény + terv) / kezdettől (tény + terv)
@@ -147,7 +148,13 @@ export default async function ForecastPage({ params, searchParams }: { params: P
 
       {view === "single" && <>
       <div className="grid cols-4" style={{ marginBottom: 14 }}>
-        <div className="card stat primary"><div className="label">Adózás előtti eredmény ({scope === "forecast" ? "tervezési időszak" : scope === "fy" ? `${fyStart.slice(0, 4)}. üzleti év, tény + terv` : "kezdettől, tény + terv"})</div><div className="value">{fmtHuf(r.totals.preTax)}<small>Ft</small></div></div>
+        {scope === "fy" && curYear ? (
+          // v4.3.0 – ugyanaz a szám, mint a napi összefoglaló „Várható éves eredmény” sora: tény + terv − HIPA
+          <div className="card stat primary"><div className="label">Várható éves eredmény ({curYear.year}. üzleti év, tény + terv − HIPA)</div><div className="value">{fmtHuf(curYear.preTax)}<small>Ft</small></div>
+            <div className="muted" style={{ fontSize: 12 }}>tény {fmtHuf(curYear.actualPreTax)} + terv {fmtHuf(curYear.forecastPreTax)} − HIPA {fmtHuf(curYear.hipa)} · adózás után {fmtHuf(curYear.afterTax)} Ft</div></div>
+        ) : (
+          <div className="card stat primary"><div className="label">Adózás előtti eredmény ({scope === "forecast" ? "tervezési időszak, HIPA nélkül" : "kezdettől, tény + terv, HIPA nélkül"})</div><div className="value">{fmtHuf(r.totals.preTax)}<small>Ft</small></div></div>
+        )}
         <div className="card stat"><div className="label">Eladott autók · bruttó fedezet</div><div className="value">{r.totals.carsSold} db · {fmtHuf(r.totals.grossMargin)}<small>Ft</small></div></div>
         <div className="card stat"><div className="label">{scope === "forecast" ? "Különbözeti ÁFA a tervben" : "Fizetendő ÁFA (tény + terv)"}</div><div className="value">{fmtHuf(r.totals.marginVat)}<small>Ft</small></div></div>
         <div className="card stat"><div className="label">Legalacsonyabb pénzkészlet</div><div className={`value${r.totals.minTotal < 0 ? " neg" : ""}`}>{fmtHuf(r.totals.minTotal)}<small>Ft · {fmtDate(r.totals.minTotalDate)}</small></div></div>

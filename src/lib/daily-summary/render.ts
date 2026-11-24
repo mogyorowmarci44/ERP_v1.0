@@ -139,7 +139,8 @@ function companyHtml(s: CompanySnapshot, v: Variant): string {
     ${line("Idén eddig", r.year)}
     ${line(`Várható éves eredmény (${s.date.slice(0, 4)})`, r.yearForecast, true, "Forecast szerint")}
   </table>
-  ${p != null ? `<div style="${SANS}font-size:12px;color:${K.mute};padding-top:10px">Az idei várt eredmény <b style="color:${K.ink}">${p}%-a</b> már megvan${r.yearForecastAfterTax != null ? `, adózás után várhatóan ${money(r.yearForecastAfterTax, true)} marad` : ""}.</div>
+  ${r.yearBreakdown ? `<div style="${SANS}font-size:12px;color:${K.mute};padding-top:8px">= tény ${money(r.yearBreakdown.actual, true)} + terv ${money(r.yearBreakdown.plan, true)} − HIPA ${money(r.yearBreakdown.hipa)}${r.yearForecastAfterTax != null ? ` · TAO ${money(r.yearBreakdown.tao)} · adózás után ${money(r.yearForecastAfterTax, true)}` : ""}</div>` : ""}
+  ${p != null ? `<div style="${SANS}font-size:12px;color:${K.mute};padding-top:10px">Az idei várt eredmény <b style="color:${K.ink}">${p}%-a</b> már megvan${r.yearForecastAfterTax != null && !r.yearBreakdown ? `, adózás után várhatóan ${money(r.yearForecastAfterTax, true)} marad` : ""}.</div>
     <div style="height:4px;background:${K.hair};margin-top:8px"><div style="height:4px;width:${p}%;background:${K.accent}"></div></div>` : ""}</td></tr>`);
 
   // két hasáb: teendők | naptár

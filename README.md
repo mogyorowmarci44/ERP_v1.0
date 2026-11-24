@@ -39,6 +39,13 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.3.0 – A napi összefoglaló és a Forecast éves eredménye egyezik
+
+- A Forecast oldal alapból a **Teljes üzleti év** nézetben nyílik; a fő csempe itt a **Várható éves eredmény (tény + terv − HIPA)**, alatta a bontás és az adózás utáni összeg – pontosan az, amit a napi összefoglaló „Várható éves eredmény” sora mutat.
+- A „Forecast időszak” és a „Kezdettől” nézet csempéje jelzi, hogy HIPA nélküli összeg.
+- Napi összefoglaló: a várható éves eredmény alatt a bontás (tény + terv − HIPA · TAO · adózás után); az „Idén eddig” naptári üzleti évnél a Forecast „tény” része, a havi / negyedéves / éves eredmény a 89 (társasági adó) nélkül, a Forecasttal azonos módon.
+- Az összefoglaló a Forecast folyó üzleti évét veszi (nem a naptári évet keresi).
+
 ## v4.2.0 – Napi összefoglaló: készpénz Ft és EUR külön
 
 - A „Pénztár” csempe helyett két csempe: **Készpénz Ft** és **Készpénz EUR** (mai árfolyamon Ft-ban, alatta az euróösszeg), mindkettőnél a készpénzen belüli arány.
