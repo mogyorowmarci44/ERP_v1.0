@@ -106,8 +106,8 @@ export async function GhOverview({ cid, profile, sp }: { cid: number; profile: T
         {pr ? (
           <Link href={`${base}/gh/payback#piaci-ertek`} className="card kpi" style={{ color: "inherit", textDecoration: "none" }}>
             <div className="label">Ha ma eladnám ({SALE_METHOD_LABEL[pr.method].toLowerCase()} érték)</div>
-            <div className="value">{fmtNum(pr.price / 1e6, 1)}<small>M Ft · nettó {fmtNum(pr.sale.net / 1e6, 1)} M</small></div>
-            <div className="hint">teljes nyereség: {pr.totalNominal >= 0 ? "+" : ""}{fmtNum(pr.totalNominal / 1e6, 1)} M Ft · IRR {fmtPct(pr.irrNominal, 1)} (reál {fmtPct(pr.irrReal, 1)})</div>
+            <div className="value">{fmtNum(pr.price / 1e6, 1)}<small>m Ft · nettó {fmtNum(pr.sale.net / 1e6, 1)} m</small></div>
+            <div className="hint">teljes nyereség: {pr.totalNominal >= 0 ? "+" : ""}{fmtNum(pr.totalNominal / 1e6, 1)} m Ft · IRR {fmtPct(pr.irrNominal, 1)} (reál {fmtPct(pr.irrReal, 1)})</div>
           </Link>
         ) : null}
         <div className="card kpi">

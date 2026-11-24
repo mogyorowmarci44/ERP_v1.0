@@ -3,11 +3,11 @@
  * Ezt használja az Évzárás › TAO és HIPA oldal, a Forecast és a Cégérték.
  *
  * HIPA (Htv. 39. §): vállalkozási szintű adóalap = nettó árbevétel − ELÁBÉ − közvetített szolgáltatások
- *   − anyagköltség − alvállalkozói teljesítések (− K+F közvetlen költség). 500 M Ft nettó árbevétel felett az ELÁBÉ +
+ *   − anyagköltség − alvállalkozói teljesítések (− K+F közvetlen költség). 500 m Ft nettó árbevétel felett az ELÁBÉ +
  *   közvetített szolgáltatás együtt csak sávosan vonható le (Htv. 39. § (4)).
  *   Az alapot a székhely és a telephelyek települései között kell megosztani (Htv. 3. melléklet); mindegyik település
  *   a saját mértékével és mentességével számol. A rendeleti mentesség (Htv. 39/C. § (2)) a vállalkozási szintű adóalaphoz
- *   kötött (legfeljebb 2,5 M Ft).
+ *   kötött (legfeljebb 2,5 m Ft).
  * TAO (Tao. tv.): adóalap = adózás előtti eredmény + növelő − csökkentő tételek; az elhatárolt veszteség az adóalap
  *   (a veszteségleírás előtti) 50%-áig használható fel, a keletkezését követő 5 adóévben (2015 utáni veszteség). Kulcs: 9%.
  */
@@ -38,7 +38,7 @@ export type HipaBaseInput = {
   rnd?: number;
 };
 
-/** A 500 M Ft feletti árbevételnél levonható ELÁBÉ + közvetített szolgáltatás felső határa (sávosan). */
+/** A 500 m Ft feletti árbevételnél levonható ELÁBÉ + közvetített szolgáltatás felső határa (sávosan). */
 export function cogsDeductionCap(revenue: number): number | null {
   if (revenue <= 500_000_000) return null;
   const band = (lo: number, hi: number) => Math.max(0, Math.min(revenue, hi) - lo);

@@ -9,7 +9,7 @@ import { trialBalance, openItems, journalList, vatAnalytics, type TrialBalanceRo
 import { addDaysIso, monthStart, today } from "@/lib/dates";
 import { isPrivate } from "@/lib/entity";
 import { nextVatDeadline } from "@/lib/vat-deadline";
-import { cashSplit } from "@/lib/cash-split";
+import { cashSplit, isCashAccount } from "@/lib/cash-split";
 import { unclosedVatPeriods } from "@/lib/vat-closing";
 import { consistencyCounts } from "@/lib/consistency";
 import { companyKpis, operationStartOf } from "@/lib/kpi";
@@ -43,7 +43,7 @@ export type CompanySnapshot = {
   date: string; // a küldés napja
   day: string; // a „tegnap”
   headline: string;
-  kpi: { cash: number; cashHuf: number; liquidity: number; revenueDay: number; revenue30: number; stock: number | null; lateReceivable: number; lateReceivableCount: number; latePayable: number; latePayableCount: number };
+  kpi: { cash: number; cashHuf: number; liquidity: number; revenueDay: number; revenue30: number; bank: number; stock: number | null; lateReceivable: number; lateReceivableCount: number; latePayable: number; latePayableCount: number };
   /** v3.9.5 – a készlet értéke: beszerzési ár × (1 + medián bruttó fedezet %). */
   stockValue: { purchase: number; value: number; pct: number | null; count: number } | null;
   /** v3.9.4 – eredmények: folyó hó / negyedév / év (tény) és teljes év a Forecast alapján. */
@@ -264,10 +264,13 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
   const memberLoansBal = Math.max(0, -balOf(tbNow, (c) => c.startsWith(MEMBER_LOAN_ACCOUNT)));
   let cashSeries: number[] = [];
   let liquidity = cashTotal;
+  // v3.9.10 – bankszámlák külön (mai árfolyamon); a pénztár = összes pénz − bank
+  let bank = sum(cash.filter((c) => c.key.startsWith("bank")).map((c) => c.huf));
   try {
     const mm = await moneyMonitor(cid, addDaysIso(t, -29), t, "day");
     // napi értéken: a devizás számlák a mai MNB árfolyamon
     liquidity = sum(mm.accounts.filter((a) => !a.code.startsWith("389")).map((a) => a.revaluedHuf ?? a.balanceHuf));
+    bank = sum(mm.accounts.filter((a) => !a.code.startsWith("389") && !isCashAccount(a.code)).map((a) => a.revaluedHuf ?? a.balanceHuf));
     const n = mm.columns.length;
     cashSeries = Array.from({ length: n }, (_, i) => sum(mm.accounts.filter((a) => !a.code.startsWith("389")).map((a) => a.series[i]?.close ?? 0)));
   } catch {
@@ -315,6 +318,7 @@ export async function companySnapshot(cid: number, t = today()): Promise<Company
       liquidity,
       revenueDay: revenueOf(tbDay),
       revenue30: revenueOf(tb30),
+      bank,
       stock: cars ? cars.lanes.red.count + cars.lanes.yellow.count + cars.lanes.green.count : null,
       lateReceivable: sum(recvLate.map(toHuf)),
       lateReceivableCount: recvLate.length,

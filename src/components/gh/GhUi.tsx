@@ -156,7 +156,7 @@ export function LineChart({ series, base, baseLabel, title, height = 220 }: { se
   const y = (v: number) => T + ((max - v) * (H - T - B)) / (max - min);
   const labels = series[0].points.map((p) => p.label);
   const every = Math.ceil(n / 8);
-  const fmtAxis = (v: number) => (Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(Math.abs(v) % 1e6 ? 1 : 0).replace(".", ",")} M` : Math.abs(v) >= 1e3 ? `${Math.round(v / 1e3)} e` : String(Math.round(v)));
+  const fmtAxis = (v: number) => (Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(Math.abs(v) % 1e6 ? 1 : 0).replace(".", ",")} m` : Math.abs(v) >= 1e3 ? `${Math.round(v / 1e3)} e` : String(Math.round(v)));
   const colW = (W - L - R) / Math.max(1, n - 1);
   return (
     <figure style={{ margin: 0 }}>
