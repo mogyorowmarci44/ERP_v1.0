@@ -39,6 +39,13 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v5.0.1 – Tevékenységprofil szerinti menü és nyitóoldal
+
+- Általános profilnál (nem autókereskedés) elrejtve: **ÁrSugó, Gépkocsi készlet, KészletMérleg, AutóMérleg, Különbözeti ÁFA kartonok, EPR összesítő** – a bal menüből, a nyitóoldal gombjai és csempéi közül; a „gépkocsi 90 napja készleten” teendő sem jelenik meg.
+- Nyitóoldal, általános profil: „Előző eladás óta” helyett **Bevétel (év)**, „Készlet” helyett **Nyitott vevők**.
+- Beállítások: az EPR díjátalány és az EPR származáskód csak autókereskedés profilnál látszik (a mentett érték megmarad).
+- Még nincs profilhoz kötve: a napi összefoglaló e-mail autós blokkja, a számlaűrlap gépkocsi-választója, a Forecast autónkénti részei.
+
 ## v5.0.0 – Kft sablon, tevékenységprofil
 
 - Új cégnél választható **sablon**: *Általános Kft – tevékenységi kör még nem ismert* (alapértelmezés) vagy *Autókereskedés*. Egyelőre mindkettő ugyanazt kapja: üres cég, azonos számlatükör, ÁFA-kódok, naplók és felület.

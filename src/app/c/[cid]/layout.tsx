@@ -39,6 +39,7 @@ import {
   FileCheck2,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
+import { isCarDealer } from "@/lib/activity";
 import { APP_VERSION } from "@/lib/version";
 import { requireCompany } from "@/lib/auth";
 import { logoutAction } from "@/app/auth-actions";
@@ -55,6 +56,8 @@ export default async function CompanyLayout({ children, params }: { children: Re
   const b = `/c/${cid}`;
   const theme = normalizeTheme(company.theme);
   const priv = isPrivate(company);
+  // v5.0.1 – autókereskedés-specifikus menüpontok csak autókereskedés profilnál
+  const car = isCarDealer(company);
   return (
     <div className="shell" style={themeVars(theme) as React.CSSProperties} data-mode={theme.mode}>
       <nav className="side" aria-label="Fő navigáció">
@@ -121,14 +124,14 @@ export default async function CompanyLayout({ children, params }: { children: Re
 
           <div className="group">Tervezés</div>
           <NavLink href={`${b}/forecast`}><TrendingUp />Forecast</NavLink>
-          <NavLink href={`${b}/arsugo`}><Tag />ÁrSugó</NavLink>
+          {car && <NavLink href={`${b}/arsugo`}><Tag />ÁrSugó</NavLink>}
 
           <div className="group">Kimutatások</div>
           <NavLink href={`${b}/reports/kpi`}><Gauge />KPI-Dashboard</NavLink>
           <NavLink href={`${b}/reports/statements`}><ChartNoAxesCombined />P&amp;L, cash-flow, mérleg</NavLink>
           <NavLink href={`${b}/reports/vat`}><Percent />ÁFA analitika</NavLink>
-          <NavLink href={`${b}/vehicles/kartonok`}><ReceiptText />Különbözeti ÁFA kartonok</NavLink>
-          <NavLink href={`${b}/vehicles/epr`}><Recycle />EPR összesítő</NavLink>
+          {car && <NavLink href={`${b}/vehicles/kartonok`}><ReceiptText />Különbözeti ÁFA kartonok</NavLink>}
+          {car && <NavLink href={`${b}/vehicles/epr`}><Recycle />EPR összesítő</NavLink>}
           <NavLink href={`${b}/reports/open-items`}><Clock />Nyitott tételek</NavLink>
           <NavLink href={`${b}/reports/consistency`}><ListChecks />Egyezőség</NavLink>
 
@@ -139,8 +142,8 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={`${b}/closing`}><BookOpenCheck />Évzárás</NavLink>
 
           <div className="group">Törzsadatok</div>
-          <NavLink href={`${b}/vehicles`} exact><CarFront />Gépkocsi készlet</NavLink>
-          <NavLink href={`${b}/vehicles/merleg`}><Scale />KészletMérleg</NavLink>
+          {car && <NavLink href={`${b}/vehicles`} exact><CarFront />Gépkocsi készlet</NavLink>}
+          {car && <NavLink href={`${b}/vehicles/merleg`}><Scale />KészletMérleg</NavLink>}
           <NavLink href={`${b}/partners`}><Users />Partnerek</NavLink>
           <NavLink href={`${b}/accounts`}><ListTree />Számlatükör</NavLink>
           <NavLink href={`${b}/fx`}><Coins />Árfolyamok (MNB)</NavLink>
