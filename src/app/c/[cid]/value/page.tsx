@@ -107,7 +107,7 @@ export default async function CompanyValuePage({ params, searchParams }: { param
         ) : (
           <>
             <p className="muted">
-              A könyv szerinti saját tőkéhez hozzáadjuk a következő {v.forward.months} hónap tervezett, adózott eredményének jelenértékét. Nem a korrigált értékből indul,
+              A könyv szerinti saját tőkéhez hozzáadjuk az üzleti év hátralévő {v.forward.months} hónapjának tervezett eredményét (jelenértéken), és levonjuk az év teljes TAO-ját és HIPA-ját. Nem a korrigált értékből indul,
               mert a készlet eladásából várt haszon már benne van a Forecast eredményében – így nincs kétszer számolva.
             </p>
             <Calc lines={v.forward.lines} total={f.base.value} totalLabel="Előretekintő érték (alap)" />

@@ -39,6 +39,10 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v5.1.3 – Forecast-cégérték a folyó üzleti év végéig
+
+- Az előretekintő (forecast) cégérték már nem a következő 12 hónapot, hanem **a folyó üzleti év végéig** tartó időszakot nézi: könyv szerinti saját tőke + az év hátralévő hónapjainak tervezett eredménye (jelenértéken) − az év teljes TAO-ja és HIPA-ja (tény + terv). A nyitóoldali „forecast” sor és a Cégérték oldal 3. módszere is így számol.
+
 ## v5.1.2 – Cégérték csempe: szebb forecast-sor
 
 - A forecast-cégérték külön sorban a korrigált érték alatt („forecast 12 345 eFt”), mellette az eltérés a korrigált értékhez képest (▲ zöld / ▼ piros eFt); egér alatt a számítás magyarázata.

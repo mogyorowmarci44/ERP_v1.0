@@ -2,7 +2,7 @@
  * v2.2 – Cégérték (kereskedő cégekre) – három módszer:
  *  1. Korrigált nettó eszközérték: könyv szerinti saját tőke, a készlet a várható nettó eladási értéken, a becsült adóval.
  *  2. Eredményszorzós: (elmúlt 12 hónap adózás előtti eredménye + értékcsökkenés) × szorzó + pénzeszközök − hitelek / tagi kölcsön.
- *  3. Előretekintő: könyv szerinti saját tőke + a Forecast következő 12 havi adózott eredményének jelenértéke (három forgatókönyv).
+ *  3. Előretekintő: könyv szerinti saját tőke + a Forecast szerinti eredmény a folyó üzleti év végéig (jelenértéken) − az év TAO + HIPA (három forgatókönyv).
  */
 import { hipaTax, taoCalc } from "./corp-tax";
 import { db, schema } from "@/db";
@@ -33,6 +33,12 @@ const mv = (gross: number, base: number) => Math.max(0, Math.round(((gross - bas
 const sumBy = (tb: TrialBalanceRow[], pred: (code: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.closingDebit - r.closingCredit, 0);
 /** Időszaki forgalom (T − K) az eredményszámlákhoz (a kivonat záró egyenlege az üzleti év elejétől halmoz). */
 const flowBy = (tb: TrialBalanceRow[], pred: (code: string) => boolean) => tb.filter((r) => pred(r.code)).reduce((s, r) => s + r.periodDebit - r.periodCredit, 0);
+/** Az üzleti év utolsó napja a TAO/HIPA befizetési határidőből (év vége + 5 hónap, hó vége). */
+const lastOfFy = (payDate: string) => {
+  const d = new Date(payDate + "T00:00:00Z");
+  d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 5); d.setUTCMonth(d.getUTCMonth() + 1); d.setUTCDate(0);
+  return d.toISOString().slice(0, 10);
+};
 const monthsBetween = (a: string, b: string) => Math.max(0, (Date.parse(b) - Date.parse(a)) / (86400000 * 30.4375));
 
 export async function companyValue(companyId: number, opts: { multiple?: number; discountRate?: number } = {}): Promise<CompanyValue> {
@@ -100,22 +106,27 @@ export async function companyValue(companyId: number, opts: { multiple?: number;
   const r = opts.discountRate ?? DEFAULT_DISCOUNT_RATE;
   const monthly = Math.pow(1 + r, 1 / 12) - 1;
   const empty = input.plans.length === 0 && input.items.length === 0;
+  // v5.1.3 – a folyó üzleti év végéig: könyv szerinti saját tőke (benne a tárgyévi, adózás előtti tényeredmény)
+  // + az év hátralévő hónapjainak tervezett eredménye (diszkontálva) − a teljes évi HIPA és TAO (tény + terv alapján).
   let fwdMonths = 0;
+  let fyEnd = "";
   const scenarios = Object.fromEntries(SCENARIOS.map((sc) => {
     const run = runForecast(input, sc, "month");
-    const months12 = run.months.slice(0, 12);
-    fwdMonths = months12.length;
-    const preTax = months12.reduce((a, m) => a + m.preTax, 0);
-    // éves HIPA a folyó üzleti év becsléséből; TAO az elhatárolt veszteséggel
-    const hipaYear = run.years[0]?.hipa ?? 0;
-    const afterTax = preTax - hipaYear - taoCalc({ preTax: preTax - hipaYear, losses: tx?.losses ?? [], rate: tao }).tax;
-    // havi diszkontálás: az egyes hónapok adózott eredménye a hónap végén
-    const ratio = preTax !== 0 ? afterTax / preTax : 1;
-    const pv = months12.reduce((a, m, i) => a + (m.preTax * ratio) / Math.pow(1 + monthly, i + 1), 0);
+    const fy = run.years[0];
+    fyEnd = fy?.payDate ? lastOfFy(fy.payDate) : `${t.slice(0, 4)}-12-31`;
+    const rest = run.months.filter((m) => m.end <= fyEnd);
+    fwdMonths = rest.length;
+    const preTax = rest.reduce((a, m) => a + m.preTax, 0);
+    const pvPre = rest.reduce((a, m, i) => a + m.preTax / Math.pow(1 + monthly, i + 1), 0);
+    const taxes = (fy?.hipa ?? 0) + (fy?.tao ?? 0);
+    const afterTax = preTax - taxes;
+    const pv = pvPre - taxes;
     return [sc, { preTax: round2(preTax), afterTax: round2(afterTax), pv: round2(pv), value: round2(bookEquity + pv) }];
   })) as CompanyValue["forward"]["scenarios"];
 
   const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
+  const fyBase = runForecast(input, "base", "month").years[0];
+  const fyTaxBase = (fyBase?.hipa ?? 0) + (fyBase?.tao ?? 0);
   return {
     asOf: t,
     rates: { tao, hipa },
@@ -147,7 +158,8 @@ export async function companyValue(companyId: number, opts: { multiple?: number;
       discountRate: r, months: fwdMonths, empty, scenarios,
       lines: [
         { label: "Könyv szerinti saját tőke", amount: round2(bookEquity), hint: "nem a korrigált érték: a készlet eladásának haszna már a Forecast eredményében van" },
-        { label: `+ Következő ${fwdMonths} hónap adózott eredményének jelenértéke (alap)`, amount: scenarios.base.pv, hint: `diszkontráta ${pct(r)} / év` },
+        { label: `+ Az üzleti év hátralévő ${fwdMonths} hónapjának tervezett eredménye (alap, ${fyEnd}-ig)`, amount: round2(scenarios.base.pv + fyTaxBase), hint: `diszkontráta ${pct(r)} / év` },
+        { label: "− Az üzleti év TAO + HIPA (tény + terv)", amount: -round2(fyTaxBase), hint: "a saját tőkében a tárgyévi eredmény még adózás előtt szerepel" },
       ],
     },
   };
