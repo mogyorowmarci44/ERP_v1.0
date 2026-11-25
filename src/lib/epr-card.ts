@@ -135,6 +135,22 @@ export async function eprCard(companyId: number, vehicleId: number): Promise<Epr
   return build(company, vehicle, await vehicleDocs(companyId, [vehicleId]));
 }
 
+/** v4.5.2 – Több gépkocsi EPR kartonja egy lekérdezéssel (Forecast: nettó fedezet EPR-rel). */
+export async function eprCards(companyId: number, vehicleIds: number[]): Promise<Map<number, EprCard>> {
+  const out = new Map<number, EprCard>();
+  if (!vehicleIds.length) return out;
+  const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+  if (!company) return out;
+  const [vs, rows] = await Promise.all([
+    db.select().from(vehicles).where(and(eq(vehicles.companyId, companyId), inArray(vehicles.id, vehicleIds))),
+    vehicleDocs(companyId, vehicleIds),
+  ]);
+  for (const v of vs) out.set(v.id, build(company, v, rows.filter((r) => r.vehicleId === v.id)));
+  return out;
+}
+
+export { eprEstimate } from "./epr";
+
 export type EprSummaryRow = { kfCode: string; category: EprCategory; rate: number | null; count: number; massKg: number; fee: number; missingMass: number };
 export type EprQuarter = {
   company: typeof companies.$inferSelect;

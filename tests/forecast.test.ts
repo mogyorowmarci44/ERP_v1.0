@@ -194,3 +194,29 @@ describe("forecast – fizetés napja (bér, járulék)", () => {
     expect(dec.cashOut).toBe(300_000);
   });
 });
+
+describe("v4.5.2 – EPR díj a nettó fedezetben", () => {
+  it("az EPR díj csökkenti a nettó fedezetet és az eredményt, a HIPA-alapot nem; befizetés a negyedévet követő hó 20-án", () => {
+    const base = runForecast({ opening, plans: [stockPlan], items: [], settings }, "base");
+    const r = runForecast({ opening, plans: [{ ...stockPlan, epr: 60_000 }], items: [], settings }, "base");
+    const s = r.sales[0];
+    expect(s.epr).toBe(60_000);
+    expect(s.grossMargin).toBe(343_701);
+    expect(s.netMargin).toBe(283_701);
+    const dec = r.months.find((m) => m.month === "2026-12")!;
+    expect(dec.vehicleCosts).toBe(60_000);
+    expect(dec.preTax).toBe(base.months.find((m) => m.month === "2026-12")!.preTax - 60_000);
+    expect(r.years[0].hipaBase).toBe(base.years[0].hipaBase);
+    // 2026. Q4 → 2027-01-20, bankból
+    const jan = r.months.find((m) => m.month === "2027-01")!;
+    const janBase = base.months.find((m) => m.month === "2027-01")!;
+    expect(jan.endBank).toBe(janBase.endBank - 60_000);
+    expect(dec.endBank).toBe(base.months.find((m) => m.month === "2026-12")!.endBank);
+  });
+
+  it("EPR nélkül (belföldi autó) a nettó fedezet = bruttó fedezet", () => {
+    const r = runForecast({ opening, plans: [stockPlan], items: [], settings }, "base");
+    expect(r.sales[0].epr).toBe(0);
+    expect(r.sales[0].netMargin).toBe(r.sales[0].grossMargin);
+  });
+});

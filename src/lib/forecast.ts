@@ -13,6 +13,7 @@
 import type { ForecastScenarioParams, ForecastSettings } from "@/db/schema";
 import { fmtNum } from "@/lib/money";
 import { hipaTax, taoCalc, type HipaSiteCalc, type LossEntry } from "@/lib/corp-tax";
+import { eprDeadline, quarterOf } from "@/lib/epr";
 
 export type Scenario = "base" | "pessimistic" | "optimistic";
 export const SCENARIO_LABEL: Record<Scenario, string> = { pessimistic: "Rosszabb", base: "Alap", optimistic: "Jobb" };
@@ -67,6 +68,8 @@ export type FcPlan = {
   purchase?: { date: string; price: number; payment: Channel } | null;
   sale?: { date: string; price: number; payment: Channel } | null;
   costs: FcCost[];
+  /** v4.5.2 – Várható EPR díj (Ft, fix, ÁFA-t nem csökkentő): az eladás napján költség, a negyedévet követő hó 20-án fizetendő. */
+  epr?: number | null;
 };
 export type FcItem = {
   id: number;
@@ -220,6 +223,10 @@ export type FcSaleRow = {
   netRevenue: number;
   cogs: number;
   grossMargin: number;
+  /** v4.5.2 – EPR díj (0, ha nem kötelezett vagy nem számolható). */
+  epr: number;
+  /** Nettó fedezet = bruttó fedezet − EPR díj. */
+  netMargin: number;
   inHorizon: boolean;
   shifted: boolean;
 };
@@ -320,9 +327,10 @@ export function runForecast(
     if (plan.purchase && date < plan.purchase.date) date = plan.purchase.date;
     const vat = marginVat(price, base);
     const cogs = book + capitalized;
+    const epr = Math.max(0, r0(plan.epr ?? 0));
     const row: FcSaleRow = {
       planId: plan.id, label: plan.label, saleDate: date, salePrice: price, marginBase: base, marginVat: vat, netRevenue: price - vat,
-      cogs, grossMargin: price - vat - cogs, inHorizon: date <= horizonEnd, shifted: ym(date) !== ym(atLeastToday(plan.sale.date)),
+      cogs, grossMargin: price - vat - cogs, epr, netMargin: price - vat - cogs - epr, inHorizon: date <= horizonEnd, shifted: ym(date) !== ym(atLeastToday(plan.sale.date)),
     };
     sales.push(row);
     if (plan.stock && base <= 0) warnings.push(`${plan.label}: nincs különbözeti ÁFA-alap (beszerzési ár) – az ÁFA a teljes eladási árból számolódik`);
@@ -336,6 +344,14 @@ export function runForecast(
     addVat(date, vat);
     addPl(date, row.grossMargin, row.grossMargin);
     events.push({ date, channel: plan.sale.payment, amount: price, kind: "sale", note: plan.label });
+    if (epr) {
+      // EPR díj: az eladás (első belföldi forgalomba hozatal) napján költség – a HIPA-alapot nem csökkenti –,
+      // befizetés a tárgynegyedévet követő hónap 20-áig, utalással.
+      b.vehicleCosts += epr;
+      addPl(date, -epr, 0);
+      const due = eprDeadline(quarterOf(date));
+      if (due <= horizonEnd) events.push({ date: due, channel: "bank", amount: -epr, kind: "cost", note: `${plan.label}: EPR díj` });
+    }
   }
 
   // Ismétlődő / egyszeri tételek

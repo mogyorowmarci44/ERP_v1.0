@@ -39,6 +39,14 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.5.2 – Forecast: EPR díj a nettó fedezetben
+
+- A Forecast autónkénti **nettó fedezete** = bruttó fedezet − **EPR díj**. Importautónál a díj: tömeg × az eladás tervezett napján érvényes díjtétel (az EPR-lap kategóriájával, hajtásával, átalány-beállításával); belföldi beszerzésnél 0.
+- Az EPR díj az eladás napján költség (csökkenti az adózás előtti eredményt, a HIPA-alapot nem), befizetése a negyedévet követő hónap 20-án, utalással – a pénzszimulációban is.
+- „Eladások a tervben” táblázat: új **EPR díj** oszlop; Tervezés › Készlet: a nettó fedezet az EPR díjjal csökkentve.
+- Ha a díj nem számolható (hiányzó tömeg, kategória vagy származás), a Forecast jelzi; ha a tervköltségek között már szerepel EPR, nem számoljuk kétszer.
+- A napi összefoglaló és az Évzárás éves Forecast-eredménye automatikusan az EPR-rel csökkentett értéket használja.
+
 ## v4.5.1 – Tagi kölcsön: Áttekintés fül, kijelölés és nyomtatás
 
 - A „Minden mozgás” fül neve **Áttekintés**; a táblázat görgetés nélkül elfér (8 oszlop, a két lejárat egy oszlopban „régi → új”, a hosszabbító űrlap a Nyitott fülön marad).

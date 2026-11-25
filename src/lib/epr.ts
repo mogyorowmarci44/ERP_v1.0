@@ -130,5 +130,21 @@ export function eprLiability(args: { origin: EprOrigin | null; saleDate: string 
   return { liable: true, reason: "Külföldről behozott gépjármű első belföldi tulajdon-átruházása – első belföldi forgalomba hozatal." };
 }
 
+/**
+ * v4.5.2 – Várható EPR díj egy még el nem adott gépkocsira a tervezett eladás napjával (belföldi vevőt feltételezve).
+ * Importautó: tömeg × az eladás napján érvényes díjtétel; belföldi beszerzés: 0; nem eldönthető / hiányzó tömeg: null + figyelmeztetés.
+ */
+export function eprEstimate(
+  card: { fee: number | null; origin: EprOrigin | null; category: EprCategory | null; drive: EprDrive | null; massKg: number | null; flat: boolean },
+  saleDate: string,
+): { fee: number | null; warning: string | null } {
+  if (card.fee != null) return { fee: card.fee, warning: null };
+  if (card.origin === "domestic") return { fee: 0, warning: null };
+  if (card.origin === null) return { fee: null, warning: "nem állapítható meg a származás (import / belföld) – EPR díj nélkül számolva" };
+  if (!card.category) return { fee: null, warning: "importautó, de nincs megadva a járműkategória – EPR díj nélkül számolva" };
+  if (!card.massKg) return { fee: null, warning: "importautó, de hiányzik a tömeg – EPR díj nélkül számolva (EPR-lap)" };
+  return { fee: eprFee(card.massKg, eprRate(saleDate, card.category, card.drive ?? "ice", card.flat)), warning: null };
+}
+
 /** Számlán kötelező szöveg (EPR-rendelet 21. § (2)) – kiskereskedelmi értékesítés kivételével. */
 export const EPR_INVOICE_TEXT = "A kiterjesztett gyártói felelősségi díj megfizetése az eladót terheli.";

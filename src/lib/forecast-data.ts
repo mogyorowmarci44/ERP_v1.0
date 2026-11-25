@@ -8,6 +8,8 @@ import { today, addDaysIso } from "./dates";
 import { round2 } from "./money";
 import { lossPoolForCurrentYear, fyOf } from "./corp-tax-data";
 import { vehicleTitle } from "./vehicle-id";
+import { eprCards, type EprCard } from "./epr-card";
+import { eprEstimate } from "./epr";
 import {
   normalizeSettings, calibrate, quantile, MIN_CALIBRATION_SALES, periodList, periodKey,
   type FcOpening, type FcPlan, type FcItem, type SoldHistory, type Channel, type FcMonth, type Granularity,
@@ -80,7 +82,19 @@ export type StockRow = {
   bookValue: number;
   marginBase: number;
   plan: (typeof forecastPlans.$inferSelect & { costs: (typeof forecastPlanCosts.$inferSelect)[] }) | null;
+  /** v4.5.2 – EPR karton (származás, kategória, tömeg) a várható EPR díjhoz. */
+  epr: EprCard | null;
 };
+
+/** A tervköltségek között kézzel felvett EPR díjat nem számoljuk kétszer. */
+const eprInCosts = (costs: Array<{ description: string }>) => costs.some((c) => /\bepr\b|kiterjesztett gyártói/i.test(c.description));
+
+/** v4.5.2 – Várható EPR díj a tervezett eladás napjával (null = nincs / nem számolható / a tervköltségek között szerepel). */
+export function stockEpr(s: StockRow, saleDate: string | null): { fee: number | null; warning: string | null } {
+  if (!s.epr || !saleDate) return { fee: null, warning: null };
+  if (s.plan && eprInCosts(s.plan.costs)) return { fee: null, warning: null };
+  return eprEstimate(s.epr, saleDate);
+}
 export type ClosedRow = {
   plan: typeof forecastPlans.$inferSelect;
   vehicle: typeof vehicles.$inferSelect;
@@ -96,10 +110,10 @@ export async function loadPlans(companyId: number) {
   const costs = plans.length ? await db.select().from(forecastPlanCosts).where(inArray(forecastPlanCosts.planId, plans.map((p) => p.id))).orderBy(asc(forecastPlanCosts.id)) : [];
   const withCosts = plans.map((p) => ({ ...p, costs: costs.filter((c) => c.planId === p.id) }));
   const inStock = vs.filter((v) => v.status !== "sold");
-  const books = await vehicleBookValues(db, companyId, inStock.map((v) => v.id));
+  const [books, eprs] = await Promise.all([vehicleBookValues(db, companyId, inStock.map((v) => v.id)), eprCards(companyId, inStock.map((v) => v.id))]);
   const stock: StockRow[] = [];
   for (const v of inStock) {
-    stock.push({ vehicle: v, bookValue: round2(books.get(v.id) ?? 0), marginBase: round2(await marginPurchaseBase(db, companyId, v.id)), plan: withCosts.find((p) => p.vehicleId === v.id) ?? null });
+    stock.push({ vehicle: v, bookValue: round2(books.get(v.id) ?? 0), marginBase: round2(await marginPurchaseBase(db, companyId, v.id)), plan: withCosts.find((p) => p.vehicleId === v.id) ?? null, epr: eprs.get(v.id) ?? null });
   }
   const planned = withCosts.filter((p) => p.vehicleId === null);
   const soldIds = vs.filter((v) => v.status === "sold").map((v) => v.id);
@@ -135,11 +149,14 @@ export async function loadForecastInput(companyId: number) {
   });
   const fcPlans: FcPlan[] = [];
   const unplanned: string[] = [];
+  const eprWarnings: string[] = [];
   for (const s of plans.stock) {
     const label = vehicleLabel(s.vehicle);
     if (!s.plan?.salePrice || !s.plan?.saleDate) { unplanned.push(label); continue; }
+    const epr = stockEpr(s, s.plan.saleDate);
+    if (epr.warning) eprWarnings.push(`${label}: ${epr.warning}`);
     fcPlans.push({ id: s.plan.id, label, stock: { bookValue: s.bookValue, marginBase: s.marginBase },
-      sale: { date: s.plan.saleDate, price: Number(s.plan.salePrice), payment: s.plan.salePayment as Channel }, costs: s.plan.costs.map(costOf) });
+      sale: { date: s.plan.saleDate, price: Number(s.plan.salePrice), payment: s.plan.salePayment as Channel }, costs: s.plan.costs.map(costOf), epr: epr.fee });
   }
   for (const p of plans.planned) {
     if (!p.purchaseDate || !p.purchasePrice) continue;
@@ -148,7 +165,7 @@ export async function loadForecastInput(companyId: number) {
   }
   const items: FcItem[] = itemsRows.map((i) => ({ id: i.id, category: i.category, description: i.description, accountCode: i.accountCode, net: Number(i.net), vatRate: i.vatRate,
     deductible: i.deductible, frequency: i.frequency, startDate: i.startDate, endDate: i.endDate, payment: i.payment as Channel, payDay: i.payDay }));
-  return { settings, opening, plans: fcPlans, items, unplanned, plansRaw: plans, itemsRows };
+  return { settings, opening, plans: fcPlans, items, unplanned, eprWarnings, plansRaw: plans, itemsRows };
 }
 
 // ---------------------------------------------------------------------------

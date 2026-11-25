@@ -1,5 +1,5 @@
 import { requireCompany } from "@/lib/auth";
-import { loadPlans, soldHistory, suggestSale, vehicleLabel } from "@/lib/forecast-data";
+import { loadPlans, soldHistory, stockEpr, suggestSale, vehicleLabel } from "@/lib/forecast-data";
 import { MIN_CALIBRATION_SALES } from "@/lib/forecast";
 import { ForecastTabs } from "@/components/Forecast";
 import { Flash } from "@/components/Flash";
@@ -103,7 +103,8 @@ export default async function ForecastStockPage({ params, searchParams }: { para
               const capCost = costs.filter((c) => c.capitalize).reduce((a, c) => a + c.net + (c.deductible ? 0 : Math.round((c.net * c.vatRate) / 100)), 0);
               const price = p?.salePrice ? Number(p.salePrice) : null;
               const vat = price ? mv(price, s.marginBase) : null;
-              const margin = price ? price - vat! - s.bookValue - capCost : null;
+              const epr = price ? stockEpr(s, p?.saleDate ?? t) : null;
+              const margin = price ? price - vat! - s.bookValue - capCost - (epr?.fee ?? 0) : null;
               const sug = !price ? suggestSale(s.bookValue, s.vehicle.purchaseDate, hist) : null;
               return (
                 <tr key={s.vehicle.id}>
@@ -135,7 +136,11 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                     {p?.note && <div className="muted" style={{ fontSize: 12 }}>{p.note}</div>}
                   </td>
                   <td className="num">{vat !== null ? fmtHuf(vat) : <span className="muted">–</span>}</td>
-                  <td className="num">{margin !== null ? <span className={margin < 0 ? "neg" : undefined}>{fmtHuf(margin)}</span> : <span className="muted">–</span>}</td>
+                  <td className="num">
+                    {margin !== null ? <span className={margin < 0 ? "neg" : undefined}>{fmtHuf(margin)}</span> : <span className="muted">–</span>}
+                    {epr?.fee ? <div className="muted" style={{ fontSize: 12 }}>EPR díjjal: −{fmtHuf(epr.fee)}</div> : null}
+                    {epr?.warning ? <div className="muted" style={{ fontSize: 12 }}>EPR: {epr.warning}</div> : null}
+                  </td>
                 </tr>
               );
             })}
