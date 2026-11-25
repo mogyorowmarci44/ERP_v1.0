@@ -56,3 +56,20 @@ describe("negyedév", () => {
     expect(quarterRange({ year: 2026, q: 2 }).to).toBe("2026-06-30");
   });
 });
+
+import { eprEstimate, eprFee as fee_, eprRate as rate_ } from "@/lib/epr";
+
+describe("v4.5.2 – várható EPR díj a Forecasthoz", () => {
+  const card = (o: Partial<Parameters<typeof eprEstimate>[0]>) => ({ fee: null, origin: "import" as const, category: "M1" as const, drive: "ice" as const, massKg: 1200, flat: false, ...o });
+  it("importautó: tömeg × az eladás napján érvényes díjtétel", () => {
+    expect(eprEstimate(card({}), "2026-12-05")).toEqual({ fee: fee_(1200, rate_("2026-12-05", "M1", "ice", false)), warning: null });
+  });
+  it("belföldi beszerzés: 0", () => {
+    expect(eprEstimate(card({ origin: "domestic" }), "2026-12-05").fee).toBe(0);
+  });
+  it("hiányzó tömeg: nincs díj, figyelmeztetés", () => {
+    const e = eprEstimate(card({ massKg: null }), "2026-12-05");
+    expect(e.fee).toBeNull();
+    expect(e.warning).toMatch(/tömeg/);
+  });
+});

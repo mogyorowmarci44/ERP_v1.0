@@ -183,6 +183,9 @@ export default async function ForecastPage({ params, searchParams }: { params: P
           <ul>{r.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
         </div>
       )}
+      {input.eprWarnings.length > 0 && (
+        <p className="muted">EPR díj nem számolható: {input.eprWarnings.join("; ")}.</p>
+      )}
       {input.unplanned.length > 0 && (
         <p className="muted">Terv nélküli készletautó (nem számol vele): {input.unplanned.join(", ")} – <Link href={`/c/${cid}/forecast/stock`}>terv megadása</Link>.</p>
       )}
@@ -226,7 +229,7 @@ export default async function ForecastPage({ params, searchParams }: { params: P
           <h2>Eladások a tervben</h2>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Gépkocsi</th><th>Eladás</th><th className="num">Bruttó ár</th><th className="num">ÁFA-alap (beszerzés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Nettó árbevétel</th><th className="num">ELÁBÉ</th><th className="num">Nettó fedezet</th></tr></thead>
+              <thead><tr><th>Gépkocsi</th><th>Eladás</th><th className="num">Bruttó ár</th><th className="num">ÁFA-alap (beszerzés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Nettó árbevétel</th><th className="num">ELÁBÉ</th><th className="num">EPR díj</th><th className="num">Nettó fedezet</th></tr></thead>
               <tbody>
                 {[...r.sales].sort((a, b) => (a.saleDate < b.saleDate ? -1 : 1)).map((s) => (
                   <tr key={s.planId} className={s.inHorizon ? undefined : "muted"}>
@@ -237,17 +240,18 @@ export default async function ForecastPage({ params, searchParams }: { params: P
                     <td className="num">{fmtHuf(s.marginVat)}</td>
                     <td className="num">{fmtHuf(s.netRevenue)}</td>
                     <td className="num">{fmtHuf(s.cogs)}</td>
-                    <td className="num"><Amount v={s.grossMargin} /></td>
+                    <td className="num">{s.epr ? fmtHuf(s.epr) : <span className="muted">–</span>}</td>
+                    <td className="num"><Amount v={s.netMargin} /></td>
                   </tr>
                 ))}
-                {r.sales.length === 0 && <tr><td colSpan={8} className="muted">Nincs tervezett eladás.</td></tr>}
+                {r.sales.length === 0 && <tr><td colSpan={9} className="muted">Nincs tervezett eladás.</td></tr>}
               </tbody>
             </table>
           </div>
         </>
       )}
       <p className="muted" style={{ marginTop: 12 }}>
-        A különbözeti ÁFA autónként számolódik: (bruttó eladási ár − beszerzési ár) × 27/127, negatív különbözetnél 0. Az ÁFA a bevallási időszak után ({o.vatPeriod === "monthly" ? "havi" : o.vatPeriod === "quarterly" ? "negyedéves" : "éves"}) esedékes; a negatív egyenleg továbbvihető.
+        A különbözeti ÁFA autónként számolódik: (bruttó eladási ár − beszerzési ár) × 27/127, negatív különbözetnél 0. Az ÁFA a bevallási időszak után ({o.vatPeriod === "monthly" ? "havi" : o.vatPeriod === "quarterly" ? "negyedéves" : "éves"}) esedékes; a negatív egyenleg továbbvihető. Importautónál a nettó fedezetből levonjuk az EPR díjat (tömeg × az eladás napján érvényes díjtétel): az eladás napján költség, befizetése a negyedévet követő hónap 20-án.
         A *-gal jelölt időszak részleges (a tervezési horizont előbb ér véget). A TAO az üzleti év tény + terv eredményéből, a HIPA a nettó árbevétel − ELÁBÉ − anyagköltség alapból becsült (ez veszteség mellett is lehet pozitív; a mentességi határ alatt nincs HIPA) (előlegek és adóalap-korrekciók nélkül), befizetés a következő év május 31-ig.
       </p>
     </div>
