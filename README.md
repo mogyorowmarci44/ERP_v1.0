@@ -39,6 +39,11 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v5.1.1 – Nyitóoldal: forecast-cégérték a Cégérték alatt
+
+- A nyitóoldal Cégérték csempéjén a korrigált nettó eszközérték alatt kisbetűvel ott a **forecast** szerinti cégérték is (könyv szerinti saját tőke + a Forecast következő 12 havi adózott eredményének jelenértéke, alap forgatókönyv) – mint az „Előző eladás óta” csempén a medián. Forecast-terv nélkül nem jelenik meg.
+- Típuskatalógus (v4.5.3 pótlás): a kínai „AUDI” márka sorai kimaradnak a betöltésből; EPR-tömeg tartalék – ha a változatnak nincs saját tömege, a generáció, végül a modell évjáratban gyártott legnehezebb változata.
+
 ## v5.0.1 – Tevékenységprofil szerinti menü és nyitóoldal
 
 - Általános profilnál (nem autókereskedés) elrejtve: **ÁrSugó, Gépkocsi készlet, KészletMérleg, AutóMérleg, Különbözeti ÁFA kartonok, EPR összesítő** – a bal menüből, a nyitóoldal gombjai és csempéi közül; a „gépkocsi 90 napja készleten” teendő sem jelenik meg.
