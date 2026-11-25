@@ -39,6 +39,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
         <form action={logoutAction} className="row">
           <Link href="/admin/summary">Napi összefoglaló</Link>
+          <Link href="/admin/catalog">Típuskatalógus</Link>
           <Link href="/">← Cégeim</Link>
           <span className="muted">{me.name}</span>
           <button>Kilépés</button>

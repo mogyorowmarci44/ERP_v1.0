@@ -39,6 +39,12 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.5.3 – Típuskatalógus
+
+- Új, cégfüggetlen táblák: `car_makes` (márka + hasznaltauto.hu hirdetésszám), `car_models`, `car_variants` (generáció, gyártás kezdete–vége évjárat-intervallumként, hajtáslánc, üzemanyag, hengerűrtartalom, kW / LE, motorkód, hajtás, váltó és fokozatszám, saját tömeg alsó–felső érték, megengedett össztömeg). Migráció: `0030_v4_5_3_car_catalog.sql`.
+- Kör: a hasznaltauto.hu-n 200-nál több hirdetéssel rendelkező 44 márka (2026-11-25; a Mercedes-AMG a Mercedes-Benz alatt), minden modell és motorváltozat (forrás: auto-data.net).
+- Admin › **Típuskatalógus**: az `autodata_tipusok.csv` betöltése (újratölthető, a változatok frissülnek); évjáratonkénti lekérdezés: `year_from ≤ év ≤ coalesce(year_to, idei év)`.
+
 ## v4.5.4 – Forecast › Készlet: új elrendezés, nyitott tételek a főkönyvből
 
 - Készlet tábla: a könyv szerinti érték oszlop és a soronkénti Mentés gomb kikerült (alul egy „Összes mentése”). Fedezet-oszlopok: **Különbözeti ÁFA · EPR díj · Nettó fedezet**, alul összesítő sor.
