@@ -184,7 +184,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
           {!cv.forward.empty && (() => {
             const fv = cv.forward.scenarios.base.value, d = fv - cv.nav.value;
             return (
-              <div className="lp-value-sub" title="Előretekintő cégérték: könyv szerinti saját tőke + a Forecast következő 12 havi adózott eredményének jelenértéke (alap forgatókönyv). A felső szám a korrigált nettó eszközérték.">
+              <div className="lp-value-sub" title="Előretekintő cégérték: könyv szerinti saját tőke + a Forecast szerinti eredmény a folyó üzleti év végéig − az év TAO + HIPA (alap forgatókönyv). A felső szám a korrigált nettó eszközérték.">
                 <span>forecast</span> <b>{eFt(fv)}</b>
                 {Math.abs(d) >= 1000 && <span className={d < 0 ? "neg" : "pos"}>{d < 0 ? "▼" : "▲"} {eFt(Math.abs(d))}</span>}
               </div>
