@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { parseActivityProfile } from "@/lib/activity";
 import { linkEntryToInvoice, offsetInvoices } from "@/lib/matching";
 import { closeVatPeriod, reopenVatPeriod } from "@/lib/vat-closing";
 import { releaseAccrual } from "@/lib/accruals";
@@ -460,6 +461,8 @@ export async function updateCompanyAction(fd: FormData) {
         address: optStr(fd, "address"),
         vatPeriod: str(fd, "vatPeriod") as "monthly",
         fiscalYearStartMonth: Number(fd.get("fiscalYearStartMonth")) || 1,
+        // v5.0.0 – tevékenységprofil (csak társaságnál van az űrlapon)
+        ...(fd.has("activityProfile") ? { activityProfile: parseActivityProfile(str(fd, "activityProfile")) } : {}),
       })
       .where(eq(schema.companies.id, cid));
     return `/c/${cid}/settings?ok=${encodeURIComponent("Cégadatok mentve.")}`;

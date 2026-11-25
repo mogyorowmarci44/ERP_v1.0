@@ -39,6 +39,12 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v5.0.0 – Kft sablon, tevékenységprofil
+
+- Új cégnél választható **sablon**: *Általános Kft – tevékenységi kör még nem ismert* (alapértelmezés) vagy *Autókereskedés*. Egyelőre mindkettő ugyanazt kapja: üres cég, azonos számlatükör, ÁFA-kódok, naplók és felület.
+- Új mező a cégen: **tevékenységprofil** (`car_dealer` / `general`), a Beállítások › Cégadatok alatt módosítható, a cégkártyán látszik. A meglévő társaságok autókereskedés profilt kapnak. Migráció: `0031_v5_0_activity_profile.sql`.
+- Előkészítés: `isCarDealer()` (`src/lib/activity.ts`) – a következő lépésben ez rejti el általános profilnál az autós modulokat (ÁrSugó, AutóMérleg, KészletMérleg, jármű-EPR, különbözeti ÁFA alapértelmezés, autónkénti Forecast és KPI, napi e-mail autókészlet-blokkja).
+
 ## v4.5.3 – Típuskatalógus
 
 - Új, cégfüggetlen táblák: `car_makes` (márka + hasznaltauto.hu hirdetésszám), `car_models`, `car_variants` (generáció, gyártás kezdete–vége évjárat-intervallumként, hajtáslánc, üzemanyag, hengerűrtartalom, kW / LE, motorkód, hajtás, váltó és fokozatszám, saját tömeg alsó–felső érték, megengedett össztömeg). Migráció: `0030_v4_5_3_car_catalog.sql`.

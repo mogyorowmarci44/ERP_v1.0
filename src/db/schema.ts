@@ -53,6 +53,8 @@ export const vehicleStatusEnum = pgEnum("vehicle_status", ["in_stock", "reserved
 export const vehicleVatEnum = pgEnum("vehicle_vat", ["margin", "normal"]);
 /** v2.0 – Az entitás jogi formája: társaság (Bt/Kft/Zrt) vagy adószámos magánszemély. */
 export const entityTypeEnum = pgEnum("entity_type", ["company", "private_taxpayer"]);
+/** v5.0.0 – Tevékenységprofil: autókereskedés vagy általános (a tevékenységi kör még nem ismert). */
+export const activityProfileEnum = pgEnum("activity_profile", ["car_dealer", "general"]);
 
 // ---------------------------------------------------------------------------
 // Felhasználók, cégek
@@ -327,6 +329,8 @@ export const companies = pgTable("companies", {
   settings: jsonb("settings").$type<CompanySettings>().notNull(),
   /** v2.0 – jogi forma: company (Bt/Kft/Zrt) | private_taxpayer (adószámos magánszemély). */
   entityType: entityTypeEnum("entity_type").notNull().default("company"),
+  /** v5.0.0 – tevékenységprofil (egyelőre csak címke; a profil szerinti modulkapcsolás a következő lépés). */
+  activityProfile: activityProfileEnum("activity_profile").notNull().default("general"),
   /** v2.0 – magánszemély adózási profilja (társaságnál null). */
   taxProfile: jsonb("tax_profile").$type<TaxProfile>(),
   /** Megjelenés: téma (preset + egyedi színek). */

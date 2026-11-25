@@ -8,6 +8,7 @@ import { verifyTotp, normalizeRecoveryCode, hashRecoveryCode } from "@/lib/totp"
 import { mfaRequired } from "@/lib/app-settings";
 import { createCompany } from "@/lib/ledger";
 import { taxProfileFromForm } from "@/lib/entity";
+import { parseActivityProfile } from "@/lib/activity";
 import { wipeCompanyData } from "@/lib/importer";
 import { runOrRedirect, str, optStr } from "@/lib/action-utils";
 
@@ -141,6 +142,8 @@ export async function createCompanyAction(fd: FormData) {
       registrationNumber: optStr(fd, "registrationNumber"),
       address: optStr(fd, "address"),
       vatPeriod: (str(fd, "vatPeriod") || "monthly") as "monthly" | "quarterly" | "yearly",
+      // v5.0.0 – sablon: autókereskedés vagy általános Kft (egyelőre azonos számlatükör és felület)
+      activityProfile: parseActivityProfile(str(fd, "activityProfile")),
     });
     return `/c/${c.id}`;
   });

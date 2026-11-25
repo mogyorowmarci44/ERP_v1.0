@@ -218,6 +218,13 @@
       "when": 1795630000000,
       "tag": "0030_v4_5_3_car_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795720000000,
+      "tag": "0031_v5_0_activity_profile",
+      "breakpoints": true
     }
   ]
 }

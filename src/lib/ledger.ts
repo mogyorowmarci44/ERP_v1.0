@@ -7,6 +7,7 @@ import { db, schema, type DbOrTx, type Tx } from "@/db";
 import { ACCOUNT_CURRENCY, isPostingCode } from "./coa";
 import { entitySeed, noInputVatDeduction, type EntityType } from "./entity";
 import type { TaxProfile } from "@/db/schema";
+import type { ActivityProfile } from "./activity";
 import {
   assertBalanced,
   buildInvoicePosting,
@@ -42,6 +43,8 @@ export type NewCompany = {
   /** v2.0 – jogi forma; alapértelmezés: company. */
   entityType?: EntityType;
   taxProfile?: TaxProfile | null;
+  /** v5.0.0 – tevékenységprofil; alapértelmezés: general. */
+  activityProfile?: ActivityProfile;
 };
 
 export async function createCompany(userId: number, data: NewCompany, outerTx?: Tx) {
