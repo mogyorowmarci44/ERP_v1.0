@@ -180,7 +180,16 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
         )}
         <Link href={`${b}/value`} className="card stat lp-value" title="Korrigált nettó eszközérték – kattints a három számításért">
           <div className="label">Cégérték</div>
-          <div className={cv.nav.value < 0 ? "value neg" : "value"}>{eFt(cv.nav.value)}{!cv.forward.empty && <small title="Előretekintő cégérték: könyv szerinti saját tőke + a Forecast következő 12 havi adózott eredményének jelenértéke (alap forgatókönyv)">forecast {eFt(cv.forward.scenarios.base.value)}</small>}</div>
+          <div className={cv.nav.value < 0 ? "value neg" : "value"}>{eFt(cv.nav.value)}</div>
+          {!cv.forward.empty && (() => {
+            const fv = cv.forward.scenarios.base.value, d = fv - cv.nav.value;
+            return (
+              <div className="lp-value-sub" title="Előretekintő cégérték: könyv szerinti saját tőke + a Forecast következő 12 havi adózott eredményének jelenértéke (alap forgatókönyv). A felső szám a korrigált nettó eszközérték.">
+                <span>forecast</span> <b>{eFt(fv)}</b>
+                {Math.abs(d) >= 1000 && <span className={d < 0 ? "neg" : "pos"}>{d < 0 ? "▼" : "▲"} {eFt(Math.abs(d))}</span>}
+              </div>
+            );
+          })()}
         </Link>
         {car
           ? <div className="card stat"><div className="label">Készlet ({inStock.length} db)</div><div className="value">{eFt(stockValue)}</div></div>
