@@ -8,6 +8,7 @@ import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { normalizeTheme } from "./themes";
 import { brandWorkbook, finish, palette, sheet, d, HUF, type Col } from "./invoice-export";
+import { PAID_FROM_LEDGER } from "./reports";
 
 const s = schema;
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
@@ -53,7 +54,7 @@ export async function buildExport(companyId: number, from: string, to: string) {
   for (const i of invoices) if (i.journalEntryId) invOfEntry.set(i.journalEntryId, `${i.direction === "in" ? "szállítói" : "vevő"} ${i.invoiceNumber}`);
   const open = iIds.length
     ? new Map(((await db.execute(sql`
-        select i.id, (i.gross_fx - coalesce((select sum(p.amount_fx) from payments p join journal_entries e on e.id = p.journal_entry_id where p.invoice_id = i.id and e.reversed_by_id is null), 0))::float8 open
+        select i.id, (i.gross_fx - ${PAID_FROM_LEDGER("i")})::float8 open
         from invoices i where i.id in ${sql.raw(`(${iIds.join(",")})`)}`)) as unknown as Array<{ id: number; open: number }>).map((r) => [r.id, Number(r.open)]))
     : new Map<number, number>();
 
