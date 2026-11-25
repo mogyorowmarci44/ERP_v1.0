@@ -1152,3 +1152,60 @@ export const summaryRecipients = pgTable(
   },
   (t) => [uniqueIndex("summary_recipients_company_email").on(t.companyId, t.email)],
 );
+
+// ---------------------------------------------------------------------------
+// v4.5.3 – Típuskatalógus (cégfüggetlen): márka › modell › motorváltozat
+// ---------------------------------------------------------------------------
+
+export const carMakes = pgTable("car_makes", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 80 }).notNull().unique("car_makes_name"),
+  /** hasznaltauto.hu márka-azonosító és hirdetésszám (a katalógus körének alapja). */
+  haId: integer("ha_id"),
+  haCount: integer("ha_count"),
+  haCountedAt: date("ha_counted_at"),
+});
+
+export const carModels = pgTable("car_models", {
+  id: serial("id").primaryKey(),
+  makeId: integer("make_id").notNull().references(() => carMakes.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 120 }).notNull(),
+  haId: integer("ha_id"),
+  haCount: integer("ha_count"),
+}, (t) => [uniqueIndex("car_models_make_name").on(t.makeId, t.name)]);
+
+export const carVariants = pgTable("car_variants", {
+  id: serial("id").primaryKey(),
+  modelId: integer("model_id").notNull().references(() => carModels.id, { onDelete: "cascade" }),
+  source: varchar("source", { length: 20 }).notNull().default("auto-data"),
+  sourceId: integer("source_id").notNull(),
+  generation: varchar("generation", { length: 160 }).notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  /** Évjárat-intervallum (gyártás kezdete–vége); year_to null = gyártásban. Évjáratonkénti keresés: year_from ≤ év ≤ coalesce(year_to, idei év). */
+  yearFrom: integer("year_from"),
+  monthFrom: integer("month_from"),
+  yearTo: integer("year_to"),
+  monthTo: integer("month_to"),
+  /** ice | mhev | hev | phev | bev | fcev */
+  powertrain: varchar("powertrain", { length: 12 }),
+  body: varchar("body", { length: 60 }),
+  /** benzin | dízel | elektromos | hibrid | LPG | CNG | hidrogén | egyéb */
+  fuel: varchar("fuel", { length: 20 }),
+  fuelRaw: varchar("fuel_raw", { length: 80 }),
+  displacementCc: integer("displacement_cc"),
+  powerHp: integer("power_hp"),
+  powerKw: integer("power_kw"),
+  engineCode: varchar("engine_code", { length: 80 }),
+  /** fwd | rwd | awd */
+  drive: varchar("drive", { length: 8 }),
+  gears: integer("gears"),
+  /** manuális | automata | DSG | CVT | robot */
+  gearbox: varchar("gearbox", { length: 12 }),
+  gearboxRaw: varchar("gearbox_raw", { length: 120 }),
+  /** Saját tömeg tartomány; az EPR-hez a felső érték (legnehezebb kivitel). */
+  kerbMinKg: integer("kerb_min_kg"),
+  kerbMaxKg: integer("kerb_max_kg"),
+  /** Megengedett össztömeg. */
+  grossKg: integer("gross_kg"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("car_variants_source").on(t.source, t.sourceId), index("car_variants_model_years").on(t.modelId, t.yearFrom, t.yearTo)]);
