@@ -4,6 +4,7 @@ import { requireCompany } from "@/lib/auth";
 import { updateCompanyAction, lockPeriodAction, updateTaxProfileAction } from "../actions";
 import { TaxProfileFields } from "@/components/TaxProfileFields";
 import { ENTITY_LABEL, isPrivate } from "@/lib/entity";
+import { ACTIVITY_LABEL, ACTIVITY_PROFILES } from "@/lib/activity";
 import { addMemberAction } from "@/app/auth-actions";
 import { Flash } from "@/components/Flash";
 import { today } from "@/lib/dates";
@@ -44,6 +45,13 @@ export default async function SettingsPage({ params, searchParams }: { params: P
             <option value="monthly">havi</option><option value="quarterly">negyedéves</option><option value="yearly">éves</option>
           </select>
         </label>
+        {!priv && (
+          <label title="v5.0.0: egyelőre csak címke – a profil szerinti modulkapcsolás (ÁrSugó, AutóMérleg, jármű-EPR…) a következő verzióban jön.">Tevékenységprofil
+            <select name="activityProfile" defaultValue={company.activityProfile}>
+              {ACTIVITY_PROFILES.map((p) => <option key={p} value={p}>{ACTIVITY_LABEL[p]}</option>)}
+            </select>
+          </label>
+        )}
         {!priv && <label>Üzleti év kezdő hónapja<input name="fiscalYearStartMonth" type="number" min={1} max={12} defaultValue={company.fiscalYearStartMonth} /></label>}
         {!priv && (
           <>

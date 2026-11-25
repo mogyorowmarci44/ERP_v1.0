@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { createCompanyAction, createPrivateTaxpayerAction, logoutAction, changePasswordAction, deleteCompanyAction } from "./auth-actions";
 import { TaxProfileFields } from "@/components/TaxProfileFields";
 import { ENTITY_LABEL } from "@/lib/entity";
+import { ACTIVITY_SHORT } from "@/lib/activity";
 import { APP_VERSION } from "@/lib/version";
 import { Flash } from "@/components/Flash";
 import { CompanyMark, ErpLogo, AppFooter } from "@/components/Brand";
@@ -23,6 +24,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         taxNumber: schema.companies.taxNumber,
         vatPeriod: schema.companies.vatPeriod,
         entityType: schema.companies.entityType,
+        activityProfile: schema.companies.activityProfile,
         theme: schema.companies.theme,
         logoUpdatedAt: schema.companies.logoUpdatedAt,
       },
@@ -61,7 +63,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
               </div>
               <div className="body">
                 <strong>{c.name}</strong>
-                <span className="entity-tag">{ENTITY_LABEL[c.entityType]}</span>
+                <span className="entity-tag">{ENTITY_LABEL[c.entityType]}{c.entityType === "company" ? ` · ${ACTIVITY_SHORT[c.activityProfile]}` : ""}</span>
                 <span className="muted">{c.taxNumber ?? "adószám nélkül"}</span>
                 <span className="muted">ÁFA: {{ monthly: "havi", quarterly: "negyedéves", yearly: "éves" }[c.vatPeriod]} bevalló, szerep: {{ owner: "tulajdonos", accountant: "könyvelő", viewer: "CEO - Ügyvezető" }[role]}</span>
               </div>
@@ -73,7 +75,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
 
       <h2>Új cég (Bt / Kft / Zrt)</h2>
       <form action={createCompanyAction} className="card form-grid">
-        <label>Cégnév<input name="name" required placeholder="MM Cars Kft" /></label>
+        <label>Sablon
+          <select name="activityProfile" defaultValue="general">
+            <option value="general">Általános Kft – tevékenységi kör még nem ismert</option>
+            <option value="car_dealer">Autókereskedés (PezCar / MM Car Trade minta)</option>
+          </select>
+        </label>
+        <label>Cégnév<input name="name" required placeholder="Új Kft" /></label>
         <label>Adószám<input name="taxNumber" placeholder="12345678-2-42" /></label>
         <label>Közösségi adószám<input name="euVatNumber" placeholder="HU12345678" /></label>
         <label>Cégjegyzékszám<input name="registrationNumber" /></label>
@@ -85,7 +93,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         </label>
         <div style={{ alignSelf: "end" }}><button className="primary">Cég létrehozása</button></div>
       </form>
-      <p className="muted">Új cég létrehozásakor betöltődik az alap számlatükör, ÁFA-kódok (köztük a különbözeti) és naplók.</p>
+      <p className="muted">Új cég létrehozásakor betöltődik az alap számlatükör, ÁFA-kódok (köztük a különbözeti) és naplók – mindkét sablonnál ugyanaz, üres adatokkal. A sablon (tevékenységprofil) később a Beállításokban módosítható.</p>
 
       <h2>Új adószámos magánszemély (pl. vendégház)</h2>
       <form action={createPrivateTaxpayerAction} className="card form-grid">
