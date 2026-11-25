@@ -8,6 +8,7 @@ import { requireCompany } from "@/lib/auth";
 import { trialBalance, openItems, vehicleStock, vatAnalytics } from "@/lib/reports";
 import { fmtDate, monthEnd, monthStart, today, yearStart } from "@/lib/dates";
 import { isPrivate } from "@/lib/entity";
+import { isCarDealer } from "@/lib/activity";
 import { nextVatDeadline } from "@/lib/vat-deadline";
 import { GhOverview } from "./gh/Overview";
 import { cashSplit } from "@/lib/cash-split";
@@ -80,6 +81,9 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   const vatDue = nextVatDeadline(company.vatPeriod, t);
   const vatDays = daysBetween(t, vatDue);
   const b = `/c/${cid}`;
+  // v5.0.1 – autókereskedés-specifikus elemek csak autókereskedés profilnál
+  const car = isCarDealer(company);
+  const carLinks = (...l: [string, string][]): [string, string][] => (car ? l : []);
 
   type Todo = { icon: React.ReactNode; text: string; href: string; tag: string; warn?: boolean };
   const todos: Todo[] = [];
@@ -92,17 +96,17 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   if (cons.errors || cons.warnings) todos.push({ icon: <ListChecks />, text: cons.errors ? `${cons.errors} egyezőségi hiba a könyvelésben` : `${cons.warnings} egyezőségi figyelmeztetés`, href: `${b}/reports/consistency`, tag: "Egyezőség", warn: true });
   if (vatOpen.length) todos.push({ icon: <Percent />, text: `${vatOpen.length} lejárt ÁFA-időszak nincs lezárva (466 / 467 → 468)`, href: `${b}/reports/vat/closing?year=${vatOpen[0].to.slice(0, 4)}`, tag: "ÁFA-zárás", warn: true });
   if (accDue.length) todos.push({ icon: <Clock />, text: `${accDue.length} időbeli elhatárolás feloldásra vár · ${eFt(accDue.reduce((s, a) => s + a.amount, 0))}`, href: `${b}/closing/accruals`, tag: "Elhatárolás", warn: true });
-  if (stale.length) todos.push({ icon: <CarFront />, text: `${stale.length} gépkocsi több mint ${STALE_DAYS} napja készleten`, href: `${b}/vehicles/merleg`, tag: "Figyelj", warn: true });
+  if (car && stale.length) todos.push({ icon: <CarFront />, text: `${stale.length} gépkocsi több mint ${STALE_DAYS} napja készleten`, href: `${b}/vehicles/merleg`, tag: "Figyelj", warn: true });
   // az ÁFA-határidő csak akkor számít teendőnek, ha 5 napon belül van
   const open = todos.length - (vatDays <= 5 ? 0 : 1);
 
   const tiles: { title: string; icon: React.ReactNode; badge?: string; links: [string, string][] }[] = [
     { title: "Bizonylatok", icon: <Files />, badge: inbox.n ? `${inbox.n} új` : undefined, links: [["Beérkező bizonylatok", `${b}/inbox`], ["Vevőszámlák", `${b}/invoices?dir=out`], ["Szállítói számlák", `${b}/invoices?dir=in`], ["Vegyes / bank tétel", `${b}/journal/new`]] },
     { title: "Pénzügy", icon: <PiggyBank />, links: [["Pénztár és bank", `${b}/money`], ["Tagi kölcsön", `${b}/member-loans`], ["Bérszámfejtés", `${b}/payroll`]] },
-    { title: "Kimutatások", icon: <ChartNoAxesCombined />, links: [["KPI-Dashboard", `${b}/reports/kpi`], ["P&L, cash-flow, mérleg", `${b}/reports/statements`], ["ÁFA", `${b}/reports/vat`], ["KészletMérleg", `${b}/vehicles/merleg`], ["EPR összesítő", `${b}/vehicles/epr`], ["Nyitott tételek", `${b}/reports/open-items`], ["Egyezőség", `${b}/reports/consistency`]] },
+    { title: "Kimutatások", icon: <ChartNoAxesCombined />, links: [["KPI-Dashboard", `${b}/reports/kpi`], ["P&L, cash-flow, mérleg", `${b}/reports/statements`], ["ÁFA", `${b}/reports/vat`], ...carLinks(["KészletMérleg", `${b}/vehicles/merleg`], ["EPR összesítő", `${b}/vehicles/epr`]), ["Nyitott tételek", `${b}/reports/open-items`], ["Egyezőség", `${b}/reports/consistency`]] },
     { title: "Főkönyv", icon: <Library />, links: [["Napló", `${b}/journal`], ["Számlakarton", `${b}/reports/ledger`], ["Tárgyi eszközök", `${b}/assets`], ["Évzárás", `${b}/closing`]] },
-    { title: "Törzsadatok", icon: <Database />, badge: `${inStock.length} autó`, links: [["Gépkocsi készlet", `${b}/vehicles`], ["KészletMérleg", `${b}/vehicles/merleg`], ["Partnerek", `${b}/partners`], ["Számlatükör", `${b}/accounts`], ["Árfolyamok (MNB)", `${b}/fx`]] },
-    { title: "Tervezés és rendszer", icon: <Cog />, links: [["Forecast", `${b}/forecast`], ["ÁrSugó", `${b}/arsugo`], ["Megjelenés", `${b}/appearance`], ["Beállítások", `${b}/settings`], ["Adatimport / export", `${b}/import`]] },
+    { title: "Törzsadatok", icon: <Database />, badge: car ? `${inStock.length} autó` : undefined, links: [...carLinks(["Gépkocsi készlet", `${b}/vehicles`], ["KészletMérleg", `${b}/vehicles/merleg`]), ["Partnerek", `${b}/partners`], ["Számlatükör", `${b}/accounts`], ["Árfolyamok (MNB)", `${b}/fx`]] },
+    { title: "Tervezés és rendszer", icon: <Cog />, links: [["Forecast", `${b}/forecast`], ...carLinks(["ÁrSugó", `${b}/arsugo`]), ["Megjelenés", `${b}/appearance`], ["Beállítások", `${b}/settings`], ["Adatimport / export", `${b}/import`]] },
   ];
 
   return (
@@ -127,10 +131,14 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
           <Link className="btn primary" href={`${b}/invoices/new?dir=out`}><FileOutput />Új vevőszámla</Link>
           <Link className="btn" href={`${b}/invoices/new?dir=in`}><FileInput />Új szállítói számla</Link>
           <Link className="btn" href={`${b}/journal/new`}><BookPlus />Vegyes / bank tétel</Link>
-          <Link className="btn" href={`${b}/vehicles`}><CarFront />Gépkocsi készlet</Link>
-          <Link className="btn" href={`${b}/vehicles/merleg`}><Scale />KészletMérleg</Link>
-          <Link className="btn" href={`${b}/arsugo`}><Tag />ÁrSugó</Link>
-          {inStock.length > 0 && (
+          {car && (
+            <>
+              <Link className="btn" href={`${b}/vehicles`}><CarFront />Gépkocsi készlet</Link>
+              <Link className="btn" href={`${b}/vehicles/merleg`}><Scale />KészletMérleg</Link>
+              <Link className="btn" href={`${b}/arsugo`}><Tag />ÁrSugó</Link>
+            </>
+          )}
+          {car && inStock.length > 0 && (
             <form action={`${b}/vehicles/automerleg`} className="lp-automerleg">
               <label className="sr-only" htmlFor="lp-am-car">Autó</label>
               <select id="lp-am-car" name="vehicle" defaultValue="">
@@ -154,6 +162,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
         ))}
       </div>
       <div className="grid lp-kpi lp-kpi5">
+        {car ? (
         <Link href={`${b}/reports/kpi`} className="card stat lp-gap" style={{ background: gapBg(gap.tone) }}
           title={gap.median != null ? `Medián szünet két eladás között: ${Math.round(gap.median)} nap (${gap.gapCount} szünet alapján)` : "Még nincs elég eladás a mediánhoz"}>
           <div className="label">Előző eladás óta</div>
@@ -166,11 +175,16 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
             </div>
           )}
         </Link>
+        ) : (
+          <Link href={`${b}/reports/statements?type=pnl&gran=month`} className="card stat"><div className="label">Bevétel (év)</div><div className="value">{eFt(revenue)}</div></Link>
+        )}
         <Link href={`${b}/value`} className="card stat lp-value" title="Korrigált nettó eszközérték – kattints a három számításért">
           <div className="label">Cégérték</div>
           <div className={cv.nav.value < 0 ? "value neg" : "value"}>{eFt(cv.nav.value)}</div>
         </Link>
-        <div className="card stat"><div className="label">Készlet ({inStock.length} db)</div><div className="value">{eFt(stockValue)}</div></div>
+        {car
+          ? <div className="card stat"><div className="label">Készlet ({inStock.length} db)</div><div className="value">{eFt(stockValue)}</div></div>
+          : <Link href={`${b}/reports/open-items`} className="card stat"><div className="label">Nyitott vevők</div><div className="value">{eFt(recvHuf)}</div></Link>}
         <div className="card stat"><div className="label">Eredmény (év, adózás előtt)</div><div className={result < 0 ? "value neg" : "value"}>{eFt(result)}</div></div>
         <div className="card stat"><div className="label">ÁFA egyenleg (tárgyhó)</div><div className="value">{eFt(vat.balance)}</div></div>
       </div>
