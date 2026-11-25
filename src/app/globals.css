@@ -1174,3 +1174,6 @@ tbody tr.att-row:hover td { background: var(--surface-2); }
   .lo-table th:nth-child(3), .lo-table td:nth-child(3), .lo-table th:nth-child(8), .lo-table td:nth-child(8) { display: none; }
   .lo-table col.lo-c1 { width: 24%; } .lo-table col.lo-c5 { width: 26%; }
 }
+
+/* v4.5.4 – Forecast › Készlet: összesítő sor */
+table.fc-plan tr.total td { border-top: 1px solid var(--line, currentColor); }

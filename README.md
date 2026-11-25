@@ -39,6 +39,13 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v4.5.4 – Forecast › Készlet: új elrendezés, nyitott tételek a főkönyvből
+
+- Készlet tábla: a könyv szerinti érték oszlop és a soronkénti Mentés gomb kikerült (alul egy „Összes mentése”). Fedezet-oszlopok: **Különbözeti ÁFA · EPR díj · Nettó fedezet**, alul összesítő sor.
+- A nettó fedezet alatt az eltérés a **medián nettó fedezettől %-ban** (KPI, utolsó 12 hó eladásai): ±5%-on belül szürke, fölötte zöld ▲, alatta piros ▼; az egér alatt a forintos eltérés.
+- Tervezett beszerzések: ugyanez a fedezet-blokk, soronkénti Mentés nélkül.
+- Nyitott tételek (és az adatexport nyitott összege): a kiegyenlítés a rendezési tételek partnerszámla-soraiból (311 / 454) számolódik a számla devizájában – a más devizából fizetett számla (pl. forintos számla euróból) és a beszámított előleg már nem marad tévesen nyitva.
+
 ## v4.5.2 – Forecast: EPR díj a nettó fedezetben
 
 - A Forecast autónkénti **nettó fedezete** = bruttó fedezet − **EPR díj**. Importautónál a díj: tömeg × az eladás tervezett napján érvényes díjtétel (az EPR-lap kategóriájával, hajtásával, átalány-beállításával); belföldi beszerzésnél 0.

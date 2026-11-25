@@ -186,6 +186,18 @@ export async function vatAnalytics(companyId: number, from: string, to: string, 
 }
 
 /** Nyitott vevő / szállító tételek. */
+/** v4.5.4 – Számla kiegyenlített összege a számla devizájában, a rendezési tételek partnerszámla-soraiból. */
+export const PAID_FROM_LEDGER = (alias: string) => sql.raw(`coalesce((
+  select sum(case when "${alias}".currency = 'HUF'
+      then (case when "${alias}".direction = 'in' then jl.debit - jl.credit else jl.credit - jl.debit end)
+      else (case when "${alias}".direction = 'in' then sign(jl.debit - jl.credit) else sign(jl.credit - jl.debit) end) * abs(coalesce(jl.amount_fx, 0)) end)
+  from journal_lines jl join journal_entries je on je.id = jl.entry_id
+  where je.reversed_by_id is null
+    and je.id in (select p.journal_entry_id from payments p where p.invoice_id = "${alias}".id)
+    and jl.account_id in (select l.account_id from journal_lines l where l.entry_id = "${alias}".journal_entry_id
+                          and (case when "${alias}".direction = 'in' then l.credit <> 0 else l.debit <> 0 end))
+), 0)::float8`);
+
 export async function openItems(companyId: number, direction: "out" | "in") {
   const rows = await db
     .select({
@@ -197,7 +209,9 @@ export async function openItems(companyId: number, direction: "out" | "in") {
       currency: invoices.currency,
       grossFx: invoices.grossFx,
       grossHuf: invoices.grossHuf,
-      paidFx: sql<number>`coalesce((select sum(p.amount_fx) from payments p join journal_entries je on je.id = p.journal_entry_id where p.invoice_id = "invoices"."id" and je.reversed_by_id is null), 0)::float8`,
+      // v4.5.4 – a kiegyenlített összeg a rendezési tételek partnerszámla-soraiból (311 / 454), a számla devizájában:
+      // így a más devizájú kifizetés (pl. forintos számla euróból) és a beszámított előleg is helyesen rendez.
+      paidFx: sql<number>`${PAID_FROM_LEDGER("invoices")}`,
     })
     .from(invoices)
     .innerJoin(partners, eq(partners.id, invoices.partnerId))

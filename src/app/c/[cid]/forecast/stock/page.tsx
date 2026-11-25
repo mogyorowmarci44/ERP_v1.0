@@ -8,10 +8,25 @@ import { fmtDate, today } from "@/lib/dates";
 import { ClearSalePlan } from "@/components/ClearSalePlan";
 import { savePlanAction, savePlansBulkAction, deletePlanAction, addPlanCostAction, deletePlanCostAction, fillSuggestionsAction, linkPlanAction, deleteAllPlannedAction } from "../actions";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { companyKpis } from "@/lib/kpi";
 
 type Cost = { id: number; description: string; date: string | null; net: number; vatRate: number; deductible: boolean; capitalize: boolean; payment: string };
 const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 const mv = (gross: number, base: number) => Math.max(0, Math.round(((gross - base) * 27) / 127));
+
+/** v4.5.4 – Nettó fedezet a medián nettó fedezethez képest (%), ±5% semleges; az egér alatt a forintos eltérés. */
+function MedDev({ v, med }: { v: number; med: number | null }) {
+  if (med == null || med <= 0) return null;
+  const pct = (v - med) / med;
+  const cls = pct > 0.05 ? "pos" : pct < -0.05 ? "neg" : "muted";
+  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "±";
+  const diff = v - med;
+  return (
+    <div className={cls} style={{ fontSize: 12 }} title={`${diff >= 0 ? "+" : "−"}${fmtHuf(Math.abs(diff))} Ft a mediánhoz (${fmtHuf(med)} Ft) képest`}>
+      {pct > 0.05 ? "▲" : pct < -0.05 ? "▼" : "●"} {sign}{fmtNum(Math.abs(pct * 100), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+    </div>
+  );
+}
 
 function CostList({ cid, costs, canWrite }: { cid: number; costs: Cost[]; canWrite: boolean }) {
   if (!costs.length) return null;
@@ -60,7 +75,8 @@ export default async function ForecastStockPage({ params, searchParams }: { para
   const sp = await searchParams;
   const { role } = await requireCompany(cid);
   const canWrite = role !== "viewer";
-  const [{ stock, planned, closed }, hist] = await Promise.all([loadPlans(cid), soldHistory(cid)]);
+  const [{ stock, planned, closed }, hist, kpi] = await Promise.all([loadPlans(cid), soldHistory(cid), companyKpis(cid)]);
+  const med = kpi?.margin.medF2 != null ? Math.round(kpi.margin.medF2) : null;
   const t = today();
   const unplanned = stock.filter((s) => !s.plan?.salePrice || !s.plan?.saleDate).length;
   const freeVehicles = stock.filter((s) => !s.plan);
@@ -90,11 +106,14 @@ export default async function ForecastStockPage({ params, searchParams }: { para
 
       {canWrite && <form id={BULK} action={savePlansBulkAction}><input type="hidden" name="cid" value={cid} /></form>}
 
-      <h2>Készleten ({stock.length} autó)</h2>
+      <div className="fc-head">
+        <h2 style={{ margin: 0 }}>Készleten ({stock.length} autó)</h2>
+        {med != null && <span className="muted" style={{ fontSize: 13 }}>Medián nettó fedezet: {fmtHuf(med)} Ft · {kpi?.margin.soldCount} eladás (12 hó)</span>}
+      </div>
       <div className="table-wrap">
         <table className="fc-plan">
           <thead>
-            <tr><th>Gépkocsi</th><th className="num">Könyv szerinti érték</th><th className="num">ÁFA-alap</th><th>Eladási terv (bruttó ár, dátum, fizetés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Nettó fedezet</th></tr>
+            <tr><th>Gépkocsi</th><th className="num">ÁFA-alap</th><th>Eladási terv (bruttó ár, dátum, fizetés)</th><th className="num">Különbözeti ÁFA</th><th className="num">EPR díj</th><th className="num">Nettó fedezet</th></tr>
           </thead>
           <tbody>
             {stock.map((s) => {
@@ -116,8 +135,7 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                     <CostList cid={cid} costs={costs} canWrite={canWrite} />
                     {canWrite && <AddCost cid={cid} planId={p?.id} vehicleId={p ? undefined : s.vehicle.id} />}
                   </td>
-                  <td className="num">{fmtHuf(s.bookValue)}{capCost > 0 && <div className="muted" style={{ fontSize: 12 }}>+ {fmtHuf(capCost)} terv</div>}</td>
-                  <td className="num">{s.marginBase > 0 ? fmtHuf(s.marginBase) : <span className="neg">hiányzik</span>}</td>
+                  <td className="num">{s.marginBase > 0 ? fmtHuf(s.marginBase) : <span className="neg">hiányzik</span>}{capCost > 0 && <div className="muted" style={{ fontSize: 12 }}>+ {fmtHuf(capCost)} terv</div>}</td>
                   <td>
                     {canWrite ? (
                       <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
@@ -129,7 +147,6 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                         <input key={`sd-${p?.saleDate ?? ""}`} form={BULK} type="date" name={`v${s.vehicle.id}:saleDate`} defaultValue={p?.saleDate ?? ""} aria-label="Eladás dátuma" />
                         <select form={BULK} name={`v${s.vehicle.id}:salePayment`} defaultValue={p?.salePayment ?? "bank"} aria-label="Fizetés módja"><option value="bank">utalás</option><option value="cash">készpénz</option></select>
                         <input form={BULK} type="hidden" name={`v${s.vehicle.id}:note`} value={p?.note ?? ""} />
-                        <button form={BULK} title="Az összes sor mentése">Mentés</button>
                         <ClearSalePlan cid={cid} planId={p?.id} row={`v${s.vehicle.id}`} form={BULK} saved={!!(p && (p.salePrice || p.saleDate))} />
                       </div>
                     ) : price ? `${fmtHuf(price)} Ft · ${fmtDate(p?.saleDate)}` : "–"}
@@ -137,14 +154,37 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                   </td>
                   <td className="num">{vat !== null ? fmtHuf(vat) : <span className="muted">–</span>}</td>
                   <td className="num">
-                    {margin !== null ? <span className={margin < 0 ? "neg" : undefined}>{fmtHuf(margin)}</span> : <span className="muted">–</span>}
-                    {epr?.fee ? <div className="muted" style={{ fontSize: 12 }}>EPR díjjal: −{fmtHuf(epr.fee)}</div> : null}
-                    {epr?.warning ? <div className="muted" style={{ fontSize: 12 }}>EPR: {epr.warning}</div> : null}
+                    {epr?.fee ? fmtHuf(epr.fee) : epr?.warning ? <span className="neg" title={epr.warning}>?</span> : <span className="muted">–</span>}
+                  </td>
+                  <td className="num">
+                    {margin !== null ? <><span className={margin < 0 ? "neg" : undefined}>{fmtHuf(margin)}</span><MedDev v={margin} med={med} /></> : <span className="muted">–</span>}
                   </td>
                 </tr>
               );
             })}
             {stock.length === 0 && <tr><td colSpan={6} className="muted">Nincs gépkocsi készleten.</td></tr>}
+            {(() => {
+              const rows = stock.flatMap((s) => {
+                const p = s.plan;
+                const price = p?.salePrice ? Number(p.salePrice) : null;
+                if (!price) return [];
+                const capCost = (p?.costs ?? []).filter((c) => c.capitalize).reduce((a, c) => a + Number(c.net) + (c.deductible ? 0 : Math.round((Number(c.net) * c.vatRate) / 100)), 0);
+                const vat = mv(price, s.marginBase);
+                const epr = stockEpr(s, p?.saleDate ?? t).fee ?? 0;
+                return [{ vat, epr, margin: price - vat - s.bookValue - capCost - epr }];
+              });
+              if (rows.length < 2) return null;
+              const sum = (f: (r: (typeof rows)[number]) => number) => rows.reduce((a, r) => a + f(r), 0);
+              const tot = sum((r) => r.margin);
+              return (
+                <tr className="total">
+                  <td colSpan={3} className="muted">Összesen ({rows.length} tervezett eladás)</td>
+                  <td className="num">{fmtHuf(sum((r) => r.vat))}</td>
+                  <td className="num">{fmtHuf(sum((r) => r.epr))}</td>
+                  <td className="num"><strong className={tot < 0 ? "neg" : undefined}>{fmtHuf(tot)}</strong><MedDev v={tot / rows.length} med={med} /></td>
+                </tr>
+              );
+            })()}
           </tbody>
         </table>
       </div>
@@ -160,7 +200,7 @@ export default async function ForecastStockPage({ params, searchParams }: { para
       </div>
       <div className="table-wrap">
         <table className="fc-plan">
-          <thead><tr><th>Megnevezés</th><th>Beszerzés (bruttó ár = ÁFA-alap, dátum, fizetés)</th><th>Eladás (bruttó ár, dátum, fizetés)</th><th className="num">Különbözeti ÁFA</th><th className="num">Nettó fedezet</th><th /></tr></thead>
+          <thead><tr><th>Megnevezés</th><th>Beszerzés (bruttó ár = ÁFA-alap, dátum, fizetés)</th><th>Eladás (bruttó ár, dátum, fizetés)</th><th className="num">Különbözeti ÁFA</th><th className="num">EPR díj</th><th className="num">Nettó fedezet</th><th /></tr></thead>
           <tbody>
             {planned.map((p) => {
               const costs = p.costs.map((c) => ({ ...c, net: Number(c.net) }));
@@ -203,7 +243,6 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                           <input form={BULK} name={`${r}:salePrice`} className="num" style={{ width: 120 }} defaultValue={p.salePrice ?? ""} aria-label="Eladási ár" />
                           <input form={BULK} type="date" name={`${r}:saleDate`} defaultValue={p.saleDate ?? ""} aria-label="Eladás dátuma" />
                           <select form={BULK} name={`${r}:salePayment`} defaultValue={p.salePayment} aria-label="Eladás fizetése"><option value="bank">utalás</option><option value="cash">készpénz</option></select>
-                          <button form={BULK} title="Az összes sor mentése">Mentés</button>
                         </div>
                       </td>
                     </>
@@ -214,7 +253,8 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                     </>
                   )}
                   <td className="num">{vat !== null ? fmtHuf(vat) : "–"}</td>
-                  <td className="num">{price ? fmtHuf(price - vat! - buy - capCost) : "–"}</td>
+                  <td className="num"><span className="muted">–</span></td>
+                  <td className="num">{price ? <>{fmtHuf(price - vat! - buy - capCost)}<MedDev v={price - vat! - buy - capCost} med={med} /></> : "–"}</td>
                   <td>
                     {canWrite && (
                       <form action={deletePlanAction}>
@@ -226,14 +266,13 @@ export default async function ForecastStockPage({ params, searchParams }: { para
                 </tr>
               );
             })}
-            {planned.length === 0 && <tr><td colSpan={6} className="muted">Nincs tervezett beszerzés.</td></tr>}
+            {planned.length === 0 && <tr><td colSpan={7} className="muted">Nincs tervezett beszerzés.</td></tr>}
           </tbody>
         </table>
       </div>
       {canWrite && (stock.length > 0 || planned.length > 0) && (
         <div className="fc-bulk-save">
           <button form={BULK} className="primary">Összes mentése</button>
-          <span className="muted">Bármelyik sor Mentés gombja is az összes sort menti.</span>
         </div>
       )}
       {canWrite && (
