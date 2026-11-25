@@ -26,7 +26,8 @@ export async function importCatalogCsv(text: string) {
   let skipped = 0;
   for (const f of rows.slice(1)) {
     const r = parseCatalogRow(f);
-    if (r) parsed.push(r); else if (f.some((x) => x.trim())) skipped++;
+    // „AUDI” az auto-data.net-en a kínai közös vállalat (SAIC/FAW-Audi) külön márkája – nem kell
+    if (r && r.make !== "AUDI") parsed.push(r); else if (f.some((x) => x.trim())) skipped++;
   }
   if (!parsed.length) throw new Error("A fájlban nincs értelmezhető sor (autodata_tipusok.csv kell).");
 
@@ -72,4 +73,22 @@ export async function variantsFor(modelId: number, year?: number) {
   return db.select().from(carVariants)
     .where(and(eq(carVariants.modelId, modelId), y == null ? undefined : and(lte(carVariants.yearFrom, y), or(isNull(carVariants.yearTo), gte(carVariants.yearTo, y)))))
     .orderBy(asc(carVariants.generation), asc(carVariants.yearFrom), asc(carVariants.powerHp));
+}
+
+/**
+ * EPR-tömeg egy változatra: a saját tömeg felső értéke; ha hiányzik, a generáció legnehezebb változata,
+ * végül a modell legnehezebb, az évjáratban gyártott változata (a „legnehezebb kivitellel számolunk” szabály).
+ */
+export async function eprMassFor(variantId: number): Promise<{ kg: number | null; basis: "variant" | "generation" | "model" | null }> {
+  const [r] = (await db.execute(sql`
+    select v.kerb_max_kg own,
+      (select max(g.kerb_max_kg) from car_variants g where g.model_id = v.model_id and g.generation = v.generation) gen,
+      (select max(m.kerb_max_kg) from car_variants m where m.model_id = v.model_id
+         and m.year_from <= coalesce(v.year_to, extract(year from now())::int) and coalesce(m.year_to, extract(year from now())::int) >= v.year_from) model
+    from car_variants v where v.id = ${variantId}`)) as unknown as Array<{ own: number | null; gen: number | null; model: number | null }>;
+  if (!r) return { kg: null, basis: null };
+  if (r.own) return { kg: r.own, basis: "variant" };
+  if (r.gen) return { kg: r.gen, basis: "generation" };
+  if (r.model) return { kg: r.model, basis: "model" };
+  return { kg: null, basis: null };
 }
