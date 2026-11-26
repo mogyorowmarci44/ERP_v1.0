@@ -28,6 +28,7 @@ export default async function ResetPage({ searchParams }: { searchParams: Promis
               <input type="text" name="username" autoComplete="username" defaultValue={r.user.email} hidden readOnly />
               <label>Új jelszó<input name="password" type="password" minLength={10} autoComplete="new-password" required autoFocus /></label>
               <label>Új jelszó még egyszer<input name="password2" type="password" minLength={10} autoComplete="new-password" required /></label>
+              {invite && <label className="check"><input type="checkbox" name="terms" required /> Elfogadom az <a href="/jogi/aszf" target="_blank">ÁSZF</a>-et (és az <a href="/jogi/adatfeldolgozas" target="_blank">adatfeldolgozói szerződést</a>), és megismertem az <a href="/jogi/adatkezeles" target="_blank">adatkezelési tájékoztatót</a>.</label>}
               <button className="primary">{invite ? "Aktiválás" : "Jelszó beállítása"}</button>
             </form>
           </>

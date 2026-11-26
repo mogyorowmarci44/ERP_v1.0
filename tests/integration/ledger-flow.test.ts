@@ -6,7 +6,9 @@
  * TEST_DATABASE_URL nélkül a teszt kimarad – a normál `npm test` adatbázis nélkül is fut.
  * SOHA ne az éles adatbázisra irányítsd: minden futás új tesztcéget hoz létre.
  */
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
 
 const URL = process.env.TEST_DATABASE_URL;
 
@@ -254,4 +256,45 @@ describe.skipIf(!URL)("könyvelési folyamat (integráció)", () => {
     const co3 = await m.L.createCompany(u2.id, { name: `IT3 Kft ${Date.now()}` } as never);
     expect(co3.organizationId).toBe(co2.organizationId);
   });
+  it("v6.1.0 – érzékeny mezők titkosítva, teljes mentés → törlés → visszaállítás azonos eredménnyel", async () => {
+    process.env.DATA_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+    const { sql } = await import("drizzle-orm");
+    const B = await import("@/lib/backup");
+    const { wipeCompanyData } = await import("@/lib/importer");
+    const s = m.db.schema;
+    const [emp] = await m.db.db.insert(s.employees).values({ companyId: cid, name: "Dolgozó Dóra", taxId: "8123456789" }).returning();
+    await m.db.db.insert(s.companyMembers).values({ companyId: cid, name: "Tag Tamás", motherName: "Anya Anna", taxId: "8987654321", address: "1111 Budapest, Fő u. 1." });
+    // az adatbázisban titkosítva, a programban olvashatóan
+    const [raw] = (await m.db.db.execute(sql`select tax_id from employees where id = ${emp.id}`)) as unknown as Array<{ tax_id: string }>;
+    expect(raw.tax_id.startsWith("enc1:")).toBe(true);
+    const [back] = await m.db.db.select().from(s.employees).where(m.eq(s.employees.id, emp.id));
+    expect(back.taxId).toBe("8123456789");
+
+    const before = await tb();
+    const count = async (t: string, col = "company_id") => Number(((await m.db.db.execute(sql`select count(*)::int as n from ${sql.identifier(t)} where ${sql.identifier(col)} = ${cid}`)) as unknown as Array<{ n: number }>)[0].n);
+    const nLines = await count("journal_lines"), nInv = await count("invoices");
+    const b = B.parseBackup(B.backupToGzip(await B.buildBackup(cid)));
+    expect(b.tables.employees.find((e) => e.id === emp.id)?.tax_id).toBe("8123456789"); // a mentés visszafejtve tartalmazza
+    // létező cégre nem állítható vissza
+    await expect(B.restoreBackup(b, { organizationId: 1, userId })).rejects.toThrow(/még megvan/);
+
+    const [me] = await m.db.db.select().from(s.users).where(m.eq(s.users.id, userId));
+    await wipeCompanyData(cid);
+    await m.db.db.delete(s.companies).where(m.eq(s.companies.id, cid));
+    expect(await count("journal_lines")).toBe(0);
+
+    const r = await B.restoreBackup(b, { organizationId: me.organizationId!, userId });
+    expect(r.companyId).toBe(cid);
+    expect(await count("journal_lines")).toBe(nLines);
+    expect(await count("invoices")).toBe(nInv);
+    expect(await tb()).toEqual(before);
+    const [emp2] = await m.db.db.select().from(s.employees).where(m.eq(s.employees.id, emp.id));
+    expect(emp2.taxId).toBe("8123456789");
+    const [raw2] = (await m.db.db.execute(sql`select tax_id from employees where id = ${emp.id}`)) as unknown as Array<{ tax_id: string }>;
+    expect(raw2.tax_id.startsWith("enc1:")).toBe(true);
+    // a sorszámok a visszaállított azonosítók után folytatódnak
+    const [p2] = await m.db.db.insert(s.partners).values({ companyId: cid, name: "Visszaállítás után" }).returning();
+    expect(p2.id).toBeGreaterThan(Math.max(...b.tables.partners.map((p) => Number(p.id))));
+    delete process.env.DATA_ENCRYPTION_KEY;
+  }, 120_000);
 });

@@ -14,10 +14,19 @@ import {
   index,
   primaryKey,
   bigserial,
+  customType,
 } from "drizzle-orm/pg-core";
+import { decryptField, encryptField } from "../lib/field-crypto";
 
 /** Pénzösszeg: numeric(18,2), JS-ben number – mindig round2-vel számolunk. */
 const money = (name: string) => numeric(name, { precision: 18, scale: 2, mode: "number" });
+
+/** v6.1.0 – Titkosítva tárolt szöveg (AES-256-GCM, ld. lib/field-crypto). Olvasáskor automatikusan visszafejtődik. */
+const encText = customType<{ data: string; driverData: string }>({
+  dataType: () => "text",
+  toDriver: (v) => encryptField(v) as string,
+  fromDriver: (v) => decryptField(v) as string,
+});
 const rate = (name: string) => numeric(name, { precision: 18, scale: 6, mode: "number" });
 
 // ---------------------------------------------------------------------------
@@ -93,6 +102,9 @@ export const users = pgTable("users", {
   /** Növelése az összes korábbi munkamenetet érvényteleníti (jelszócsere, 2FA visszaállítás). */
   sessionVersion: integer("session_version").notNull().default(0),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  /** v6.1.0 – az ÁSZF és az adatkezelési tájékoztató elfogadása (melyik változat, mikor). */
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+  termsVersion: varchar("terms_version", { length: 20 }),
 });
 
 // ---------------------------------------------------------------------------
@@ -172,7 +184,8 @@ export const employees = pgTable("employees", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
-  taxId: varchar("tax_id", { length: 20 }),
+  /** v6.1.0 – titkosítva tárolva. */
+  taxId: encText("tax_id"),
   position: varchar("position", { length: 128 }),
   partnerId: integer("partner_id"),
   note: text("note"),
@@ -685,11 +698,12 @@ export const companyMembers = pgTable("company_members", {
   endDate: date("end_date"),
   /** önálló | együttes */
   representation: varchar("representation", { length: 12 }),
-  birthPlace: varchar("birth_place", { length: 120 }),
+  /** v6.1.0 – a születési hely, anyja neve, lakcím és adóazonosító jel titkosítva tárolva. */
+  birthPlace: encText("birth_place"),
   birthDate: date("birth_date"),
-  motherName: varchar("mother_name", { length: 255 }),
-  address: text("address"),
-  taxId: varchar("tax_id", { length: 20 }),
+  motherName: encText("mother_name"),
+  address: encText("address"),
+  taxId: encText("tax_id"),
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("company_members_company").on(t.companyId)]);

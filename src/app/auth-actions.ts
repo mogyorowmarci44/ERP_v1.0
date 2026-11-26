@@ -11,6 +11,7 @@ import { clientIp, emailKey, ipKey, throttleClear, throttleFail, throttleLockedM
 import { ACCOUNT_LIMIT, IP_LIMIT, RESET_LIMIT } from "@/lib/throttle-calc";
 import { consumeUserToken, createUserToken, mailTokenLink, tokenLink, sendInvite } from "@/lib/user-tokens";
 import { canPurge, daysUntilPurge, exportFresh, EXPORT_MAX_AGE_HOURS } from "@/lib/archive-calc";
+import { TERMS_VERSION } from "@/lib/vendor";
 import { createCompany } from "@/lib/ledger";
 import { taxProfileFromForm } from "@/lib/entity";
 import { parseActivityProfile } from "@/lib/activity";
@@ -155,11 +156,12 @@ export async function setupAction(fd: FormData) {
     if (n > 0) throw new Error("A rendszer már be van állítva.");
     const pw = str(fd, "password");
     if (pw.length < 10) throw new Error("A jelszó legalább 10 karakter legyen.");
+    if (fd.get("terms") !== "on") throw new Error("Az ÁSZF és az adatkezelési tájékoztató elfogadása szükséges.");
     // v6.0.0 – az első felhasználó az üzemeltető és az első ügyfélfiók adminja
     const [org] = await db.insert(schema.organizations).values({ name: str(fd, "orgName") || str(fd, "name") }).returning();
     const [u] = await db
       .insert(schema.users)
-      .values({ email: str(fd, "email").toLowerCase(), name: str(fd, "name"), passwordHash: await hashPassword(pw), isAdmin: true, isPlatformAdmin: true, organizationId: org.id })
+      .values({ email: str(fd, "email").toLowerCase(), name: str(fd, "name"), passwordHash: await hashPassword(pw), isAdmin: true, isPlatformAdmin: true, organizationId: org.id, termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION })
       .returning();
     await audit({ action: "org.create", user: actorOf(u), organizationId: org.id, target: org.name });
     if (!(await mfaRequired(u.organizationId))) { await createSession(u, "none"); return "/"; }
@@ -292,7 +294,7 @@ export async function archiveCompanyAction(fd: FormData) {
     const m = await ownedCompany(user.id, cid);
     if (m.archivedAt) throw new Error("A cég már archivált.");
     if (!exportFresh(m.lastFullExportAt, new Date()))
-      throw new Error(`Archiválás előtt töltsd le a cég teljes adatexportját (az elmúlt ${EXPORT_MAX_AGE_HOURS} órában) – a lenti „Teljes export” gombbal.`);
+      throw new Error(`Archiválás előtt töltsd le a cég teljes mentését (az elmúlt ${EXPORT_MAX_AGE_HOURS} órában) – a lenti „Teljes mentés letöltése” gombbal.`);
     if (!(await verifyPassword(str(fd, "password"), user.passwordHash))) throw new Error("Hibás jelszó – a cég nem lett archiválva.");
     await db.update(schema.companies).set({ archivedAt: new Date(), archivedBy: user.id }).where(eq(schema.companies.id, cid));
     await audit({ action: "company.archive", companyId: cid, target: m.name });
@@ -363,13 +365,27 @@ export async function resetPasswordAction(fd: FormData) {
     const pw = str(fd, "password");
     if (pw.length < 10) throw new Error("A jelszó legalább 10 karakter legyen.");
     if (pw !== str(fd, "password2")) throw new Error("A két jelszó nem egyezik.");
+    const invite = !!fd.get("invite");
+    if (invite && fd.get("terms") !== "on") throw new Error("Az ÁSZF és az adatkezelési tájékoztató elfogadása szükséges.");
     const r = await consumeUserToken(raw);
     if (!r) return "/login?error=" + encodeURIComponent("A link lejárt vagy már fel lett használva – kérj újat.");
     await db.update(schema.users).set({
       passwordHash: await hashPassword(pw), sessionVersion: dsql`${schema.users.sessionVersion} + 1`, mfaFailedCount: 0, mfaLockedUntil: null,
+      ...(invite ? { termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION } : {}),
     }).where(eq(schema.users.id, r.user.id));
     await throttleClear(emailKey(r.user.email));
     await audit({ action: r.token.purpose === "invite" ? "invite.accept" : "password.reset", user: actorOf(r.user) });
     return "/login?ok=" + encodeURIComponent(r.token.purpose === "invite" ? "Fiók aktiválva – lépj be az e-mail címeddel és az új jelszavaddal." : "Jelszó beállítva – lépj be az új jelszóval.");
+  });
+}
+
+/** v6.1.0 – Az ÁSZF és az adatkezelési tájékoztató (aktuális változatának) elfogadása. */
+export async function acceptTermsAction(fd: FormData) {
+  const user = await requireUser();
+  await runOrRedirect("/", async () => {
+    if (fd.get("terms") !== "on") throw new Error("Jelöld be az elfogadást.");
+    await db.update(schema.users).set({ termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION }).where(eq(schema.users.id, user.id));
+    await audit({ action: "terms.accept", details: { version: TERMS_VERSION } });
+    return `/?ok=${encodeURIComponent("Köszönjük, elfogadva.")}`;
   });
 }

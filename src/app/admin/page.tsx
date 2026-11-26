@@ -43,6 +43,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
         <form action={logoutAction} className="row">
           <Link href="/admin/log">Tevékenységnapló</Link>
+          <Link href="/admin/backup">Mentés és visszaállítás</Link>
           {me.isPlatformAdmin && <Link href="/admin/platform">Ügyfélfiókok</Link>}
           {me.isPlatformAdmin && <Link href="/admin/summary">Napi összefoglaló</Link>}
           {me.isPlatformAdmin && <Link href="/admin/catalog">Típuskatalógus</Link>}
