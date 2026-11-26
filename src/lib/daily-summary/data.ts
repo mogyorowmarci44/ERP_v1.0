@@ -3,7 +3,7 @@
  * Minden szám a könyvelésből jön (ugyanazok a riportfüggvények, mint a felületen), a „tegnap” a küldés előtti nap.
  */
 import "server-only";
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { trialBalance, openItems, journalList, vatAnalytics, type TrialBalanceRow } from "@/lib/reports";
 import { addDaysIso, monthStart, today } from "@/lib/dates";
@@ -377,7 +377,8 @@ export type HoldingSnapshot = {
 
 /** Az összes cég egyben (a holding tulajdonosainak). */
 export async function holdingSnapshot(t = today(), cache = new Map<number, CompanySnapshot>()): Promise<HoldingSnapshot> {
-  const list = await db.select({ id: schema.companies.id }).from(schema.companies).orderBy(schema.companies.name);
+  // v6.0.0 – csak az üzemeltető (holding) ügyfélfiókjának aktív cégei; archivált és más ügyfél cége nem kerül bele
+  const list = await db.select({ id: schema.companies.id }).from(schema.companies).where(holdingCompanies()).orderBy(schema.companies.name);
   const companies: CompanySnapshot[] = [];
   for (const c of list) companies.push(cache.get(c.id) ?? (await companySnapshot(c.id, t)));
   const S = (f: (c: CompanySnapshot) => number) => sum(companies.map(f));
@@ -413,4 +414,12 @@ export async function holdingSnapshot(t = today(), cache = new Map<number, Compa
   const todoTxt = open ? `${cap(cnt(open))} dolog vár rád${red ? (red === open ? (open === 1 ? ", és sürgős" : ", mind sürgős") : red === 1 ? ", az egyik sürgős" : `, ebből ${cnt(red)} sürgős`) : ""}.` : "Minden rendben, nincs teendő.";
   const headline = `A cégcsoportnak ${money(S((c) => c.kpi.liquidity))} pénze van, ebben a hónapban eddig ${money(totals.mtdResult, true)} az eredmény. ${todoTxt}`;
   return { date: t, day: addDaysIso(t, -1), companies, totals, cashSeries, lanes: { red: lane("red"), yellow: lane("yellow"), green: lane("green") }, bestSale, headline };
+}
+
+/** v6.0.0 – A holding-összefoglaló cégei: az üzemeltető ügyfélfiókjának nem archivált cégei. */
+export function holdingCompanies() {
+  return and(
+    isNull(schema.companies.archivedAt),
+    inArray(schema.companies.organizationId, db.select({ o: schema.users.organizationId }).from(schema.users).where(eq(schema.users.isPlatformAdmin, true))),
+  );
 }

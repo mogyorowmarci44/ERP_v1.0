@@ -35,12 +35,17 @@ import { invoiceAudit } from "@/lib/invoice-audit";
 import { updateEntryMeta, renameInvoiceLine, setEntryChecked, updateManualEntry, reopenInvoice, logInvoiceRepost, editPayment, type EntryLineInput } from "@/lib/journal-edit";
 import { DEFAULT_TAX_PROFILE, isPrivate, taxProfileFromForm } from "@/lib/entity";
 import { cleanPartnerInput, findDuplicatePartner, type NewPartnerInput } from "@/lib/partner-input";
+import { withAudit } from "@/lib/audit";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
 // --- Partnerek -------------------------------------------------------------
 
 export async function savePartnerAction(fd: FormData) {
+  return withAudit("savePartnerAction", fd, () => savePartnerActionImpl(fd));
+}
+
+async function savePartnerActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/partners`, async () => {
@@ -70,6 +75,10 @@ export async function savePartnerAction(fd: FormData) {
 // --- Gépkocsik -------------------------------------------------------------
 
 export async function saveVehicleAction(fd: FormData) {
+  return withAudit("saveVehicleAction", fd, () => saveVehicleActionImpl(fd));
+}
+
+async function saveVehicleActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/vehicles`, async () => {
@@ -101,6 +110,10 @@ export async function saveVehicleAction(fd: FormData) {
 // --- Számlatükör -----------------------------------------------------------
 
 export async function saveAccountAction(fd: FormData) {
+  return withAudit("saveAccountAction", fd, () => saveAccountActionImpl(fd));
+}
+
+async function saveAccountActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/accounts`, async () => {
@@ -140,6 +153,17 @@ export async function saveInvoiceAction(
   /** v3.9.0 – a számla-űrlapon felvett új partner; a számlával együtt (egy tranzakcióban) kerül a Partnerek közé. */
   newPartner?: NewPartnerInput | null,
 ): Promise<ActionResult> {
+  return withAudit("saveInvoiceAction", { cid }, () => saveInvoiceActionImpl(cid, input, invoiceId, postNow, newPartner));
+}
+
+async function saveInvoiceActionImpl(
+  cid: number,
+  input: InvoiceInput,
+  invoiceId?: number,
+  postNow = false,
+  /** v3.9.0 – a számla-űrlapon felvett új partner; a számlával együtt (egy tranzakcióban) kerül a Partnerek közé. */
+  newPartner?: NewPartnerInput | null,
+): Promise<ActionResult> {
   const { user } = await requireCompany(cid, { write: true });
   try {
     for (const d of [input.issueDate, input.fulfillmentDate]) if (!isDate(d)) throw new Error("Hiányzó vagy hibás dátum.");
@@ -169,6 +193,10 @@ export async function saveInvoiceAction(
 }
 
 export async function postInvoiceAction(fd: FormData) {
+  return withAudit("postInvoiceAction", fd, () => postInvoiceActionImpl(fd));
+}
+
+async function postInvoiceActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -181,6 +209,10 @@ export async function postInvoiceAction(fd: FormData) {
 }
 
 export async function cancelInvoiceAction(fd: FormData) {
+  return withAudit("cancelInvoiceAction", fd, () => cancelInvoiceActionImpl(fd));
+}
+
+async function cancelInvoiceActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -193,6 +225,10 @@ export async function cancelInvoiceAction(fd: FormData) {
 
 /** v3.9.4 – Piszkozat rontottnak (érvénytelenített papírszámla) jelölése / visszavonása. */
 export async function voidInvoiceAction(fd: FormData) {
+  return withAudit("voidInvoiceAction", fd, () => voidInvoiceActionImpl(fd));
+}
+
+async function voidInvoiceActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -209,6 +245,10 @@ export async function voidInvoiceAction(fd: FormData) {
 
 /** Könyvelt számla tételmegnevezésének javítása (összeg nem változik), naplózva. */
 export async function renameInvoiceLineAction(fd: FormData) {
+  return withAudit("renameInvoiceLineAction", fd, () => renameInvoiceLineActionImpl(fd));
+}
+
+async function renameInvoiceLineActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -220,6 +260,10 @@ export async function renameInvoiceLineAction(fd: FormData) {
 }
 
 export async function payInvoiceAction(fd: FormData) {
+  return withAudit("payInvoiceAction", fd, () => payInvoiceActionImpl(fd));
+}
+
+async function payInvoiceActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -243,6 +287,10 @@ export async function payInvoiceAction(fd: FormData) {
 
 /** Könyvelt számla újranyitása javításra (piszkozat lesz, újrakönyveléskor ugyanazt a tételszámot kapja). */
 export async function reopenInvoiceAction(fd: FormData) {
+  return withAudit("reopenInvoiceAction", fd, () => reopenInvoiceActionImpl(fd));
+}
+
+async function reopenInvoiceActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -255,6 +303,10 @@ export async function reopenInvoiceAction(fd: FormData) {
 
 /** Pénzügyi rendezés javítása (dátum, pénzeszköz, összeg). */
 export async function editPaymentAction(fd: FormData) {
+  return withAudit("editPaymentAction", fd, () => editPaymentActionImpl(fd));
+}
+
+async function editPaymentActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("invoiceId"));
@@ -273,6 +325,10 @@ export async function editPaymentAction(fd: FormData) {
 }
 
 export async function reversePaymentAction(fd: FormData) {
+  return withAudit("reversePaymentAction", fd, () => reversePaymentActionImpl(fd));
+}
+
+async function reversePaymentActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("invoiceId"));
@@ -285,6 +341,10 @@ export async function reversePaymentAction(fd: FormData) {
 // --- Párosítás, beszámítás (v2.2) -------------------------------------------
 
 export async function linkEntryAction(fd: FormData) {
+  return withAudit("linkEntryAction", fd, () => linkEntryActionImpl(fd));
+}
+
+async function linkEntryActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -296,6 +356,10 @@ export async function linkEntryAction(fd: FormData) {
 }
 
 export async function offsetInvoiceAction(fd: FormData) {
+  return withAudit("offsetInvoiceAction", fd, () => offsetInvoiceActionImpl(fd));
+}
+
+async function offsetInvoiceActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -311,6 +375,10 @@ export async function offsetInvoiceAction(fd: FormData) {
 // --- ÁFA-zárás, elhatárolások (v2.2) ------------------------------------------
 
 export async function closeVatAction(fd: FormData) {
+  return withAudit("closeVatAction", fd, () => closeVatActionImpl(fd));
+}
+
+async function closeVatActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/reports/vat/closing?year=${str(fd, "to").slice(0, 4)}`;
@@ -322,6 +390,10 @@ export async function closeVatAction(fd: FormData) {
 }
 
 export async function reopenVatAction(fd: FormData) {
+  return withAudit("reopenVatAction", fd, () => reopenVatActionImpl(fd));
+}
+
+async function reopenVatActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/reports/vat/closing?year=${str(fd, "year")}`;
@@ -333,6 +405,10 @@ export async function reopenVatAction(fd: FormData) {
 }
 
 export async function releaseAccrualAction(fd: FormData) {
+  return withAudit("releaseAccrualAction", fd, () => releaseAccrualActionImpl(fd));
+}
+
+async function releaseAccrualActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/closing/accruals`;
@@ -351,6 +427,13 @@ export async function manualEntryAction(
   cid: number,
   input: { journalCode: string; date: string; description: string; lines: DraftLine[] },
 ): Promise<ActionResult> {
+  return withAudit("manualEntryAction", { cid }, () => manualEntryActionImpl(cid, input));
+}
+
+async function manualEntryActionImpl(
+  cid: number,
+  input: { journalCode: string; date: string; description: string; lines: DraftLine[] },
+): Promise<ActionResult> {
   const { user } = await requireCompany(cid, { write: true });
   try {
     if (!isDate(input.date)) throw new Error("Hibás dátum.");
@@ -364,6 +447,10 @@ export async function manualEntryAction(
 }
 
 export async function reverseEntryAction(fd: FormData) {
+  return withAudit("reverseEntryAction", fd, () => reverseEntryActionImpl(fd));
+}
+
+async function reverseEntryActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/journal`, async () => {
@@ -377,6 +464,10 @@ export async function reverseEntryAction(fd: FormData) {
 
 /** Napló-tétel „ellenőrzött” jelölése be / ki. */
 export async function toggleEntryCheckAction(fd: FormData) {
+  return withAudit("toggleEntryCheckAction", fd, () => toggleEntryCheckActionImpl(fd));
+}
+
+async function toggleEntryCheckActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const back = str(fd, "back") || `/c/${cid}/journal`;
@@ -389,6 +480,10 @@ export async function toggleEntryCheckAction(fd: FormData) {
 
 /** Kézi tétel teljes javítása (dátum, megnevezés, sorok). Sor mezők: `${key}:mező`, a `row` mezők sorolják a sorokat. */
 export async function updateManualEntryAction(fd: FormData) {
+  return withAudit("updateManualEntryAction", fd, () => updateManualEntryActionImpl(fd));
+}
+
+async function updateManualEntryActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const entryId = Number(fd.get("entryId"));
@@ -418,6 +513,10 @@ export async function updateManualEntryAction(fd: FormData) {
 
 /** Lekönyvelt kézi tétel kiegészítő adatainak (megnevezés, sorszöveg, partner, gépkocsi) módosítása. */
 export async function updateEntryMetaAction(fd: FormData) {
+  return withAudit("updateEntryMetaAction", fd, () => updateEntryMetaActionImpl(fd));
+}
+
+async function updateEntryMetaActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const entryId = Number(fd.get("entryId"));
@@ -440,6 +539,10 @@ export async function updateEntryMetaAction(fd: FormData) {
 // --- Beállítások -----------------------------------------------------------
 
 export async function updateCompanyAction(fd: FormData) {
+  return withAudit("updateCompanyAction", fd, () => updateCompanyActionImpl(fd));
+}
+
+async function updateCompanyActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { role } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/settings`, async () => {
@@ -471,6 +574,10 @@ export async function updateCompanyAction(fd: FormData) {
 
 /** v2.0 – Magánszemély adózási profiljának mentése. */
 export async function updateTaxProfileAction(fd: FormData) {
+  return withAudit("updateTaxProfileAction", fd, () => updateTaxProfileActionImpl(fd));
+}
+
+async function updateTaxProfileActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { role, company } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/settings`, async () => {
@@ -484,6 +591,10 @@ export async function updateTaxProfileAction(fd: FormData) {
 
 /** v2.0 – P&L: melyik csatorna TFH / IFA-ja kerüljön az eredménybe. */
 export async function setPnlTaxIncludeAction(fd: FormData) {
+  return withAudit("setPnlTaxIncludeAction", fd, () => setPnlTaxIncludeActionImpl(fd));
+}
+
+async function setPnlTaxIncludeActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
   const year = str(fd, "year");
@@ -503,6 +614,10 @@ export async function setPnlTaxIncludeAction(fd: FormData) {
 
 /** v2.0 – IFA adatai: tarifa, átlagos vendégszám, éves vendégéjszakák csatornánként (üres = becslés a számlákból). */
 export async function saveIfaInputsAction(fd: FormData) {
+  return withAudit("saveIfaInputsAction", fd, () => saveIfaInputsActionImpl(fd));
+}
+
+async function saveIfaInputsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
   const year = str(fd, "year");
@@ -527,6 +642,10 @@ export async function saveIfaInputsAction(fd: FormData) {
 }
 
 export async function lockPeriodAction(fd: FormData) {
+  return withAudit("lockPeriodAction", fd, () => lockPeriodActionImpl(fd));
+}
+
+async function lockPeriodActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user, role } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/settings`, async () => {
@@ -554,6 +673,10 @@ export async function getRateAction(cid: number, currency: string, date: string)
 }
 
 export async function refreshRatesAction(fd: FormData) {
+  return withAudit("refreshRatesAction", fd, () => refreshRatesActionImpl(fd));
+}
+
+async function refreshRatesActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/fx`, async () => {
@@ -567,6 +690,10 @@ export async function refreshRatesAction(fd: FormData) {
 }
 
 export async function manualRateAction(fd: FormData) {
+  return withAudit("manualRateAction", fd, () => manualRateActionImpl(fd));
+}
+
+async function manualRateActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/fx`, async () => {
@@ -585,6 +712,10 @@ const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 const LOGO_MAX = 400 * 1024;
 
 export async function saveThemeAction(fd: FormData) {
+  return withAudit("saveThemeAction", fd, () => saveThemeActionImpl(fd));
+}
+
+async function saveThemeActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { role } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/appearance`, async () => {
@@ -602,6 +733,10 @@ export async function saveThemeAction(fd: FormData) {
 }
 
 export async function uploadLogoAction(fd: FormData) {
+  return withAudit("uploadLogoAction", fd, () => uploadLogoActionImpl(fd));
+}
+
+async function uploadLogoActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { role } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/appearance`, async () => {
@@ -618,6 +753,10 @@ export async function uploadLogoAction(fd: FormData) {
 }
 
 export async function removeLogoAction(fd: FormData) {
+  return withAudit("removeLogoAction", fd, () => removeLogoActionImpl(fd));
+}
+
+async function removeLogoActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { role } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/appearance`, async () => {
@@ -631,6 +770,10 @@ export async function removeLogoAction(fd: FormData) {
 // --- Adatimport ------------------------------------------------------------------
 
 export async function importBundleAction(cid: number, json: string): Promise<{ error?: string; report?: ImportReport }> {
+  return withAudit("importBundleAction", { cid }, () => importBundleActionImpl(cid, json));
+}
+
+async function importBundleActionImpl(cid: number, json: string): Promise<{ error?: string; report?: ImportReport }> {
   const { user, role } = await requireCompany(cid, { write: true });
   if (role !== "owner") return { error: "Importálni csak a cég tulajdonosa tud." };
   try {
@@ -659,6 +802,10 @@ export async function importBundleAction(cid: number, json: string): Promise<{ e
 // --- Kiegészítő import (mm-erp-delta/1) -------------------------------------------------
 
 export async function deltaImportAction(cid: number, json: string, fileName: string, apply: boolean): Promise<{ error?: string; report?: DeltaReport }> {
+  return withAudit("deltaImportAction", { cid }, () => deltaImportActionImpl(cid, json, fileName, apply));
+}
+
+async function deltaImportActionImpl(cid: number, json: string, fileName: string, apply: boolean): Promise<{ error?: string; report?: DeltaReport }> {
   const { user, role } = await requireCompany(cid, { write: true });
   if (role !== "owner") return { error: "Kiegészítő csomagot csak a cég tulajdonosa tölthet be." };
   try {
@@ -674,6 +821,10 @@ export async function deltaImportAction(cid: number, json: string, fileName: str
 // --- Tagi kölcsön -------------------------------------------------------------------
 
 export async function memberLoanAction(fd: FormData) {
+  return withAudit("memberLoanAction", fd, () => memberLoanActionImpl(fd));
+}
+
+async function memberLoanActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/member-loans`, async () => {
@@ -702,6 +853,10 @@ export async function memberLoanAction(fd: FormData) {
 }
 
 export async function extendLoanAction(fd: FormData) {
+  return withAudit("extendLoanAction", fd, () => extendLoanActionImpl(fd));
+}
+
+async function extendLoanActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/member-loans`, async () => {
@@ -719,6 +874,10 @@ export async function extendLoanAction(fd: FormData) {
 }
 
 export async function setLoanDueAction(fd: FormData) {
+  return withAudit("setLoanDueAction", fd, () => setLoanDueActionImpl(fd));
+}
+
+async function setLoanDueActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/member-loans`, async () => {
@@ -731,6 +890,10 @@ export async function setLoanDueAction(fd: FormData) {
 }
 
 export async function undoExtensionAction(fd: FormData) {
+  return withAudit("undoExtensionAction", fd, () => undoExtensionActionImpl(fd));
+}
+
+async function undoExtensionActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/member-loans`, async () => {
@@ -741,6 +904,10 @@ export async function undoExtensionAction(fd: FormData) {
 }
 
 export async function revalueMemberLoansAction(fd: FormData) {
+  return withAudit("revalueMemberLoansAction", fd, () => revalueMemberLoansActionImpl(fd));
+}
+
+async function revalueMemberLoansActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/member-loans`, async () => {
@@ -754,6 +921,10 @@ export async function revalueMemberLoansAction(fd: FormData) {
 }
 
 export async function importLoanTermsAction(cid: number, json: string): Promise<{ error?: string; added?: number; extensions?: number; repayments?: number; warnings?: string[] }> {
+  return withAudit("importLoanTermsAction", { cid }, () => importLoanTermsActionImpl(cid, json));
+}
+
+async function importLoanTermsActionImpl(cid: number, json: string): Promise<{ error?: string; added?: number; extensions?: number; repayments?: number; warnings?: string[] }> {
   const { role } = await requireCompany(cid, { write: true });
   if (role !== "owner") return { error: "Ezt csak a cég tulajdonosa teheti meg." };
   try {
@@ -766,6 +937,10 @@ export async function importLoanTermsAction(cid: number, json: string): Promise<
 }
 
 export async function wipeCompanyAction(fd: FormData) {
+  return withAudit("wipeCompanyAction", fd, () => wipeCompanyActionImpl(fd));
+}
+
+async function wipeCompanyActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { role, company } = await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/import`, async () => {
@@ -781,6 +956,10 @@ export async function wipeCompanyAction(fd: FormData) {
 
 /** Ellenőrizve pipa be/ki – a pipa a számla aktuális ujjlenyomatával mentődik. */
 export async function toggleInvoiceCheckAction(fd: FormData) {
+  return withAudit("toggleInvoiceCheckAction", fd, () => toggleInvoiceCheckActionImpl(fd));
+}
+
+async function toggleInvoiceCheckActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const back = str(fd, "back") || `/c/${cid}/invoices`;
@@ -798,6 +977,10 @@ export async function toggleInvoiceCheckAction(fd: FormData) {
 
 /** Ellenőrzési megjegyzés és bizonylat-hivatkozás mentése. */
 export async function saveInvoiceCheckNoteAction(fd: FormData) {
+  return withAudit("saveInvoiceCheckNoteAction", fd, () => saveInvoiceCheckNoteActionImpl(fd));
+}
+
+async function saveInvoiceCheckNoteActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -817,6 +1000,10 @@ export async function saveInvoiceCheckNoteAction(fd: FormData) {
 // --- v4.5.0 – Tagok és tisztségviselők ---------------------------------------------------------
 
 export async function saveCompanyMemberAction(fd: FormData) {
+  return withAudit("saveCompanyMemberAction", fd, () => saveCompanyMemberActionImpl(fd));
+}
+
+async function saveCompanyMemberActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/settings?member=${str(fd, "id") || "new"}#tagok`, async () => {
@@ -846,6 +1033,10 @@ export async function saveCompanyMemberAction(fd: FormData) {
 }
 
 export async function deleteCompanyMemberAction(fd: FormData) {
+  return withAudit("deleteCompanyMemberAction", fd, () => deleteCompanyMemberActionImpl(fd));
+}
+
+async function deleteCompanyMemberActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/settings#tagok`, async () => {

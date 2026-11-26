@@ -6,11 +6,16 @@ import { runOrRedirect, str, optStr } from "@/lib/action-utils";
 import { parseNumber } from "@/lib/money";
 import { isDate } from "@/lib/dates";
 import { createAsset, deleteAsset, postDepreciation, registerFromLine, updateAsset } from "@/lib/assets";
+import { withAudit } from "@/lib/audit";
 
 const back = (cid: number, q = "") => `/c/${cid}/assets${q}`;
 const ok = (cid: number, msg: string, path = "") => `${back(cid, path)}?ok=${encodeURIComponent(msg)}`;
 
 export async function registerLineAction(fd: FormData) {
+  return withAudit("registerLineAction", fd, () => registerLineActionImpl(fd));
+}
+
+async function registerLineActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   const { user } = await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid), async () => {
@@ -23,6 +28,10 @@ export async function registerLineAction(fd: FormData) {
 }
 
 export async function createAssetAction(fd: FormData) {
+  return withAudit("createAssetAction", fd, () => createAssetActionImpl(fd));
+}
+
+async function createAssetActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   const { user } = await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "/new"), async () => {
@@ -43,6 +52,10 @@ export async function createAssetAction(fd: FormData) {
 }
 
 export async function updateAssetAction(fd: FormData) {
+  return withAudit("updateAssetAction", fd, () => updateAssetActionImpl(fd));
+}
+
+async function updateAssetActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), id = Number(fd.get("id"));
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, `/${id}`), async () => {
@@ -59,6 +72,10 @@ export async function updateAssetAction(fd: FormData) {
 }
 
 export async function deleteAssetAction(fd: FormData) {
+  return withAudit("deleteAssetAction", fd, () => deleteAssetActionImpl(fd));
+}
+
+async function deleteAssetActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), id = Number(fd.get("id"));
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, `/${id}`), async () => {
@@ -69,6 +86,10 @@ export async function deleteAssetAction(fd: FormData) {
 }
 
 export async function postDepreciationAction(fd: FormData) {
+  return withAudit("postDepreciationAction", fd, () => postDepreciationActionImpl(fd));
+}
+
+async function postDepreciationActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   const { user } = await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid), async () => {

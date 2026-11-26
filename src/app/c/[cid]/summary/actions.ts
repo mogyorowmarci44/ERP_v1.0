@@ -7,6 +7,7 @@ import { requireCompany } from "@/lib/auth";
 import { runOrRedirect, str, intOrNull } from "@/lib/action-utils";
 import { sendTestCompany, setSummaryToggle } from "@/lib/daily-summary/send";
 import type { Variant } from "@/lib/daily-summary/render";
+import { withAudit } from "@/lib/audit";
 
 const VARIANTS: Variant[] = ["ceo", "cfo", "full"];
 const variantOf = (v: string): Variant => (VARIANTS.includes(v as Variant) ? (v as Variant) : "ceo");
@@ -15,6 +16,10 @@ const okTo = (cid: number, msg: string) => `${back(cid)}?ok=${encodeURIComponent
 const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
 export async function addRecipientAction(fd: FormData) {
+  return withAudit("addRecipientAction", fd, () => addRecipientActionImpl(fd));
+}
+
+async function addRecipientActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid), async () => {
@@ -29,6 +34,10 @@ export async function addRecipientAction(fd: FormData) {
 }
 
 export async function updateRecipientAction(fd: FormData) {
+  return withAudit("updateRecipientAction", fd, () => updateRecipientActionImpl(fd));
+}
+
+async function updateRecipientActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid), async () => {
@@ -50,6 +59,10 @@ export async function updateRecipientAction(fd: FormData) {
 }
 
 export async function testRecipientAction(fd: FormData) {
+  return withAudit("testRecipientAction", fd, () => testRecipientActionImpl(fd));
+}
+
+async function testRecipientActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid), async () => {
@@ -63,6 +76,10 @@ export async function testRecipientAction(fd: FormData) {
 
 /** v3.9.3 – A cég napi összefoglalójának be / ki kapcsolása. */
 export async function toggleCompanySummaryAction(fd: FormData) {
+  return withAudit("toggleCompanySummaryAction", fd, () => toggleCompanySummaryActionImpl(fd));
+}
+
+async function toggleCompanySummaryActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid), async () => {
@@ -75,6 +92,10 @@ export async function toggleCompanySummaryAction(fd: FormData) {
 
 /** v3.9.4 – A napi összefoglalóból kihagyott gépkocsik (pl. szándékosan készleten tartott autó). */
 export async function saveSummaryExcludeAction(fd: FormData) {
+  return withAudit("saveSummaryExcludeAction", fd, () => saveSummaryExcludeActionImpl(fd));
+}
+
+async function saveSummaryExcludeActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid), async () => {

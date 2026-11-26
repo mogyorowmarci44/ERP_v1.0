@@ -1,4 +1,5 @@
 import { requireCompany } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 import { buildAnykXml } from "@/lib/anyk";
 import { getFiling } from "@/lib/filings";
 
@@ -9,6 +10,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ cid: st
   const p = await params;
   const cid = Number(p.cid);
   const { company } = await requireCompany(cid);
+  await audit({ action: "export.file", companyId: cid, target: new URL(_req.url).pathname.slice(0, 255) }); // v6.0.0
   const f = await getFiling(cid, Number(p.id));
   if (!f) return new Response("Nincs ilyen bevallás.", { status: 404 });
   const xml = buildAnykXml({

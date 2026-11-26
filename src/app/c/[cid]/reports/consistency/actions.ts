@@ -5,9 +5,14 @@ import { runOrRedirect } from "@/lib/action-utils";
 import { recomputeVatClosings } from "@/lib/vat-closing";
 import { mergeAllDuplicates } from "@/lib/partner-merge";
 import { autoLinkManualSettlements } from "@/lib/matching";
+import { withAudit } from "@/lib/audit";
 
 /** v3.9.6 – Az Egyezőség oldal javító gombjai. */
 export async function consistencyFixAction(fd: FormData) {
+  return withAudit("consistencyFixAction", fd, () => consistencyFixActionImpl(fd));
+}
+
+async function consistencyFixActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   const { user } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/reports/consistency`;

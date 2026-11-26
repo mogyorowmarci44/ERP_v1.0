@@ -50,9 +50,17 @@ export type NewCompany = {
 export async function createCompany(userId: number, data: NewCompany, outerTx?: Tx) {
   const seed = entitySeed(data.entityType ?? "company");
   return inTx(outerTx, async (tx) => {
+    // v6.0.0 – a cég a létrehozó ügyfélfiókjába kerül; ügyfélfiók nélküli felhasználónak (pl. tesztek) újat nyitunk
+    const [u] = await tx.select({ orgId: schema.users.organizationId, name: schema.users.name }).from(schema.users).where(eq(schema.users.id, userId));
+    let organizationId = u?.orgId ?? null;
+    if (!organizationId) {
+      const [o] = await tx.insert(schema.organizations).values({ name: u?.name || data.name }).returning();
+      organizationId = o.id;
+      await tx.update(schema.users).set({ organizationId }).where(eq(schema.users.id, userId));
+    }
     const [c] = await tx
       .insert(companies)
-      .values({ ...data, settings: seed.settings })
+      .values({ ...data, organizationId, settings: seed.settings })
       .returning();
     await tx.insert(memberships).values({ userId, companyId: c.id, role: "owner" });
     await tx.insert(accounts).values(

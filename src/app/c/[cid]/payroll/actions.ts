@@ -9,11 +9,16 @@ import { parseNumber } from "@/lib/money";
 import { isDate } from "@/lib/dates";
 import { deleteEmployee, deleteEmployment, markExternal, postMonth, saveMonth, saveParams, unpostMonth } from "@/lib/payroll";
 import { KIND_LABEL, PARAM_LABELS, defaultParams, type EmploymentKind, type PayrollInput, type PayrollParams } from "@/lib/payroll-calc";
+import { withAudit } from "@/lib/audit";
 
 const isPeriod = (p: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(p);
 const ok = (url: string, msg: string) => `${url}${url.includes("?") ? "&" : "?"}ok=${encodeURIComponent(msg)}`;
 
 export async function savePayrollAction(cid: number, period: string, inputs: Record<number, PayrollInput>): Promise<{ error?: string }> {
+  return withAudit("savePayrollAction", { cid }, () => savePayrollActionImpl(cid, period, inputs));
+}
+
+async function savePayrollActionImpl(cid: number, period: string, inputs: Record<number, PayrollInput>): Promise<{ error?: string }> {
   await requireCompany(cid, { write: true });
   try {
     if (!isPeriod(period)) throw new Error("Hibás hónap.");
@@ -26,6 +31,10 @@ export async function savePayrollAction(cid: number, period: string, inputs: Rec
 }
 
 export async function postPayrollAction(fd: FormData) {
+  return withAudit("postPayrollAction", fd, () => postPayrollActionImpl(fd));
+}
+
+async function postPayrollActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), period = str(fd, "period");
   const { user } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/payroll?period=${period}`;
@@ -37,6 +46,10 @@ export async function postPayrollAction(fd: FormData) {
 }
 
 export async function markExternalAction(fd: FormData) {
+  return withAudit("markExternalAction", fd, () => markExternalActionImpl(fd));
+}
+
+async function markExternalActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), period = str(fd, "period"), on = fd.get("on") === "1";
   await requireCompany(cid, { write: true });
   const back = `/c/${cid}/payroll?period=${period}`;
@@ -49,6 +62,10 @@ export async function markExternalAction(fd: FormData) {
 }
 
 export async function unpostPayrollAction(fd: FormData) {
+  return withAudit("unpostPayrollAction", fd, () => unpostPayrollActionImpl(fd));
+}
+
+async function unpostPayrollActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), period = str(fd, "period");
   const { user } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/payroll?period=${period}`;
@@ -62,6 +79,10 @@ export async function unpostPayrollAction(fd: FormData) {
 // --- dolgozók, jogviszonyok ------------------------------------------------------------------
 
 export async function saveEmployeeAction(fd: FormData) {
+  return withAudit("saveEmployeeAction", fd, () => saveEmployeeActionImpl(fd));
+}
+
+async function saveEmployeeActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   await requireCompany(cid, { write: true });
   const back = `/c/${cid}/payroll/people`;
@@ -80,6 +101,10 @@ export async function saveEmployeeAction(fd: FormData) {
 }
 
 export async function deleteEmployeeAction(fd: FormData) {
+  return withAudit("deleteEmployeeAction", fd, () => deleteEmployeeActionImpl(fd));
+}
+
+async function deleteEmployeeActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/payroll/people`, async () => {
@@ -89,6 +114,10 @@ export async function deleteEmployeeAction(fd: FormData) {
 }
 
 export async function saveEmploymentAction(fd: FormData) {
+  return withAudit("saveEmploymentAction", fd, () => saveEmploymentActionImpl(fd));
+}
+
+async function saveEmploymentActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   await requireCompany(cid, { write: true });
   const back = `/c/${cid}/payroll/people`;
@@ -118,6 +147,10 @@ export async function saveEmploymentAction(fd: FormData) {
 }
 
 export async function deleteEmploymentAction(fd: FormData) {
+  return withAudit("deleteEmploymentAction", fd, () => deleteEmploymentActionImpl(fd));
+}
+
+async function deleteEmploymentActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/payroll/people`, async () => {
@@ -129,6 +162,10 @@ export async function deleteEmploymentAction(fd: FormData) {
 // --- paraméterek ---------------------------------------------------------------------------
 
 export async function saveParamsAction(fd: FormData) {
+  return withAudit("saveParamsAction", fd, () => saveParamsActionImpl(fd));
+}
+
+async function saveParamsActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), year = Number(fd.get("year"));
   const { role } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/payroll/params?year=${year}`;

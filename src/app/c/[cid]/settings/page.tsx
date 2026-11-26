@@ -107,7 +107,6 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           <input type="hidden" name="companyId" value={cid} />
           <label>E-mail<input name="email" type="email" required /></label>
           <label>Név (új felhasználónál)<input name="name" /></label>
-          <label>Kezdő jelszó (új felhasználónál)<input name="password" type="password" /></label>
           <label>Szerep
             <select name="role" defaultValue="accountant">
               <option value="owner">tulajdonos</option><option value="accountant">könyvelő</option><option value="viewer">CEO - Ügyvezető</option>
@@ -116,6 +115,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           <div style={{ alignSelf: "end" }}><button>Hozzáadás</button></div>
         </form>
       )}
+      {role === "owner" && <p className="muted" style={{ fontSize: 13 }}>Új e-mail címre meghívó link megy ki (7 napig érvényes) – a jelszót a meghívott maga állítja be.</p>}
     </>
   );
 }

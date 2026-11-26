@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
-import { and, eq, getTableColumns } from "drizzle-orm";
+import { and, eq, gt, getTableColumns } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { mfaRequired } from "@/lib/app-settings";
 
@@ -58,12 +58,12 @@ export const getUser = cache(async function getUser() {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
-    // 2FA-val szerzett munkamenet mindig érvényes; csak jelszavas csak akkor, ha a 2FA nincs kötelezővé téve
-    const viaTotp = payload.mfa === true || payload.mfa === "totp";
-    if (!viaTotp && !(payload.mfa === "none" && !(await mfaRequired()))) return null;
     const uid = Number(payload.uid);
     const [u] = await db.select().from(schema.users).where(eq(schema.users.id, uid));
     if (!u || Number(payload.tv) !== u.sessionVersion) return null;
+    // 2FA-val szerzett munkamenet mindig érvényes; csak jelszavas csak akkor, ha az ügyfélfiókban a 2FA nincs kötelezővé téve
+    const viaTotp = payload.mfa === true || payload.mfa === "totp";
+    if (!viaTotp && !(payload.mfa === "none" && !(await mfaRequired(u.organizationId)))) return null;
     return u;
   } catch {
     return null;
@@ -129,17 +129,25 @@ export async function requireUser() {
   return u;
 }
 
-/** Csak rendszeradminisztrátor (users.is_admin) számára. */
+/** Az ügyfélfiók adminja (users.is_admin + ügyfélfiók). v6.0.0: csak a saját ügyfélfiókja felhasználóit és cégeit kezeli. */
 export async function requireAdmin() {
   const u = await requireUser();
-  if (!u.isAdmin) redirect("/");
+  if (!u.isAdmin || !u.organizationId) redirect("/");
+  return u as typeof u & { organizationId: number };
+}
+
+/** v6.0.0 – Üzemeltető (a rendszer gazdája): ügyfélfiókok, típuskatalógus, napi összefoglaló. */
+export async function requirePlatformAdmin() {
+  const u = await requireUser();
+  if (!u.isPlatformAdmin) redirect("/");
   return u;
 }
 
 /** Ellenőrzi, hogy a felhasználó tagja-e a cégnek; visszaadja a céget és a szerepkört. */
 export async function requireCompany(companyId: number, opts: { write?: boolean } = {}) {
   const r = await companyMembership(companyId);
-  if (opts.write && r.role === "viewer") throw new Error("Nincs írási jogosultságod ehhez a céghez.");
+  if (opts.write && r.role === "viewer") throw new Error(r.support ? "Támogatói hozzáféréssel csak olvasni lehet." : "Nincs írási jogosultságod ehhez a céghez.");
+  if (opts.write && r.company.archivedAt) throw new Error("A cég archivált – csak olvasható. Módosításhoz előbb állítsd vissza a Cégeim oldalon.");
   return r;
 }
 
@@ -154,8 +162,19 @@ const companyMembership = cache(async (companyId: number) => {
     .from(schema.memberships)
     .innerJoin(schema.companies, eq(schema.companies.id, schema.memberships.companyId))
     .where(and(eq(schema.memberships.userId, user.id), eq(schema.memberships.companyId, companyId)));
-  if (!row) redirect("/");
-  return { user, company: row.company, role: row.role };
+  if (row) return { user, company: row.company, role: row.role, support: false };
+  // v6.0.0 – üzemeltetői támogatói hozzáférés: időkorlátos, csak olvasás (a megadása naplózva)
+  if (user.isPlatformAdmin) {
+    const [g] = await db
+      .select({ id: schema.supportGrants.id })
+      .from(schema.supportGrants)
+      .where(and(eq(schema.supportGrants.userId, user.id), eq(schema.supportGrants.companyId, companyId), gt(schema.supportGrants.expiresAt, new Date())));
+    if (g) {
+      const [company] = await db.select(companyCols).from(schema.companies).where(eq(schema.companies.id, companyId));
+      if (company) return { user, company, role: "viewer" as const, support: true };
+    }
+  }
+  redirect("/");
 });
 
 /** Tagság ellenőrzése átirányítás nélkül (API útvonalakhoz). */

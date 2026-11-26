@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requirePlatformAdmin } from "@/lib/auth";
 import { Flash } from "@/components/Flash";
 import { ErpLogo } from "@/components/Brand";
 import { APP_VERSION } from "@/lib/version";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 /** v4.5.3 – Típuskatalógus (cégfüggetlen): márka › modell › motorváltozat, évjárat-intervallummal és tömeggel. */
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  await requireAdmin();
+  await requirePlatformAdmin();
   const sp = await searchParams;
   const st = await catalogStats();
   return (

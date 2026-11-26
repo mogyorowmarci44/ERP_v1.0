@@ -6,8 +6,13 @@ import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { runOrRedirect } from "@/lib/action-utils";
 import { parseNumber } from "@/lib/money";
+import { withAudit } from "@/lib/audit";
 
 export async function saveValuationParamsAction(fd: FormData) {
+  return withAudit("saveValuationParamsAction", fd, () => saveValuationParamsActionImpl(fd));
+}
+
+async function saveValuationParamsActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   await requireCompany(cid, { write: true });
   await runOrRedirect(`/c/${cid}/value`, async () => {

@@ -52,7 +52,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CompanyLayout({ children, params }: { children: React.ReactNode; params: Promise<{ cid: string }> }) {
   const { cid } = await params;
-  const { company, user } = await requireCompany(Number(cid));
+  const { company, user, support } = await requireCompany(Number(cid));
   const b = `/c/${cid}`;
   const theme = normalizeTheme(company.theme);
   const priv = isPrivate(company);
@@ -164,6 +164,9 @@ export default async function CompanyLayout({ children, params }: { children: Re
         </div>
       </nav>
       <main className="main">
+        {/* v6.0.0 – archivált cég / üzemeltetői támogatói hozzáférés jelzése */}
+        {company.archivedAt && <div className="flash error" role="status">Archivált cég – csak olvasható. Visszaállítás a Cégeim oldalon (tulajdonosként).</div>}
+        {support && <div className="flash error" role="status">Támogatói hozzáférés (üzemeltető) – csak olvasás, időkorlátos, és az ügyfél tevékenységnaplójában is megjelenik.</div>}
         {children}
         <AppFooter company={company.name} version={APP_VERSION} darkMark={theme.mode === "dark"} />
       </main>

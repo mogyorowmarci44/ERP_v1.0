@@ -1,4 +1,5 @@
 import { requireCompany } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 import { isDate, today } from "@/lib/dates";
 import { vatXml, xmlName } from "@/lib/vat-return-data";
 
@@ -9,6 +10,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ cid: str
   const p = await params;
   const cid = Number(p.cid);
   await requireCompany(cid);
+  await audit({ action: "export.file", companyId: cid, target: new URL(req.url).pathname.slice(0, 255) }); // v6.0.0
   if (!/^\d{4}-\d{2}$/.test(p.period)) return new Response("Hibás időszak.", { status: 400 });
   const sp = new URL(req.url).searchParams;
   const date = isDate(sp.get("date")) ? sp.get("date")! : today();
