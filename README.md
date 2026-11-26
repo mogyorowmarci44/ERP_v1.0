@@ -39,6 +39,32 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.5.0 – Első lépések új cégnél
+
+Az **Első lépések** oldalon (`/c/[cid]/start`, a menü *Rendszer* csoportjában) a 6 lépés állapota látható. Új cég nyitóoldalán egy sáv is ide vezet, amíg nincs könyvelés.
+
+**A 6 lépés:**
+1. cégadatok és modulok
+2. számlatükör
+3. partnerek
+4. nyitómérleg
+5. bank összekötése
+6. kollégák meghívása
+
+**Importok Excelből (.xlsx) vagy CSV-ből:**
+- Mindegyikhez van letölthető minta.
+- A program felismeri a fejlécet akkor is, ha a kis- és nagybetű, az ékezet vagy a szóköz eltér, és a magyar és az angol számírást is kezeli.
+- Az *Ellenőrzés* gomb semmit nem változtat, a *Betöltés* egy tranzakcióban dolgozik.
+
+**Az egyes importok:**
+- **Számlatükör:** új alszámlák kerülnek be. A típust a számlaszámból veszi, ha nincs megadva. Meglévő kódnál csak a megnevezés frissül.
+- **Partnerek:** az adószámokat ellenőrzi. Hibás sor esetén semmi nem töltődik be, és a hibás sorokat soronként listázza. A már meglévő partnereket kihagyja.
+- **Nyitómérleg:** az előző könyvelő főkönyvi kivonatából egyetlen nyitó tétel lesz (VN, a megadott napra).
+  - Tartozik és Követel összesen meg kell egyezzen.
+  - Vevő- és szállítóegyenleg partnerenként bontható; a hiányzó számlák (megnevezéssel) és partnerek létrejönnek.
+  - Devizás számlánál kötelező a devizaösszeg.
+  - Második nyitó tétel csak az első sztornózása után tölthető be.
+
 ## v6.4.0 – Központi jogszabályi paraméterek dátumhatállyal
 
 **Admin › Jogszabályi paraméterek** (csak az üzemeltetőnek):

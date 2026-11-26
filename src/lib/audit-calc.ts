@@ -94,6 +94,9 @@ export const ACTION_LABEL: Record<string, string> = {
   stockMoveAction: "Kézi készletmozgás",
   deleteStockMoveAction: "Készletmozgás törlése",
   postCogsAction: "ELÁBÉ könyvelése",
+  "onboarding.opening": "Nyitómérleg betöltése",
+  "onboarding.partners": "Partnerek importja",
+  "onboarding.accounts": "Számlatükör importja",
 };
 
 /** Megnevezés: a táblából, különben a függvénynévből („saveThemeAction” → „save theme”). */
