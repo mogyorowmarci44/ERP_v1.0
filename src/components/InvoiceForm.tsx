@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { computeLine, type VatKind } from "@/lib/posting";
 import { fmtHuf, parseNumber } from "@/lib/money";
-import type { AccountOpt, PartnerOpt, VatOpt, VehicleOpt } from "@/lib/options";
+import type { AccountOpt, ItemOpt, PartnerOpt, VatOpt, VehicleOpt } from "@/lib/options";
 import { saveInvoiceAction, getRateAction } from "@/app/c/[cid]/actions";
 import { vatRateDate } from "@/lib/fx";
 import { fmtDate } from "@/lib/dates";
@@ -13,7 +13,7 @@ import { cleanPartnerInput, findDuplicatePartner, type NewPartnerInput } from "@
 const NEW = "__new";
 const emptyPartner = (): NewPartnerInput => ({ name: "", taxNumber: "", euVatNumber: "", country: "HU", address: "", email: "", isPrivatePerson: false });
 
-type Line = { description: string; quantity: string; unitPrice: string; vatCodeId: number; accountId: number; vehicleId: number | null };
+type Line = { description: string; quantity: string; unitPrice: string; vatCodeId: number; accountId: number; vehicleId: number | null; itemId?: number | null };
 
 export type InvoiceFormInitial = {
   partnerId: number | null;
@@ -37,6 +37,8 @@ export function InvoiceForm(props: {
   accounts: AccountOpt[];
   vatCodes: VatOpt[];
   vehicles: VehicleOpt[];
+  /** v6.3.0 – cikkek (csak bekapcsolt készlet-modulnál) */
+  items?: ItemOpt[];
   initial: InvoiceFormInitial;
   invoiceId?: number;
   /** v2.0 – új sor alapértelmezései az entitás szerint (pl. magánszemélynél AAM / 27NL). */
@@ -45,6 +47,7 @@ export function InvoiceForm(props: {
   corrects?: { id: number; number: string } | null;
 }) {
   const { cid, direction, partners, accounts, vatCodes, vehicles } = props;
+  const items = props.items ?? [];
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +77,7 @@ export function InvoiceForm(props: {
     vatCodeId: vatByCode(direction === "out" ? (props.defaults?.outVat ?? "27") : (props.defaults?.inVat ?? "27")),
     accountId: accByCode(direction === "out" ? (props.defaults?.outAcc ?? "913") : (props.defaults?.inAcc ?? "523")),
     vehicleId: null,
+    itemId: null,
   });
 
   const setLine = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -91,6 +95,17 @@ export function InvoiceForm(props: {
         patch.accountId = accByCode("261");
       }
       if (!lines[i].description) patch.description = v.label;
+    }
+    setLine(i, patch);
+  };
+
+  /** v6.3.0 – cikk választásakor: beszerzésnél a cikk készletszámlája az ellenszámla, a megnevezés a cikk neve. */
+  const pickItem = (i: number, id: number | null) => {
+    const it = items.find((x) => x.id === id);
+    const patch: Partial<Line> = { itemId: id };
+    if (it) {
+      if (direction === "in") patch.accountId = accByCode(it.stockAccount);
+      if (!lines[i].description) patch.description = it.label;
     }
     setLine(i, patch);
   };
@@ -172,6 +187,7 @@ export function InvoiceForm(props: {
               vatCodeId: l.vatCodeId,
               accountId: l.accountId,
               vehicleId: l.vehicleId,
+              itemId: l.itemId ?? null,
             })),
           },
           props.invoiceId,
@@ -281,7 +297,7 @@ export function InvoiceForm(props: {
         <thead>
           <tr>
             <th style={{ width: "22%" }}>Megnevezés</th>
-            <th style={{ width: "16%" }}>Gépkocsi</th>
+            <th style={{ width: "16%" }}>{items.length && vehicles.length ? "Gépkocsi / cikk" : items.length ? "Cikk" : "Gépkocsi"}</th>
             <th style={{ width: "6%" }}>Menny.</th>
             <th style={{ width: "10%" }}>Egységár{hasMargin ? " (különb.: bruttó)" : ""}</th>
             <th style={{ width: "12%" }}>ÁFA-kód</th>
@@ -298,10 +314,18 @@ export function InvoiceForm(props: {
               <tr key={i}>
                 <td><input value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} /></td>
                 <td>
-                  <select value={l.vehicleId ?? ""} onChange={(e) => pickVehicle(i, e.target.value ? Number(e.target.value) : null)}>
-                    <option value="">–</option>
-                    {vehicles.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-                  </select>
+                  {(vehicles.length > 0 || items.length === 0) && (
+                    <select value={l.vehicleId ?? ""} onChange={(e) => pickVehicle(i, e.target.value ? Number(e.target.value) : null)}>
+                      <option value="">–</option>
+                      {vehicles.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+                    </select>
+                  )}
+                  {items.length > 0 && (
+                    <select value={l.itemId ?? ""} onChange={(e) => pickItem(i, e.target.value ? Number(e.target.value) : null)} title="Cikk – készletmozgás">
+                      <option value="">– cikk –</option>
+                      {items.map((it) => <option key={it.id} value={it.id}>{it.label} [{it.unit}]</option>)}
+                    </select>
+                  )}
                 </td>
                 <td><input className="num" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} /></td>
                 <td><input className="num" value={l.unitPrice} onChange={(e) => setLine(i, { unitPrice: e.target.value })} /></td>

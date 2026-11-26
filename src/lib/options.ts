@@ -7,10 +7,11 @@ export type Opt = { id: number; label: string };
 export type AccountOpt = { id: number; code: string; name: string; currency: string };
 export type VatOpt = { id: number; code: string; name: string; rate: number; kind: string };
 export type VehicleOpt = { id: number; label: string; vatTreatment: string; marginBase: number };
+export type ItemOpt = { id: number; label: string; unit: string; stockAccount: string; cogsAccount: string };
 export type PartnerOpt = { id: number; name: string; country: string; taxNumber: string | null; euVatNumber: string | null };
 
 export async function formOptions(cid: number, includeVehicleIds: number[] = []) {
-  const [partners, accounts, vatCodes, vehicles] = await Promise.all([
+  const [partners, accounts, vatCodes, vehicles, items] = await Promise.all([
     db.select().from(schema.partners).where(eq(schema.partners.companyId, cid)).orderBy(asc(schema.partners.name)),
     db
       .select()
@@ -19,6 +20,8 @@ export async function formOptions(cid: number, includeVehicleIds: number[] = [])
       .orderBy(asc(schema.accounts.code)),
     db.select().from(schema.vatCodes).where(and(eq(schema.vatCodes.companyId, cid), eq(schema.vatCodes.isActive, true))).orderBy(asc(schema.vatCodes.id)),
     db.select().from(schema.vehicles).where(eq(schema.vehicles.companyId, cid)).orderBy(asc(schema.vehicles.make), asc(schema.vehicles.model)),
+    // v6.3.0 – cikkek (csak aktívak)
+    db.select().from(schema.items).where(and(eq(schema.items.companyId, cid), eq(schema.items.isActive, true))).orderBy(asc(schema.items.name)),
   ]);
   const vehicleOpts: VehicleOpt[] = [];
   for (const v of vehicles) {
@@ -35,6 +38,7 @@ export async function formOptions(cid: number, includeVehicleIds: number[] = [])
     accounts: accounts.map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency })) as AccountOpt[],
     vatCodes: vatCodes.map((v) => ({ id: v.id, code: v.code, name: v.name, rate: Number(v.rate), kind: v.kind })) as VatOpt[],
     vehicles: vehicleOpts,
+    items: items.map((i) => ({ id: i.id, label: i.sku ? `${i.name} (${i.sku})` : i.name, unit: i.unit, stockAccount: i.stockAccount, cogsAccount: i.cogsAccount })) as ItemOpt[],
   };
 }
 

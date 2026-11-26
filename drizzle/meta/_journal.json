@@ -246,6 +246,13 @@
       "when": 1795830000000,
       "tag": "0034_v6_2_activity_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1795840000000,
+      "tag": "0035_v6_3_inventory",
+      "breakpoints": true
     }
   ]
 }

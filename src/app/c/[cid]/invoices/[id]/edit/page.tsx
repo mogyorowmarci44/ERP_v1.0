@@ -3,6 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { formOptions } from "@/lib/options";
+import { moduleOn } from "@/lib/modules";
 import { InvoiceForm } from "@/components/InvoiceForm";
 import { lineDefaults } from "@/lib/entity";
 
@@ -29,6 +30,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ ci
         invoiceId={id}
         defaults={lineDefaults(company)}
         {...o}
+        items={moduleOn(company, "inventory") || lines.some((l) => l.itemId) ? o.items : []}
         corrects={orig ?? null}
         initial={{
           partnerId: inv.partnerId,
@@ -49,6 +51,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ ci
             vatCodeId: l.vatCodeId,
             accountId: l.accountId,
             vehicleId: l.vehicleId,
+            itemId: l.itemId,
           })),
         }}
       />

@@ -35,6 +35,7 @@ import {
   Recycle,
   BookOpenCheck,
   Package,
+  Boxes,
   BadgeEuro,
   FileCheck2,
 } from "lucide-react";
@@ -144,6 +145,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
 
           <div className="group">Törzsadatok</div>
           {car && <NavLink href={`${b}/vehicles`} exact><CarFront />Gépkocsi készlet</NavLink>}
+          {on("inventory") && <NavLink href={`${b}/inventory`}><Boxes />Készlet (cikkek)</NavLink>}
           {car && <NavLink href={`${b}/vehicles/merleg`}><Scale />KészletMérleg</NavLink>}
           <NavLink href={`${b}/partners`}><Users />Partnerek</NavLink>
           <NavLink href={`${b}/accounts`}><ListTree />Számlatükör</NavLink>
