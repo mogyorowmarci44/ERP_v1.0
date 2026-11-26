@@ -5,9 +5,14 @@ import { requireCompany } from "@/lib/auth";
 import { runOrRedirect, str, optStr } from "@/lib/action-utils";
 import { isDate } from "@/lib/dates";
 import { parseSections, saveAnnualReport, type AnnualReportMeta } from "@/lib/annual-report";
+import { withAudit } from "@/lib/audit";
 
 /** Kiegészítő melléklet és beszámoló-fejléc mentése (évenként egy). */
 export async function saveAnnualReportAction(fd: FormData) {
+  return withAudit("saveAnnualReportAction", fd, () => saveAnnualReportActionImpl(fd));
+}
+
+async function saveAnnualReportActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   const year = Number(fd.get("year"));
   const { user } = await requireCompany(cid, { write: true });

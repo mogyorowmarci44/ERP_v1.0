@@ -8,6 +8,7 @@ import { runOrRedirect, str, optStr, intOrNull } from "@/lib/action-utils";
 import { parseNumber } from "@/lib/money";
 import { isDate, today } from "@/lib/dates";
 import { getForecastSettings, saveForecastSettings, loadPlans, soldHistory, suggestSale, costSuggestions, calibrationFor, vehicleLabel } from "@/lib/forecast-data";
+import { withAudit } from "@/lib/audit";
 
 const { forecastPlans, forecastPlanCosts, forecastItems, forecastSettings, vehicles } = schema;
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
@@ -62,6 +63,10 @@ async function savePlanCore(cid: number, fd: FormData) {
 }
 
 export async function savePlanAction(fd: FormData) {
+  return withAudit("savePlanAction", fd, () => savePlanActionImpl(fd));
+}
+
+async function savePlanActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "stock"), async () => {
@@ -73,6 +78,10 @@ export async function savePlanAction(fd: FormData) {
 
 /** A Készlet és eladások fül összes sorának mentése egy gombnyomással. Minden sor mezői `${row}:mező` néven jönnek; a `row` mezők sorolják fel a sorokat. */
 export async function savePlansBulkAction(fd: FormData) {
+  return withAudit("savePlansBulkAction", fd, () => savePlansBulkActionImpl(fd));
+}
+
+async function savePlansBulkActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "stock"), async () => {
@@ -99,6 +108,10 @@ export async function savePlansBulkAction(fd: FormData) {
 }
 
 export async function deletePlanAction(fd: FormData) {
+  return withAudit("deletePlanAction", fd, () => deletePlanActionImpl(fd));
+}
+
+async function deletePlanActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "stock"), async () => {
@@ -113,6 +126,10 @@ export async function deletePlanAction(fd: FormData) {
 /** Készleten lévő autó eladási tervének törlése. A tervezett autós költségek (javítás, fényezés …) megmaradnak;
  *  ha nincs ilyen költség, maga a terv is törlődik. */
 export async function clearSalePlanAction(fd: FormData) {
+  return withAudit("clearSalePlanAction", fd, () => clearSalePlanActionImpl(fd));
+}
+
+async function clearSalePlanActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "stock"), async () => {
@@ -130,6 +147,10 @@ export async function clearSalePlanAction(fd: FormData) {
 /** Az összes tervezett beszerzés (gépkocsihoz nem kötött terv) törlése a hozzájuk tartozó tervezett költségekkel együtt.
  *  A készleten lévő autók eladási tervei megmaradnak. */
 export async function deleteAllPlannedAction(fd: FormData) {
+  return withAudit("deleteAllPlannedAction", fd, () => deleteAllPlannedActionImpl(fd));
+}
+
+async function deleteAllPlannedActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "stock"), async () => {
@@ -141,6 +162,10 @@ export async function deleteAllPlannedAction(fd: FormData) {
 
 /** Tervezett beszerzés összekapcsolása a ténylegesen megvett gépkocsival. */
 export async function linkPlanAction(fd: FormData) {
+  return withAudit("linkPlanAction", fd, () => linkPlanActionImpl(fd));
+}
+
+async function linkPlanActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "stock"), async () => {
@@ -158,6 +183,10 @@ export async function linkPlanAction(fd: FormData) {
 }
 
 export async function addPlanCostAction(fd: FormData) {
+  return withAudit("addPlanCostAction", fd, () => addPlanCostActionImpl(fd));
+}
+
+async function addPlanCostActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "stock"), async () => {
@@ -189,6 +218,10 @@ export async function addPlanCostAction(fd: FormData) {
 }
 
 export async function deletePlanCostAction(fd: FormData) {
+  return withAudit("deletePlanCostAction", fd, () => deletePlanCostActionImpl(fd));
+}
+
+async function deletePlanCostActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "stock"), async () => {
@@ -204,6 +237,10 @@ export async function deletePlanCostAction(fd: FormData) {
 
 /** A terv nélküli készletautókra javasolt ár és dátum a múltbeli eladások mediánja alapján. */
 export async function fillSuggestionsAction(fd: FormData) {
+  return withAudit("fillSuggestionsAction", fd, () => fillSuggestionsActionImpl(fd));
+}
+
+async function fillSuggestionsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "stock"), async () => {
@@ -228,6 +265,10 @@ const CATEGORIES = new Set(["expense", "asset", "loan_in", "loan_out", "capital_
 const FREQS = new Set(["once", "monthly", "quarterly", "yearly"]);
 
 export async function saveItemAction(fd: FormData) {
+  return withAudit("saveItemAction", fd, () => saveItemActionImpl(fd));
+}
+
+async function saveItemActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "costs"), async () => {
@@ -262,6 +303,10 @@ export async function saveItemAction(fd: FormData) {
 }
 
 export async function deleteItemAction(fd: FormData) {
+  return withAudit("deleteItemAction", fd, () => deleteItemActionImpl(fd));
+}
+
+async function deleteItemActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "costs"), async () => {
@@ -273,6 +318,10 @@ export async function deleteItemAction(fd: FormData) {
 
 /** A Költségek fül összes tervtételének törlése. */
 export async function deleteAllItemsAction(fd: FormData) {
+  return withAudit("deleteAllItemsAction", fd, () => deleteAllItemsActionImpl(fd));
+}
+
+async function deleteAllItemsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "costs"), async () => {
@@ -284,6 +333,10 @@ export async function deleteAllItemsAction(fd: FormData) {
 
 /** Ismétlődő költség-javaslat(ok) felvétele (egy vagy az összes). */
 export async function acceptSuggestionsAction(fd: FormData) {
+  return withAudit("acceptSuggestionsAction", fd, () => acceptSuggestionsActionImpl(fd));
+}
+
+async function acceptSuggestionsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "costs"), async () => {
@@ -312,6 +365,10 @@ const nextMonth = (d: string) => {
 
 /** Javasolt tétel frissítése a legutóbbi tényadatokkal (összeg, ÁFA, fizetési mód). */
 export async function refreshSuggestedAction(fd: FormData) {
+  return withAudit("refreshSuggestedAction", fd, () => refreshSuggestedActionImpl(fd));
+}
+
+async function refreshSuggestedActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "costs"), async () => {
@@ -334,6 +391,10 @@ export async function refreshSuggestedAction(fd: FormData) {
 const pct = (fd: FormData, k: string) => parseNumber(fd.get(k)) / 100;
 
 export async function saveScenarioSettingsAction(fd: FormData) {
+  return withAudit("saveScenarioSettingsAction", fd, () => saveScenarioSettingsActionImpl(fd));
+}
+
+async function saveScenarioSettingsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "settings"), async () => {
@@ -354,6 +415,10 @@ export async function saveScenarioSettingsAction(fd: FormData) {
 }
 
 export async function calibrateAction(fd: FormData) {
+  return withAudit("calibrateAction", fd, () => calibrateActionImpl(fd));
+}
+
+async function calibrateActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "settings"), async () => {
@@ -368,6 +433,10 @@ export async function calibrateAction(fd: FormData) {
 /** A Forgatókönyvek fül teljes visszaállítása: a mentett beállítás törlődik, így minden (eltérések, horizont, HIPA, TAO)
  *  az alapértékre áll vissza. */
 export async function resetScenarioAction(fd: FormData) {
+  return withAudit("resetScenarioAction", fd, () => resetScenarioActionImpl(fd));
+}
+
+async function resetScenarioActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, "settings"), async () => {
@@ -380,6 +449,10 @@ export async function resetScenarioAction(fd: FormData) {
 /** A teljes forecast kiürítése: minden eladási terv és tervezett beszerzés (a tervezett költségekkel), minden költség-tervtétel
  *  és a forgatókönyv-beállítás. A könyvelési (tény) adatokat nem érinti. */
 export async function resetForecastAction(fd: FormData) {
+  return withAudit("resetForecastAction", fd, () => resetForecastActionImpl(fd));
+}
+
+async function resetForecastActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid, ""), async () => {

@@ -1,5 +1,6 @@
 import { strToU8, zipSync } from "fflate";
 import { requireCompany } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 import { isDate, today } from "@/lib/dates";
 import { vatZip } from "@/lib/vat-return-data";
 import { payrollZipFiles } from "@/lib/payroll-2608-data";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request, { params }: { params: Promise<{ cid: string }> }) {
   const cid = Number((await params).cid);
   const { company } = await requireCompany(cid);
+  await audit({ action: "export.file", companyId: cid, target: new URL(req.url).pathname.slice(0, 255) }); // v6.0.0
   const sp = new URL(req.url).searchParams;
   const date = isDate(sp.get("date")) ? sp.get("date")! : today();
   const slug = company.name.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "");

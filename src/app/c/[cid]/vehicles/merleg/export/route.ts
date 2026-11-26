@@ -1,4 +1,5 @@
 import { requireCompany } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 import { buildKeszletMerlegWorkbook } from "@/lib/keszlet-merleg";
 import { periodOf } from "../period";
 
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request, { params }: { params: Promise<{ cid: string }> }) {
   const cid = Number((await params).cid);
   const { company } = await requireCompany(cid);
+  await audit({ action: "export.file", companyId: cid, target: new URL(req.url).pathname.slice(0, 255) }); // v6.0.0
   const sp = Object.fromEntries(new URL(req.url).searchParams);
   const per = periodOf(sp);
   const g = (["model", "origin", "month"].includes(sp.g) ? sp.g : "none") as "none" | "model" | "origin" | "month";

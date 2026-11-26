@@ -1,4 +1,5 @@
 import { requireCompany } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 import { buildInvoiceWorkbook } from "@/lib/invoice-export";
 import { isDate, yearStart, monthEnd, today } from "@/lib/dates";
 
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request, { params }: { params: Promise<{ cid: string }> }) {
   const cid = Number((await params).cid);
   const { company } = await requireCompany(cid);
+  await audit({ action: "export.file", companyId: cid, target: new URL(req.url).pathname.slice(0, 255) }); // v6.0.0
   const sp = new URL(req.url).searchParams;
   const from = isDate(sp.get("from")) ? sp.get("from")! : yearStart();
   const to = isDate(sp.get("to")) ? sp.get("to")! : monthEnd(today());

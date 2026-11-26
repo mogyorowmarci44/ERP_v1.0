@@ -5,8 +5,13 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function saveRedDaysAction(fd: FormData) {
+  return withAudit("saveRedDaysAction", fd, () => saveRedDaysActionImpl(fd));
+}
+
+async function saveRedDaysActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
   const { company } = await requireCompany(cid, { write: true });
   const days = Math.round(Number(String(fd.get("days") ?? "").replace(/[^0-9]/g, "")));

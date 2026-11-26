@@ -20,6 +20,7 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
       <p className="muted">Hozd létre az adminisztrátor felhasználót.</p>
       <Flash error={sp.error} />
       <form action={setupAction}>
+        <label>Ügyfélfiók neve<input name="orgName" required placeholder="pl. a cégcsoport vagy könyvelőiroda neve" /></label>
         <label>Név<input name="name" required /></label>
         <label>E-mail<input name="email" type="email" required /></label>
         <label>Jelszó (min. 10 karakter)<input name="password" type="password" minLength={10} required /></label>

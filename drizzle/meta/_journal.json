@@ -225,6 +225,13 @@
       "when": 1795720000000,
       "tag": "0031_v5_0_activity_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795810000000,
+      "tag": "0032_v6_0_tenancy_security",
+      "breakpoints": true
     }
   ]
 }

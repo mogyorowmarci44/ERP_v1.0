@@ -13,6 +13,7 @@ import {
   uniqueIndex,
   index,
   primaryKey,
+  bigserial,
 } from "drizzle-orm/pg-core";
 
 /** Pénzösszeg: numeric(18,2), JS-ben number – mindig round2-vel számolunk. */
@@ -60,8 +61,21 @@ export const activityProfileEnum = pgEnum("activity_profile", ["car_dealer", "ge
 // Felhasználók, cégek
 // ---------------------------------------------------------------------------
 
+/** v6.0.0 – Ügyfélfiók (előfizető): a cégek és felhasználók ehhez tartoznak; egymás adatait nem látják. */
+export const organizations = pgTable("organizations", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  /** Kötelező-e a kétlépcsős azonosítás ennek az ügyfélfióknak a felhasználóira. */
+  mfaRequired: boolean("mfa_required").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
+  /** v6.0.0 – az ügyfélfiók, amelyhez a felhasználó tartozik. */
+  organizationId: integer("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  /** v6.0.0 – üzemeltető (a rendszer gazdája): ügyfélfiókokat hoz létre, támogatói hozzáférést kérhet. Az isAdmin az ügyfélfiók adminja. */
+  isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
   passwordHash: text("password_hash").notNull(),
@@ -340,6 +354,13 @@ export const companies = pgTable("companies", {
   logoMime: varchar("logo_mime", { length: 40 }),
   logoUpdatedAt: timestamp("logo_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /** v6.0.0 – ügyfélfiók. */
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  /** v6.0.0 – archivált cég: csak olvasható, a listákból kikerül; végleges törlés csak türelmi idő után. */
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  archivedBy: integer("archived_by"),
+  /** v6.0.0 – a legutóbbi teljes (első tételtől máig) adatexport ideje – archiválás előfeltétele. */
+  lastFullExportAt: timestamp("last_full_export_at", { withTimezone: true }),
 });
 
 export const memberships = pgTable(
@@ -1213,3 +1234,64 @@ export const carVariants = pgTable("car_variants", {
   grossKg: integer("gross_kg"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("car_variants_source").on(t.source, t.sourceId), index("car_variants_model_years").on(t.modelId, t.yearFrom, t.yearTo)]);
+
+// ---------------------------------------------------------------------------
+// v6.0.0 – Belépésvédelem, egyszer használható linkek, tevékenységnapló, támogatói hozzáférés
+// ---------------------------------------------------------------------------
+
+/** Hibás belépések számlálója kulcsonként (email:… / ip:…). */
+export const authThrottle = pgTable("auth_throttle", {
+  key: varchar("key", { length: 320 }).primaryKey(),
+  failures: integer("failures").notNull().default(0),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull().defaultNow(),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+});
+
+/** Jelszó-visszaállító és meghívó linkek – csak a token SHA-256 hash-e tárolódik. */
+export const userTokens = pgTable(
+  "user_tokens",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    purpose: varchar("purpose", { length: 16 }).$type<"reset" | "invite">().notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("user_tokens_user_idx").on(t.userId)],
+);
+
+/** Tevékenységnapló – idegen kulcs nélkül, hogy törlés után is megmaradjon. */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    organizationId: integer("organization_id"),
+    companyId: integer("company_id"),
+    userId: integer("user_id"),
+    userEmail: varchar("user_email", { length: 255 }),
+    action: varchar("action", { length: 64 }).notNull(),
+    ok: boolean("ok").notNull().default(true),
+    target: varchar("target", { length: 255 }),
+    details: jsonb("details").$type<Record<string, unknown>>(),
+    ip: varchar("ip", { length: 64 }),
+  },
+  (t) => [index("audit_log_org_at_idx").on(t.organizationId, t.at), index("audit_log_company_at_idx").on(t.companyId, t.at)],
+);
+
+/** Üzemeltetői (támogatói) hozzáférés egy ügyfél cégéhez – időkorlátos, csak olvasás. */
+export const supportGrants = pgTable(
+  "support_grants",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("support_grants_user_company_idx").on(t.userId, t.companyId)],
+);

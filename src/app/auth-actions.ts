@@ -6,6 +6,11 @@ import { db, schema } from "@/db";
 import { createSession, destroySession, hashPassword, verifyPassword, requireUser, startMfa, getPendingMfa, clearPendingMfa } from "@/lib/auth";
 import { verifyTotp, normalizeRecoveryCode, hashRecoveryCode } from "@/lib/totp";
 import { mfaRequired } from "@/lib/app-settings";
+import { audit } from "@/lib/audit";
+import { clientIp, emailKey, ipKey, throttleClear, throttleFail, throttleLockedMinutes } from "@/lib/throttle";
+import { ACCOUNT_LIMIT, IP_LIMIT, RESET_LIMIT } from "@/lib/throttle-calc";
+import { consumeUserToken, createUserToken, mailTokenLink, tokenLink, sendInvite } from "@/lib/user-tokens";
+import { canPurge, daysUntilPurge, exportFresh, EXPORT_MAX_AGE_HOURS } from "@/lib/archive-calc";
 import { createCompany } from "@/lib/ledger";
 import { taxProfileFromForm } from "@/lib/entity";
 import { parseActivityProfile } from "@/lib/activity";
@@ -22,16 +27,42 @@ function assertNotLocked(u: { mfaLockedUntil: Date | null }) {
   }
 }
 
-/** 1. lépés: jelszó. Siker esetén a 2FA kód megadására (vagy első alkalommal a 2FA beállítására) irányít. */
+/** Ha a felhasználó nem létezik, akkor is lefut egy bcrypt-összevetés – így a válaszidőből nem derül ki, létezik-e a fiók. */
+let dummyHash: Promise<string> | null = null;
+const getDummyHash = () => (dummyHash ??= hashPassword(crypto.randomUUID()));
+
+const actorOf = (u: { id: number; email: string; organizationId: number | null }) => ({ id: u.id, email: u.email, organizationId: u.organizationId });
+
+/**
+ * 1. lépés: jelszó. Siker esetén a 2FA kód megadására (vagy első alkalommal a 2FA beállítására) irányít.
+ * v6.0.0: fiókonként 5, IP-címenként 30 hibás próbálkozás után ideiglenes zárolás – ilyenkor a jelszót sem nézzük.
+ */
 export async function loginAction(fd: FormData) {
   await runOrRedirect("/login", async () => {
     const email = str(fd, "email").toLowerCase();
-    const [u] = await db.select().from(schema.users).where(eq(schema.users.email, email));
-    if (!u || !(await verifyPassword(str(fd, "password"), u.passwordHash))) throw new Error("Hibás e-mail cím vagy jelszó.");
-    if (!(await mfaRequired())) {
-      // az admin kikapcsolta a kötelező 2FA-t: elég a jelszó
+    const ip = await clientIp();
+    const lockedIp = await throttleLockedMinutes(ipKey(ip));
+    const lockedAcc = email ? await throttleLockedMinutes(emailKey(email)) : 0;
+    if (lockedIp || lockedAcc) {
+      const [lu] = email ? await db.select().from(schema.users).where(eq(schema.users.email, email)) : [];
+      await audit({ action: "login.locked", ok: false, user: lu ? actorOf(lu) : null, target: email || null });
+      throw new Error(`Túl sok sikertelen próbálkozás – a belépés ${Math.max(lockedIp, lockedAcc)} percig szünetel.`);
+    }
+    const [u] = email ? await db.select().from(schema.users).where(eq(schema.users.email, email)) : [];
+    const pwOk = await verifyPassword(str(fd, "password"), u?.passwordHash ?? (await getDummyHash()));
+    if (!u || !pwOk) {
+      const accLocked = email ? await throttleFail(emailKey(email), ACCOUNT_LIMIT) : false;
+      const ipLocked = await throttleFail(ipKey(ip), IP_LIMIT);
+      await audit({ action: "login.fail", ok: false, user: u ? actorOf(u) : null, target: email || null });
+      if (accLocked || ipLocked) throw new Error(`Túl sok sikertelen próbálkozás – a belépés ${accLocked ? ACCOUNT_LIMIT.lockMin : IP_LIMIT.lockMin} percig szünetel.`);
+      throw new Error("Hibás e-mail cím vagy jelszó.");
+    }
+    await throttleClear(emailKey(email));
+    if (!(await mfaRequired(u.organizationId))) {
+      // az ügyfélfiók adminja kikapcsolta a kötelező 2FA-t: elég a jelszó
       await db.update(schema.users).set({ lastLoginAt: new Date() }).where(eq(schema.users.id, u.id));
       await createSession(u, "none");
+      await audit({ action: "login.ok", user: actorOf(u), details: { method: "jelszó" } });
       return "/";
     }
     assertNotLocked(u);
@@ -39,13 +70,15 @@ export async function loginAction(fd: FormData) {
   });
 }
 
-async function finishLogin(u: { id: number; sessionVersion: number }, set: Partial<typeof schema.users.$inferInsert> = {}) {
+async function finishLogin(u: { id: number; sessionVersion: number; email: string; organizationId: number | null }, set: Partial<typeof schema.users.$inferInsert> = {}) {
   await db.update(schema.users).set({ mfaFailedCount: 0, mfaLockedUntil: null, lastLoginAt: new Date(), ...set }).where(eq(schema.users.id, u.id));
   await clearPendingMfa();
   await createSession(u);
+  await audit({ action: set.totpEnabledAt ? "mfa.setup" : "login.ok", user: actorOf(u), details: { method: "2FA" } });
 }
 
-async function registerFail(u: { id: number; mfaFailedCount: number }) {
+async function registerFail(u: { id: number; mfaFailedCount: number; email: string; organizationId: number | null }) {
+  await audit({ action: "mfa.fail", ok: false, user: actorOf(u) });
   const n = u.mfaFailedCount + 1;
   const lock = n >= MFA_MAX_FAILS;
   await db.update(schema.users)
@@ -110,6 +143,7 @@ export async function cancelMfaAction() {
 }
 
 export async function logoutAction() {
+  await audit({ action: "logout" });
   await destroySession();
   redirect("/login");
 }
@@ -121,11 +155,14 @@ export async function setupAction(fd: FormData) {
     if (n > 0) throw new Error("A rendszer már be van állítva.");
     const pw = str(fd, "password");
     if (pw.length < 10) throw new Error("A jelszó legalább 10 karakter legyen.");
+    // v6.0.0 – az első felhasználó az üzemeltető és az első ügyfélfiók adminja
+    const [org] = await db.insert(schema.organizations).values({ name: str(fd, "orgName") || str(fd, "name") }).returning();
     const [u] = await db
       .insert(schema.users)
-      .values({ email: str(fd, "email").toLowerCase(), name: str(fd, "name"), passwordHash: await hashPassword(pw), isAdmin: true })
+      .values({ email: str(fd, "email").toLowerCase(), name: str(fd, "name"), passwordHash: await hashPassword(pw), isAdmin: true, isPlatformAdmin: true, organizationId: org.id })
       .returning();
-    if (!(await mfaRequired())) { await createSession(u, "none"); return "/"; }
+    await audit({ action: "org.create", user: actorOf(u), organizationId: org.id, target: org.name });
+    if (!(await mfaRequired(u.organizationId))) { await createSession(u, "none"); return "/"; }
     return startMfa(u);
   });
 }
@@ -145,6 +182,7 @@ export async function createCompanyAction(fd: FormData) {
       // v5.0.0 – sablon: autókereskedés vagy általános Kft (egyelőre azonos számlatükör és felület)
       activityProfile: parseActivityProfile(str(fd, "activityProfile")),
     });
+    await audit({ action: "company.create", companyId: c.id, target: c.name });
     return `/c/${c.id}`;
   });
 }
@@ -164,36 +202,53 @@ export async function createPrivateTaxpayerAction(fd: FormData) {
       entityType: "private_taxpayer",
       taxProfile: taxProfileFromForm(fd),
     });
+    await audit({ action: "company.create", companyId: c.id, target: c.name });
     return `/c/${c.id}/taxes`;
   });
 }
 
-/** Meglévő felhasználó hozzáadása egy céghez (pl. az öcsém). Admin hozhat létre új felhasználót is. */
+/**
+ * Felhasználó hozzáadása egy céghez (tulajdonosként).
+ * v6.0.0: csak a cég ügyfélfiókjába tartozó felhasználó adható hozzá; új e-mail címnél meghívó link megy ki
+ * (a jelszót a meghívott maga állítja be). Ha a levélküldés nincs beállítva, a linket itt mutatjuk meg továbbadásra.
+ */
 export async function addMemberAction(fd: FormData) {
   const user = await requireUser();
   const companyId = Number(fd.get("companyId"));
   await runOrRedirect(`/c/${companyId}/settings`, async () => {
     const [m] = await db
-      .select()
+      .select({ role: schema.memberships.role, orgId: schema.companies.organizationId, companyName: schema.companies.name, archivedAt: schema.companies.archivedAt })
       .from(schema.memberships)
-      .where(dsql`${schema.memberships.userId} = ${user.id} and ${schema.memberships.companyId} = ${companyId}`);
+      .innerJoin(schema.companies, eq(schema.companies.id, schema.memberships.companyId))
+      .where(and(eq(schema.memberships.userId, user.id), eq(schema.memberships.companyId, companyId)));
     if (!m || m.role !== "owner") throw new Error("Csak tulajdonos adhat hozzá felhasználót.");
+    if (m.archivedAt) throw new Error("Archivált céghez nem adható hozzá felhasználó.");
     const email = str(fd, "email").toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Adj meg érvényes e-mail címet.");
+    const role = (str(fd, "role") || "accountant") as "owner" | "accountant" | "viewer";
+    if (!["owner", "accountant", "viewer"].includes(role)) throw new Error("Ismeretlen szerepkör.");
     let [target] = await db.select().from(schema.users).where(eq(schema.users.email, email));
+    let note = "Felhasználó hozzáadva.";
+    if (target && target.organizationId !== m.orgId) throw new Error("Ez az e-mail cím egy másik ügyfélfiókhoz tartozik – nem adható hozzá.");
     if (!target) {
-      const pw = str(fd, "password");
-      if (pw.length < 10) throw new Error("Új felhasználóhoz legalább 10 karakteres kezdő jelszó kell.");
       [target] = await db
         .insert(schema.users)
-        .values({ email, name: str(fd, "name") || email, passwordHash: await hashPassword(pw) })
+        .values({ email, name: str(fd, "name") || email, passwordHash: await hashPassword(randomUnusablePassword()), organizationId: m.orgId })
         .returning();
+      note = await sendInvite(target, user, m.companyName);
     }
     await db
       .insert(schema.memberships)
-      .values({ userId: target.id, companyId, role: (str(fd, "role") || "accountant") as "owner" | "accountant" | "viewer" })
+      .values({ userId: target.id, companyId, role })
       .onConflictDoNothing();
-    return `/c/${companyId}/settings?ok=${encodeURIComponent("Felhasználó hozzáadva.")}`;
+    await audit({ action: "access.set", companyId, target: email, details: { role } });
+    return `/c/${companyId}/settings?ok=${encodeURIComponent(note)}`;
   });
+}
+
+/** Véletlen, ki nem adott jelszó a meghívottnak – belépni csak a meghívó linken beállított jelszóval tud. */
+function randomUnusablePassword() {
+  return crypto.randomUUID() + crypto.randomUUID();
 }
 
 export async function changePasswordAction(fd: FormData) {
@@ -204,31 +259,117 @@ export async function changePasswordAction(fd: FormData) {
     if (pw.length < 10) throw new Error("Az új jelszó legalább 10 karakter legyen.");
     // a többi eszközön lévő munkamenet kilép, ez az eszköz bejelentkezve marad
     const [u] = await db.update(schema.users).set({ passwordHash: await hashPassword(pw), sessionVersion: dsql`${schema.users.sessionVersion} + 1` }).where(eq(schema.users.id, user.id)).returning();
-    await createSession(u, (await mfaRequired()) ? "totp" : "none");
+    await createSession(u, (await mfaRequired(u.organizationId)) ? "totp" : "none");
+    await audit({ action: "password.change", user: actorOf(u) });
     return `/?ok=${encodeURIComponent("Jelszó módosítva.")}`;
   });
 }
 
+// ---------------------------------------------------------------------------
+// v6.0.0 – Cég archiválása, visszaállítása, végleges törlése
+// ---------------------------------------------------------------------------
+
+async function ownedCompany(userId: number, cid: number) {
+  if (!Number.isInteger(cid) || cid <= 0) throw new Error("Válaszd ki a céget.");
+  const [m] = await db
+    .select({ role: schema.memberships.role, name: schema.companies.name, archivedAt: schema.companies.archivedAt, lastFullExportAt: schema.companies.lastFullExportAt })
+    .from(schema.memberships)
+    .innerJoin(schema.companies, eq(schema.companies.id, schema.memberships.companyId))
+    .where(and(eq(schema.memberships.userId, userId), eq(schema.memberships.companyId, cid)));
+  if (!m) throw new Error("A cég nem található.");
+  if (m.role !== "owner") throw new Error("Ezt csak a cég tulajdonosa teheti meg.");
+  return m;
+}
+
 /**
- * Cég / magánszemély végleges törlése – csak a „Cégeim” oldalról, a felhasználó jelszavával megerősítve.
- * Csak a cég tulajdonosa törölheti. Minden adat (számlák, tételek, partnerek, számlatükör, beállítások) törlődik.
+ * Archiválás (a korábbi azonnali törlés helyett): előfeltétel egy 24 órán belüli teljes adatexport.
+ * Archivált cég csak olvasható, kikerül a listákból és a napi összefoglalóból, és bármikor visszaállítható.
  */
-export async function deleteCompanyAction(fd: FormData) {
+export async function archiveCompanyAction(fd: FormData) {
   const user = await requireUser();
   await runOrRedirect("/", async () => {
     const cid = Number(fd.get("companyId"));
-    if (!Number.isInteger(cid) || cid <= 0) throw new Error("Válaszd ki a törlendő céget.");
-    const [m] = await db
-      .select({ role: schema.memberships.role, name: schema.companies.name })
-      .from(schema.memberships)
-      .innerJoin(schema.companies, eq(schema.companies.id, schema.memberships.companyId))
-      .where(and(eq(schema.memberships.userId, user.id), eq(schema.memberships.companyId, cid)));
-    if (!m) throw new Error("A cég nem található.");
-    if (m.role !== "owner") throw new Error("Cégét csak a tulajdonosa törölheti.");
+    const m = await ownedCompany(user.id, cid);
+    if (m.archivedAt) throw new Error("A cég már archivált.");
+    if (!exportFresh(m.lastFullExportAt, new Date()))
+      throw new Error(`Archiválás előtt töltsd le a cég teljes adatexportját (az elmúlt ${EXPORT_MAX_AGE_HOURS} órában) – a lenti „Teljes export” gombbal.`);
+    if (!(await verifyPassword(str(fd, "password"), user.passwordHash))) throw new Error("Hibás jelszó – a cég nem lett archiválva.");
+    await db.update(schema.companies).set({ archivedAt: new Date(), archivedBy: user.id }).where(eq(schema.companies.id, cid));
+    await audit({ action: "company.archive", companyId: cid, target: m.name });
+    return `/?ok=${encodeURIComponent(`„${m.name}” archiválva – csak olvasható, és bármikor visszaállítható.`)}`;
+  });
+}
+
+export async function restoreCompanyAction(fd: FormData) {
+  const user = await requireUser();
+  await runOrRedirect("/", async () => {
+    const cid = Number(fd.get("companyId"));
+    const m = await ownedCompany(user.id, cid);
+    if (!m.archivedAt) throw new Error("A cég nincs archiválva.");
+    await db.update(schema.companies).set({ archivedAt: null, archivedBy: null }).where(eq(schema.companies.id, cid));
+    await audit({ action: "company.restore", companyId: cid, target: m.name });
+    return `/?ok=${encodeURIComponent(`„${m.name}” visszaállítva.`)}`;
+  });
+}
+
+/**
+ * Végleges törlés: csak archivált cégnél, a türelmi idő (30 nap) letelte után, jelszóval és a megőrzési kötelezettség
+ * tudomásulvételével. A tevékenységnapló bejegyzései megmaradnak.
+ */
+export async function purgeCompanyAction(fd: FormData) {
+  const user = await requireUser();
+  await runOrRedirect("/", async () => {
+    const cid = Number(fd.get("companyId"));
+    const m = await ownedCompany(user.id, cid);
+    const now = new Date();
+    if (!m.archivedAt) throw new Error("Véglegesen csak archivált cég törölhető.");
+    if (!canPurge(m.archivedAt, now)) throw new Error(`A végleges törlés még ${daysUntilPurge(m.archivedAt, now)} nap múlva lesz elérhető.`);
+    if (fd.get("retention") !== "on") throw new Error("Jelöld be, hogy a bizonylatok megőrzéséről (8 év) az exportból gondoskodtál.");
     if (fd.get("understand") !== "on") throw new Error("Jelöld be, hogy tudomásul veszed: a törlés végleges.");
     if (!(await verifyPassword(str(fd, "password"), user.passwordHash))) throw new Error("Hibás jelszó – a cég nem lett törölve.");
     await wipeCompanyData(cid);
     await db.delete(schema.companies).where(eq(schema.companies.id, cid));
+    await audit({ action: "company.purge", companyId: cid, target: m.name });
     return `/?ok=${encodeURIComponent(`„${m.name}” véglegesen törölve.`)}`;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// v6.0.0 – Elfelejtett jelszó, jelszó beállítása linkkel (visszaállítás és meghívó)
+// ---------------------------------------------------------------------------
+
+/** Mindig ugyanazt válaszolja, akár létezik a fiók, akár nem. Címenként óránként legfeljebb 10 kérés. */
+export async function forgotPasswordAction(fd: FormData) {
+  await runOrRedirect("/login/forgot", async () => {
+    const ip = await clientIp();
+    if (await throttleLockedMinutes(`reset:${ip}`)) throw new Error("Túl sok kérés – próbáld újra egy óra múlva.");
+    await throttleFail(`reset:${ip}`, RESET_LIMIT);
+    const email = str(fd, "email").toLowerCase();
+    const [u] = email ? await db.select().from(schema.users).where(eq(schema.users.email, email)) : [];
+    if (u) {
+      const raw = await createUserToken(u.id, "reset");
+      const sent = await mailTokenLink(u.email, u.name, await tokenLink(raw, "reset"), "reset");
+      await audit({ action: "password.resetRequest", ok: sent, user: actorOf(u), details: sent ? null : { message: "a levélküldés nincs beállítva" } });
+    }
+    return "/login?ok=" + encodeURIComponent("Ha ez az e-mail cím szerepel a rendszerben, elküldtük rá a jelszó-visszaállító linket (1 óráig érvényes). Ha nem érkezik meg, kérd az ügyfélfiókod adminját.");
+  });
+}
+
+/** Új jelszó a linkkel (jelszó-visszaállítás vagy meghívó elfogadása). Minden korábbi munkamenet kilép. */
+export async function resetPasswordAction(fd: FormData) {
+  const raw = str(fd, "t");
+  const back = `/login/reset?t=${encodeURIComponent(raw)}${fd.get("invite") ? "&invite=1" : ""}`;
+  await runOrRedirect(back, async () => {
+    const pw = str(fd, "password");
+    if (pw.length < 10) throw new Error("A jelszó legalább 10 karakter legyen.");
+    if (pw !== str(fd, "password2")) throw new Error("A két jelszó nem egyezik.");
+    const r = await consumeUserToken(raw);
+    if (!r) return "/login?error=" + encodeURIComponent("A link lejárt vagy már fel lett használva – kérj újat.");
+    await db.update(schema.users).set({
+      passwordHash: await hashPassword(pw), sessionVersion: dsql`${schema.users.sessionVersion} + 1`, mfaFailedCount: 0, mfaLockedUntil: null,
+    }).where(eq(schema.users.id, r.user.id));
+    await throttleClear(emailKey(r.user.email));
+    await audit({ action: r.token.purpose === "invite" ? "invite.accept" : "password.reset", user: actorOf(r.user) });
+    return "/login?ok=" + encodeURIComponent(r.token.purpose === "invite" ? "Fiók aktiválva – lépj be az e-mail címeddel és az új jelszavaddal." : "Jelszó beállítva – lépj be az új jelszóval.");
   });
 }

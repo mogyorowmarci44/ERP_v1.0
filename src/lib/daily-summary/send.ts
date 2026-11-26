@@ -5,10 +5,10 @@
  */
 import "server-only";
 import nodemailer from "nodemailer";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { today } from "@/lib/dates";
-import { companySnapshot, holdingSnapshot, type CompanySnapshot } from "./data";
+import { companySnapshot, holdingCompanies, holdingSnapshot, type CompanySnapshot } from "./data";
 import { renderCompanyMail, renderHoldingMail, type Mail, type Variant } from "./render";
 
 export type RunLog = { date: string; at: string; trigger: string; sent: number; failed: number; errors: string[] };
@@ -152,8 +152,10 @@ export async function runDailySummary(opts: { trigger: "cron" | "manual"; force?
   let sent = 0;
   const cache = new Map<number, CompanySnapshot>();
   const byCompany = await recipientsByCompany();
+  // v6.0.0 – archivált cég jelentése nem megy ki
+  const archived = new Set((await db.select({ id: schema.companies.id }).from(schema.companies).where(isNotNull(schema.companies.archivedAt))).map((r) => r.id));
   for (const [cid, list] of byCompany) {
-    if (!companyEnabled(st, cid)) continue;
+    if (!companyEnabled(st, cid) || archived.has(cid)) continue;
     let snap: CompanySnapshot;
     try {
       snap = await companySnapshot(cid, t);
@@ -205,7 +207,7 @@ export async function sendTestHolding(email: string) {
 
 /** v3.9.8 – Figyelmeztetések a beállító oldalakhoz: miért nem menne ki levél. */
 export async function summaryWarnings(): Promise<string[]> {
-  const [st, byCompany, cos] = await Promise.all([getSummarySettings(), recipientsByCompany(), db.select({ id: schema.companies.id, name: schema.companies.name }).from(schema.companies)]);
+  const [st, byCompany, cos] = await Promise.all([getSummarySettings(), recipientsByCompany(), db.select({ id: schema.companies.id, name: schema.companies.name }).from(schema.companies).where(holdingCompanies())]);
   const w: string[] = [];
   if (!st.enabled) return ["A napi összefoglaló fő kapcsolója ki van kapcsolva – semmi nem megy ki."];
   if (!smtpConfigured()) w.push("Nincs beállítva küldési mód (MAIL_RELAY_URL / MAIL_RELAY_SECRET a Renderen).");

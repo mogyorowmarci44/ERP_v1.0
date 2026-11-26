@@ -1,11 +1,11 @@
 /** v3.9.2 – Admin: holding napi összefoglaló (címzettek, előnézet, futásnapló, küldés most). */
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requirePlatformAdmin } from "@/lib/auth";
 import { Flash } from "@/components/Flash";
 import { ErpLogo } from "@/components/Brand";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { APP_VERSION } from "@/lib/version";
-import { holdingSnapshot } from "@/lib/daily-summary/data";
+import { holdingCompanies, holdingSnapshot } from "@/lib/daily-summary/data";
 import { renderHoldingMail } from "@/lib/daily-summary/render";
 import { getSummarySettings, recipientsByCompany, summaryWarnings } from "@/lib/daily-summary/send";
 import { saveHoldingAction, testHoldingAction, runNowAction, toggleSummaryAction } from "./actions";
@@ -17,12 +17,12 @@ import { isPrivate } from "@/lib/entity";
 export const dynamic = "force-dynamic";
 
 export default async function AdminSummaryPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  const me = await requireAdmin();
+  const me = await requirePlatformAdmin();
   const sp = await searchParams;
   const [st, byCompany, companies, warnings] = await Promise.all([
     getSummarySettings(),
     recipientsByCompany(),
-    db.select().from(schema.companies).orderBy(asc(schema.companies.name)),
+    db.select().from(schema.companies).where(holdingCompanies()).orderBy(asc(schema.companies.name)),
     summaryWarnings(),
   ]);
   const companyRecipients = [...byCompany.values()].reduce((s, l) => s + l.length, 0);

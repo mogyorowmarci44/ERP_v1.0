@@ -10,6 +10,7 @@ import { citiesForZip, normName, saveHipaStore, saveImportLog, type HipaSite } f
 import { downloadHakka } from "@/lib/hakka-fetch";
 import { parseHakkaFiles } from "@/lib/hakka-parse";
 import { today } from "@/lib/dates";
+import { withAudit } from "@/lib/audit";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 const back = (cid: number, q = "") => `/c/${cid}/closing/taxes${q}`;
@@ -22,6 +23,10 @@ async function patchSettings(cid: number, patch: Partial<typeof schema.companies
 
 /** Székhely és telephelyek: irányítószám, település (ha az irányítószámhoz több tartozik), szerep, megosztási arány %. */
 export async function saveHipaSitesAction(fd: FormData) {
+  return withAudit("saveHipaSitesAction", fd, () => saveHipaSitesActionImpl(fd));
+}
+
+async function saveHipaSitesActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid), async () => {
@@ -47,6 +52,10 @@ export async function saveHipaSitesAction(fd: FormData) {
 
 /** Adóévenkénti kézi tételek és a nyitó (ERP előtti) elhatárolt veszteség. */
 export async function saveTaxAdjustmentsAction(fd: FormData) {
+  return withAudit("saveTaxAdjustmentsAction", fd, () => saveTaxAdjustmentsActionImpl(fd));
+}
+
+async function saveTaxAdjustmentsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
   const fy = str(fd, "fy");
@@ -80,6 +89,10 @@ async function storeParsed(cid: number, files: { name: string; data: Uint8Array 
 
 /** „Frissítés a Kincstártól” – csak gombnyomásra. */
 export async function refreshHakkaAction(fd: FormData) {
+  return withAudit("refreshHakkaAction", fd, () => refreshHakkaActionImpl(fd));
+}
+
+async function refreshHakkaActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid), async () => {
@@ -98,6 +111,10 @@ export async function refreshHakkaAction(fd: FormData) {
 
 /** Kézi feltöltés: a HAKKA oldalon („Az aktuális és korábbi országos havi adatok letölthetők…”) letöltött fájl. */
 export async function uploadHakkaAction(fd: FormData) {
+  return withAudit("uploadHakkaAction", fd, () => uploadHakkaActionImpl(fd));
+}
+
+async function uploadHakkaActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(back(cid), async () => {

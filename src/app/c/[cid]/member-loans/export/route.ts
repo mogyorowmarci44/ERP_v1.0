@@ -1,4 +1,5 @@
 import { requireCompany } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 import { buildMemberLoanWorkbook } from "@/lib/member-loan-export";
 import { isDate, today } from "@/lib/dates";
 
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request, { params }: { params: Promise<{ cid: string }> }) {
   const cid = Number((await params).cid);
   const { company } = await requireCompany(cid);
+  await audit({ action: "export.file", companyId: cid, target: new URL(req.url).pathname.slice(0, 255) }); // v6.0.0
   const sp = new URL(req.url).searchParams;
   const asOf = isDate(sp.get("date")) ? sp.get("date")! : today();
   const { buffer } = await buildMemberLoanWorkbook(cid, asOf);

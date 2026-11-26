@@ -239,4 +239,19 @@ describe.skipIf(!URL)("könyvelési folyamat (integráció)", () => {
       await tx.insert(m.db.schema.journalLines).values({ entryId: ent.id, companyId: cid, accountId: await acc("384"), debit: 1, credit: 0 });
     })).rejects.toThrow();
   });
+  it("v6.0.0 – ügyfélfiókok: a cég a létrehozó ügyfélfiókjába kerül, két felhasználó külön fiókot kap", async () => {
+    const { users, companies } = m.db.schema;
+    const [me] = await m.db.db.select().from(users).where(m.eq(users.id, userId));
+    const [co] = await m.db.db.select().from(companies).where(m.eq(companies.id, cid));
+    expect(me.organizationId).toBeTruthy();
+    expect(co.organizationId).toBe(me.organizationId);
+    const [u2] = await m.db.db.insert(users).values({ email: `it2-${Date.now()}@test.local`, name: "Másik ügyfél", passwordHash: "x" }).returning();
+    const co2 = await m.L.createCompany(u2.id, { name: `IT2 Kft ${Date.now()}` } as never);
+    const [u2b] = await m.db.db.select().from(users).where(m.eq(users.id, u2.id));
+    expect(co2.organizationId).toBe(u2b.organizationId);
+    expect(co2.organizationId).not.toBe(me.organizationId);
+    // ugyanaz a felhasználó második cége már a meglévő fiókjába kerül
+    const co3 = await m.L.createCompany(u2.id, { name: `IT3 Kft ${Date.now()}` } as never);
+    expect(co3.organizationId).toBe(co2.organizationId);
+  });
 });

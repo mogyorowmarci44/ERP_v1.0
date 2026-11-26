@@ -12,6 +12,7 @@ import { isDate } from "@/lib/dates";
 import { encryptSecret } from "@/lib/inbox/secret";
 import { pingRemote } from "@/lib/inbox/connector";
 import { addDocument, getInboxSettings, saveInboxSettings, runSync, processDocument, bookInvoiceProposal, bookStatementRows, loadProposeCtx, propose, assignFilingNo } from "@/lib/inbox/service";
+import { withAudit } from "@/lib/audit";
 
 const { inboxDocuments } = schema;
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
@@ -26,6 +27,10 @@ async function ownDoc(cid: number, id: number) {
 
 /** A gomb: beolvasás minden forrásból + feldolgozás + könyvelés. */
 export async function syncAction(fd: FormData) {
+  return withAudit("syncAction", fd, () => syncActionImpl(fd));
+}
+
+async function syncActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   await runOrRedirect(base(cid), async () => {
@@ -38,6 +43,10 @@ export async function syncAction(fd: FormData) {
 
 /** Kézi feltöltés (több fájl, telefonról fotó is). */
 export async function uploadAction(fd: FormData) {
+  return withAudit("uploadAction", fd, () => uploadActionImpl(fd));
+}
+
+async function uploadActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   await runOrRedirect(base(cid), async () => {
@@ -74,6 +83,10 @@ export async function uploadAction(fd: FormData) {
 const folderId = (v: string | null) => (v ? (v.match(/folders\/([A-Za-z0-9_-]{10,})/)?.[1] ?? v.replace(/[^A-Za-z0-9_-]/g, "")) : null);
 
 export async function saveSettingsAction(fd: FormData) {
+  return withAudit("saveSettingsAction", fd, () => saveSettingsActionImpl(fd));
+}
+
+async function saveSettingsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
@@ -100,6 +113,10 @@ export async function saveSettingsAction(fd: FormData) {
 
 /** Új kulcs generálása – ezt kell beírni a Google-szkriptbe. */
 export async function newSecretAction(fd: FormData) {
+  return withAudit("newSecretAction", fd, () => newSecretActionImpl(fd));
+}
+
+async function newSecretActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
@@ -111,6 +128,10 @@ export async function newSecretAction(fd: FormData) {
 }
 
 export async function testConnectionAction(fd: FormData) {
+  return withAudit("testConnectionAction", fd, () => testConnectionActionImpl(fd));
+}
+
+async function testConnectionActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
@@ -121,6 +142,10 @@ export async function testConnectionAction(fd: FormData) {
 }
 
 export async function ignoreDocAction(fd: FormData) {
+  return withAudit("ignoreDocAction", fd, () => ignoreDocActionImpl(fd));
+}
+
+async function ignoreDocActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(base(cid), async () => {
@@ -134,6 +159,10 @@ export async function ignoreDocAction(fd: FormData) {
 
 /** v3.1.0: iktatószám kézi kiosztása (pl. szövegréteges szkennelt PDF-nél, amit a rendszer nem ismert fel papírként). */
 export async function filingNoAction(fd: FormData) {
+  return withAudit("filingNoAction", fd, () => filingNoActionImpl(fd));
+}
+
+async function filingNoActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -147,6 +176,10 @@ export async function filingNoAction(fd: FormData) {
 
 /** Újra-feldolgozás (pl. új partner vagy gépkocsi felvétele után); a „reread” a kiolvasást is megismétli. */
 export async function reprocessAction(fd: FormData) {
+  return withAudit("reprocessAction", fd, () => reprocessActionImpl(fd));
+}
+
+async function reprocessActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -162,6 +195,10 @@ export async function reprocessAction(fd: FormData) {
 
 /** Számla könyvelése a (javított) jóváhagyási űrlapról. */
 export async function bookInvoiceAction(fd: FormData) {
+  return withAudit("bookInvoiceAction", fd, () => bookInvoiceActionImpl(fd));
+}
+
+async function bookInvoiceActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -214,6 +251,10 @@ export async function bookInvoiceAction(fd: FormData) {
 
 /** Kivonat-sor kézi párosítása / könyvelése. */
 export async function statementRowAction(fd: FormData) {
+  return withAudit("statementRowAction", fd, () => statementRowActionImpl(fd));
+}
+
+async function statementRowActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -238,6 +279,10 @@ export async function statementRowAction(fd: FormData) {
 
 /** A meglévő kivonat-javaslat újraszámolása (pl. a számlák felvétele után). */
 export async function repairStatementAction(fd: FormData) {
+  return withAudit("repairStatementAction", fd, () => repairStatementActionImpl(fd));
+}
+
+async function repairStatementActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const id = Number(fd.get("id"));
@@ -259,6 +304,10 @@ export async function repairStatementAction(fd: FormData) {
 
 /** Összekapcsolás: átirányítás a bank jóváhagyó felületére (Erste: George-jóváhagyás). */
 export async function connectBankAction(fd: FormData) {
+  return withAudit("connectBankAction", fd, () => connectBankActionImpl(fd));
+}
+
+async function connectBankActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
@@ -283,6 +332,10 @@ export async function connectBankAction(fd: FormData) {
 
 /** Letöltés most (a napi ütemezéssel azonos). */
 export async function bankSyncNowAction(fd: FormData) {
+  return withAudit("bankSyncNowAction", fd, () => bankSyncNowActionImpl(fd));
+}
+
+async function bankSyncNowActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
@@ -297,6 +350,10 @@ export async function bankSyncNowAction(fd: FormData) {
 
 /** Számla ki- / bekapcsolása és a kezdőnap módosítása. */
 export async function saveBankAction(fd: FormData) {
+  return withAudit("saveBankAction", fd, () => saveBankActionImpl(fd));
+}
+
+async function saveBankActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
@@ -312,6 +369,10 @@ export async function saveBankAction(fd: FormData) {
 
 /** Leválasztás: a hozzájárulás visszavonása az aggregátornál és a kapcsolat törlése. */
 export async function disconnectBankAction(fd: FormData) {
+  return withAudit("disconnectBankAction", fd, () => disconnectBankActionImpl(fd));
+}
+
+async function disconnectBankActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   await requireCompany(cid, { write: true });
   await runOrRedirect(`${base(cid)}/settings`, async () => {

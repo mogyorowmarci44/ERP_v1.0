@@ -11,6 +11,7 @@ import { manualEntry, reverseEntry } from "@/lib/ledger";
 import { DEFAULT_TAX_PROFILE, isPrivate } from "@/lib/entity";
 import { addMonths, daysBetween, monthEndOf } from "@/lib/gh-calc";
 import { today } from "@/lib/dates";
+import { withAudit } from "@/lib/audit";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
@@ -34,6 +35,10 @@ const isMoneyCode = (c: string) => (c.startsWith("38") && !c.startsWith("389")) 
 
 /** Költség rögzítése: T költségszámla / K pénz (bank vagy magánpénz), opcionálisan havonta ismételve. */
 export async function addCostAction(fd: FormData) {
+  return withAudit("addCostAction", fd, () => addCostActionImpl(fd));
+}
+
+async function addCostActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user, company } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/gh/costs`;
@@ -81,6 +86,10 @@ export async function addCostAction(fd: FormData) {
 
 /** Közvetlen foglalás: T pénz (bank / készpénz-magán) / K 913, a tartózkodás dátumaival és éjszakaszámmal. */
 export async function addDirectBookingAction(fd: FormData) {
+  return withAudit("addDirectBookingAction", fd, () => addDirectBookingActionImpl(fd));
+}
+
+async function addDirectBookingActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user, company } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/gh/bookings`;
@@ -117,6 +126,10 @@ export async function addDirectBookingAction(fd: FormData) {
 
 /** Kézi tétel sztornózása a vendégház-oldalakról. */
 export async function ghReverseAction(fd: FormData) {
+  return withAudit("ghReverseAction", fd, () => ghReverseActionImpl(fd));
+}
+
+async function ghReverseActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { user } = await requireCompany(cid, { write: true });
   const page = str(fd, "page") === "bookings" ? "bookings" : "costs";
@@ -134,6 +147,10 @@ export async function ghReverseAction(fd: FormData) {
 
 /** Megtérülés: hosszú távú inflációs feltevés (az MNB-előrejelzés utáni évekre). */
 export async function saveDiscountRateAction(fd: FormData) {
+  return withAudit("saveDiscountRateAction", fd, () => saveDiscountRateActionImpl(fd));
+}
+
+async function saveDiscountRateActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
   const g = str(fd, "g");
@@ -151,6 +168,10 @@ export async function saveDiscountRateAction(fd: FormData) {
 
 /** Ingatlan adatai és értékbecslési feltevések (fajlagos ár, tőkésítési ráta, berendezések értéke). */
 export async function savePropertyAction(fd: FormData) {
+  return withAudit("savePropertyAction", fd, () => savePropertyActionImpl(fd));
+}
+
+async function savePropertyActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}/gh/payback?g=${/^(month|quarter|year|ltd)$/.test(str(fd, "g")) ? str(fd, "g") : "year"}`;
@@ -189,6 +210,10 @@ export async function savePropertyAction(fd: FormData) {
 
 /** „Mi lenne, ha eladnám”: melyik értékbecslés legyen az eladási ár. */
 export async function setValuationMethodAction(fd: FormData) {
+  return withAudit("setValuationMethodAction", fd, () => setValuationMethodActionImpl(fd));
+}
+
+async function setValuationMethodActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
   const g = str(fd, "g");
@@ -207,6 +232,10 @@ export async function setValuationMethodAction(fd: FormData) {
 
 /** Áttekintés: „Minden adat frissítése” – Airbnb iCal, Meta Ads, Instagram (ami be van állítva). */
 export async function refreshAllAction(fd: FormData) {
+  return withAudit("refreshAllAction", fd, () => refreshAllActionImpl(fd));
+}
+
+async function refreshAllActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}`;
@@ -222,6 +251,10 @@ export async function refreshAllAction(fd: FormData) {
 
 /** Szinkronfájl (Airbnb-fiókból kiolvasott foglalások és értékelések) betöltése. */
 export async function uploadSyncAction(fd: FormData) {
+  return withAudit("uploadSyncAction", fd, () => uploadSyncActionImpl(fd));
+}
+
+async function uploadSyncActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}`;
@@ -243,6 +276,10 @@ export async function uploadSyncAction(fd: FormData) {
 
 /** Adatforrások beállítása (iCal-cím, Meta token, hirdetési fiók, Instagram-azonosító). Üres token = a meglévő marad. */
 export async function saveSyncSettingsAction(fd: FormData) {
+  return withAudit("saveSyncSettingsAction", fd, () => saveSyncSettingsActionImpl(fd));
+}
+
+async function saveSyncSettingsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
   const { company } = await requireCompany(cid, { write: true });
   const back = `/c/${cid}`;

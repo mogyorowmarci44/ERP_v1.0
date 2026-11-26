@@ -17,12 +17,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <div className="auth card">
       <ErpLogo />
       <h1>Belépés</h1>
-      <Flash error={sp.error} />
+      <Flash error={sp.error} ok={sp.ok} />
       <form action={loginAction}>
-        <label>E-mail<input name="email" type="email" required autoFocus /></label>
-        <label>Jelszó<input name="password" type="password" required /></label>
+        <label>E-mail<input name="email" type="email" autoComplete="username" required autoFocus /></label>
+        <label>Jelszó<input name="password" type="password" autoComplete="current-password" required /></label>
         <button className="primary">Belépés</button>
       </form>
+      <p style={{ marginTop: 12, fontSize: 14 }}><a href="/login/forgot">Elfelejtett jelszó?</a></p>
     </div>
     <AppFooter version={APP_VERSION} dark />
     </div>

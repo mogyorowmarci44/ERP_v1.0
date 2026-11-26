@@ -5,8 +5,13 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function saveHoldingAction(fd: FormData) {
+  return withAudit("saveHoldingAction", fd, () => saveHoldingActionImpl(fd));
+}
+
+async function saveHoldingActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), vid = Number(fd.get("vehicle"));
   const { company } = await requireCompany(cid, { write: true });
   const n = (k: string) => Number(String(fd.get(k) ?? "").replace(",", ".").replace(/[^0-9.]/g, ""));

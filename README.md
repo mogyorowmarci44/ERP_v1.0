@@ -39,6 +39,26 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.0.0 – Ügyfélfiókok és biztonság (termékké tétel, 1. lépés)
+
+**Ügyfélfiókok (szervezetek).** Minden cég és felhasználó egy ügyfélfiókhoz tartozik; a fiókok egymás adatait nem látják.
+- Az **Admin** oldal (ügyfélfiók-admin) csak a saját fiók felhasználóit és cégeit mutatja és kezeli; innen lehet felhasználót **meghívni** és admin jogot adni.
+- A kétlépcsős azonosítás kötelezősége **ügyfélfiókonként** állítható (a korábbi rendszerszintű beállítás átkerült a meglévő fiókba).
+- **Üzemeltető** (`is_platform_admin`): *Admin › Ügyfélfiókok* – új ügyfélfiók létrehozása az első adminja meghívásával; ügyfél cégébe csak **támogatói hozzáféréssel** lehet belenézni (indoklással, 2 óráig, csak olvasásra, és az ügyfél naplójában is megjelenik). A Napi összefoglaló és a Típuskatalógus az üzemeltetőé; a holding-összefoglaló csak az üzemeltető fiókjának aktív cégeit veszi.
+- Cégtulajdonos csak a saját ügyfélfiókja felhasználóit adhatja hozzá a cégéhez; más fiókhoz tartozó e-mail cím nem adható hozzá.
+- Migráció (`0032_v6_0_tenancy_security.sql`): a meglévő felhasználók és cégek egy „Mogyorosi Holding” ügyfélfiókba kerülnek; az eddigi adminok üzemeltetők is lesznek.
+
+**Belépésvédelem.** Fiókonként 5 hibás jelszó 15 percen belül → 15 perc szünet; IP-címenként 30 → 30 perc. Zárolás alatt a jelszót sem nézzük; nem létező fióknál is lefut a jelszó-összevetés (a válaszidő nem árulja el, létezik-e a fiók). Alap biztonsági fejlécek (X-Frame-Options, nosniff, Referrer-Policy).
+
+**Jelszó-visszaállítás és meghívó.** *Elfelejtett jelszó?* a belépő oldalon: 1 óráig érvényes, egyszer használható link e-mailben (címenként óránként legfeljebb 10 kérés; a válasz nem árulja el, létezik-e a fiók). Új felhasználó kezdő jelszó helyett **meghívó linket** kap (7 nap), a jelszót maga állítja be. Ha a levélküldés nincs beállítva, a link az adminnak jelenik meg továbbadásra. A linkek tokenjéből csak a SHA-256 hash tárolódik. A linkek címe: `APP_URL`, ennek hiányában a kérés fejléce.
+
+**Tevékenységnapló** (*Admin › Tevékenységnapló*). Belépések (sikertelenek és zárolások is), kilépés, jelszó- és 2FA-események, hozzáférés-változások, minden **írási művelet** a cégekben (121 szerveroldali művelet: ki, mikor, melyik cégben, sikerült-e, és ha nem, miért), exportok és letöltések, archiválás, törlés, támogatói hozzáférés. Az űrlapból csak azonosítók kerülnek a naplóba (összeg, jelszó, fájl soha). A napló nem módosítható, és törölt cég / felhasználó után is megmarad. Jogosultsági hiba (csak olvasható / archivált cég) mostantól hibaoldal helyett üzenettel tér vissza az előző oldalra.
+
+**Cégtörlés helyett archiválás** (*Cégeim* oldal):
+- Archiválás előtt kötelező a cég **teljes könyvelési exportja** (JSON vagy Excel) az elmúlt 24 órában; archiválás jelszóval.
+- Archivált cég csak olvasható (jelzősáv minden oldalon), kikerül a listákból és a napi összefoglalóból, és bármikor **visszaállítható**.
+- **Végleges törlés** csak 30 nap után, jelszóval és a 8 éves bizonylatmegőrzés tudomásulvételével.
+
 ## v5.1.2 – Cégérték csempe: szebb forecast-sor
 
 - A forecast-cégérték külön sorban a korrigált érték alatt („forecast 12 345 eFt”), mellette az eltérés a korrigált értékhez képest (▲ zöld / ▼ piros eFt); egér alatt a számítás magyarázata.

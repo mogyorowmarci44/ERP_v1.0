@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { asc } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
 import { logoutAction } from "../auth-actions";
-import { setAccessAction, resetMfaAction, logoutEverywhereAction, setMfaRequiredAction } from "./actions";
+import { setAccessAction, resetMfaAction, logoutEverywhereAction, setMfaRequiredAction, inviteUserAction, resendInviteAction, setOrgAdminAction } from "./actions";
 import { mfaRequired } from "@/lib/app-settings";
 import { RoleSelect } from "./RoleSelect";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -20,12 +20,16 @@ const dt = (d: Date | null) => (d ? d.toLocaleString("hu-HU", { timeZone: "Europ
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireAdmin();
   const sp = await searchParams;
-  const [users, companies, members] = await Promise.all([
-    db.select().from(schema.users).orderBy(asc(schema.users.name)),
-    db.select({ id: schema.companies.id, name: schema.companies.name, entityType: schema.companies.entityType }).from(schema.companies).orderBy(asc(schema.companies.name)),
-    db.select().from(schema.memberships),
+  // v6.0.0 – csak a saját ügyfélfiók felhasználói és cégei
+  const orgId = me.organizationId;
+  const [users, companies, [org]] = await Promise.all([
+    db.select().from(schema.users).where(eq(schema.users.organizationId, orgId)).orderBy(asc(schema.users.name)),
+    db.select({ id: schema.companies.id, name: schema.companies.name, entityType: schema.companies.entityType, archivedAt: schema.companies.archivedAt })
+      .from(schema.companies).where(eq(schema.companies.organizationId, orgId)).orderBy(asc(schema.companies.name)),
+    db.select().from(schema.organizations).where(eq(schema.organizations.id, orgId)),
   ]);
-  const required = await mfaRequired();
+  const members = users.length ? await db.select().from(schema.memberships).where(inArray(schema.memberships.userId, users.map((u) => u.id))) : [];
+  const required = await mfaRequired(orgId);
   const roleOf = (uid: number, cid: number) => members.find((m) => m.userId === uid && m.companyId === cid)?.role ?? "none";
   const now = new Date();
 
@@ -34,12 +38,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <div className="topbar">
         <div className="row" style={{ gap: 14 }}>
           <ErpLogo size={32} />
-          <h1>Admin – felhasználók és hozzáférések</h1>
+          <h1>Admin – {org?.name ?? "ügyfélfiók"}</h1>
           <span className="version-tag">v{APP_VERSION}</span>
         </div>
         <form action={logoutAction} className="row">
-          <Link href="/admin/summary">Napi összefoglaló</Link>
-          <Link href="/admin/catalog">Típuskatalógus</Link>
+          <Link href="/admin/log">Tevékenységnapló</Link>
+          {me.isPlatformAdmin && <Link href="/admin/platform">Ügyfélfiókok</Link>}
+          {me.isPlatformAdmin && <Link href="/admin/summary">Napi összefoglaló</Link>}
+          {me.isPlatformAdmin && <Link href="/admin/catalog">Típuskatalógus</Link>}
           <Link href="/">← Cégeim</Link>
           <span className="muted">{me.name}</span>
           <button>Kilépés</button>
@@ -60,7 +66,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <form action={setMfaRequiredAction}>
           <input type="hidden" name="on" value={required ? "0" : "1"} />
           {required
-            ? <ConfirmButton message="Biztosan kikapcsolod a kétlépcsős azonosítást az egész ERP-re? Ezután a belépéshez elég lesz a jelszó.">2FA kikapcsolása</ConfirmButton>
+            ? <ConfirmButton message="Biztosan kikapcsolod a kétlépcsős azonosítást az ügyfélfiók összes felhasználójára? Ezután a belépéshez elég lesz a jelszó.">2FA kikapcsolása</ConfirmButton>
             : <ConfirmButton className="primary" message="Bekapcsolod a kötelező kétlépcsős azonosítást? Aki csak jelszóval van bent, annak újra be kell lépnie.">2FA bekapcsolása</ConfirmButton>}
         </form>
       </div>
@@ -78,7 +84,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <th>Felhasználó</th>
               {companies.map((c) => (
                 <th key={c.id} className="co">
-                  <Link href={`/c/${c.id}`}>{c.name}</Link>
+                  <Link href={`/c/${c.id}`}>{c.name}</Link>{c.archivedAt && <span className="badge draft" style={{ marginLeft: 4 }}>archivált</span>}
                   <div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>{ENTITY_LABEL[c.entityType]}</div>
                 </th>
               ))}
@@ -89,6 +95,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <tr key={u.id}>
                 <td>
                   <strong>{u.name}</strong>{u.isAdmin && <span className="badge reserved" style={{ marginLeft: 6 }}>admin</span>}
+                  {!u.lastLoginAt && <span className="badge draft" style={{ marginLeft: 6 }}>meghívva</span>}
                   <div className="muted" style={{ fontSize: 12 }}>{u.email}</div>
                 </td>
                 {companies.map((c) => (
@@ -106,9 +113,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           </tbody>
         </table>
       </div>
+      <h2>Új felhasználó meghívása</h2>
+      <form action={inviteUserAction} className="card form-grid">
+        <label>Név<input name="name" required /></label>
+        <label>E-mail<input name="email" type="email" required /></label>
+        <label className="check"><input type="checkbox" name="isAdmin" /> Admin (felhasználókat és hozzáféréseket kezelhet)</label>
+        <div style={{ alignSelf: "end" }}><button className="primary">Meghívó küldése</button></div>
+      </form>
       <p className="muted" style={{ fontSize: 13 }}>
-        Új felhasználót a cég Beállítások oldalán lehet felvenni (tulajdonosként); itt utána bármelyik céghez hozzáférést adhatsz neki.
-        Az új felhasználó első belépéskor köteles beállítani a kétlépcsős azonosítást.
+        A meghívott e-mailben kap egy 7 napig érvényes linket, amellyel maga állítja be a jelszavát (ha a levélküldés nincs beállítva, a linket itt kapod meg továbbadásra).
+        Utána a fenti táblázatban adhatsz neki hozzáférést a cégekhez. {required && "Első belépéskor köteles beállítani a kétlépcsős azonosítást."}
       </p>
 
       <h2>Felhasználók és kétlépcsős azonosítás</h2>
@@ -154,6 +168,19 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         <input type="hidden" name="userId" value={u.id} />
                         <ConfirmButton className="link" message={`${u.name}: kiléptetsz minden eszközről?`}>kiléptetés</ConfirmButton>
                       </form>
+                      {!u.lastLoginAt && (
+                        <form action={resendInviteAction}>
+                          <input type="hidden" name="userId" value={u.id} />
+                          <button className="link">új meghívó</button>
+                        </form>
+                      )}
+                      {u.id !== me.id && (
+                        <form action={setOrgAdminAction}>
+                          <input type="hidden" name="userId" value={u.id} />
+                          <input type="hidden" name="on" value={u.isAdmin ? "0" : "1"} />
+                          <ConfirmButton className="link" message={u.isAdmin ? `${u.name}: elveszed az admin jogát?` : `${u.name}: adminná teszed? Felhasználókat és hozzáféréseket kezelhet.`}>{u.isAdmin ? "admin jog el" : "admin jog"}</ConfirmButton>
+                        </form>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -165,6 +192,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <p className="muted" style={{ fontSize: 13 }}>
         Elveszett vagy lecserélt telefon: „2FA visszaállítása”, és a felhasználó a következő belépéskor új QR-kódot kap.
         5 hibás kód után a fiók 15 percre zárolódik; a „kiléptetés” a zárolást is feloldja.
+        Hibás jelszónál: fiókonként 5 próbálkozás után 15, IP-címenként 30 után 30 perc szünet. Elfelejtett jelszót a belépő oldalon lehet visszaállítani.
       </p>
 
       <AppFooter version={APP_VERSION} />
