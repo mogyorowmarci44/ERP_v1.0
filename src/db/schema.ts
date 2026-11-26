@@ -304,6 +304,8 @@ export type CompanySettings = {
   summaryExcludeVehicles?: number[] | null;
   /** v3.3.3 – Az ERP előtti évek elhatárolt vesztesége (keletkezés éve, összeg). */
   openingLosses?: { year: string; amount: number }[] | null;
+  /** v6.4.0 – a társas vállalkozó helyett viselt járulék költségszámlája (alap: 551). */
+  payrollMemberTbAccount?: string | null;
   /** v6.2.0 – modulkapcsolók: csak a profil alapértelmezésétől eltérő értékek (ld. lib/modules.ts). */
   modules?: Partial<Record<import("../lib/modules").ModuleKey, boolean>> | null;
 };
@@ -1371,4 +1373,18 @@ export const stockCogs = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("stock_cogs_company_period_idx").on(t.companyId, t.period)],
+);
+
+/** v6.4.0 – Jogszabályi paraméterek az üzemeltetőtől, dátumtól hatályos értékekkel (a beépítettek a lib/legal-params-calc.ts-ben). */
+export const legalParams = pgTable(
+  "legal_params",
+  {
+    key: varchar("key", { length: 64 }).notNull(),
+    validFrom: date("valid_from").notNull(),
+    value: numeric("value", { precision: 18, scale: 6, mode: "number" }).notNull(),
+    note: text("note"),
+    updatedBy: integer("updated_by"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ name: "legal_params_pk", columns: [t.key, t.validFrom] })],
 );

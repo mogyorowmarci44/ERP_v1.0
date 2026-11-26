@@ -18,6 +18,7 @@ import { accommodationYear } from "@/lib/accommodation-taxes";
 import { CHANNEL_LABEL, PNL_INCLUDE_LABEL, TFH_SUSPENSIONS, type PnlTaxInclude } from "@/lib/entity";
 import { saveIfaInputsAction, setPnlTaxIncludeAction } from "../actions";
 import { Flash } from "@/components/Flash";
+import { paramAt } from "@/lib/legal-params";
 
 /** v2.0 – Adók: tételes átalányadó, SZJA-módszerek, alanyi ÁFA-mentesség, fordított ÁFA, IFA. */
 export default async function TaxesPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -45,8 +46,11 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
   const isCurrent = asOf !== to;
   const proj = (x: number) => (isCurrent ? round2((x * yearDays) / dayOfYear) : x);
 
-  const methods = compareSzjaMethods({ revenue, costs, rooms: p.rooms, flatRatePerRoom: p.flatRatePerRoom });
-  const methodsProj = compareSzjaMethods({ revenue: proj(revenue), costs: proj(costs), rooms: p.rooms, flatRatePerRoom: p.flatRatePerRoom });
+  // v6.4.0 – SZJA és szocho kulcsa a központi jogszabályi paraméterekből (az év végén hatályos)
+  const [szjaPct, szochoPct] = await Promise.all([paramAt("payroll.szjaPct", to), paramAt("payroll.szochoPct", to)]);
+  const rates = { szja: szjaPct != null ? szjaPct / 100 : undefined, szocho: szochoPct != null ? szochoPct / 100 : undefined };
+  const methods = compareSzjaMethods({ revenue, costs, rooms: p.rooms, flatRatePerRoom: p.flatRatePerRoom }, rates);
+  const methodsProj = compareSzjaMethods({ revenue: proj(revenue), costs: proj(costs), rooms: p.rooms, flatRatePerRoom: p.flatRatePerRoom }, rates);
   const best = methodsProj.reduce((a, m) => (m.total < a.total ? m : a), methodsProj[0]);
   const schedule = flatRateSchedule(p.rooms, p.flatRatePerRoom, year);
 

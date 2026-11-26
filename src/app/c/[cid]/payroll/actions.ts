@@ -7,8 +7,9 @@ import { requireCompany } from "@/lib/auth";
 import { errMsg, runOrRedirect, str, optStr } from "@/lib/action-utils";
 import { parseNumber } from "@/lib/money";
 import { isDate } from "@/lib/dates";
-import { deleteEmployee, deleteEmployment, markExternal, postMonth, saveMonth, saveParams, unpostMonth } from "@/lib/payroll";
-import { KIND_LABEL, PARAM_LABELS, defaultParams, type EmploymentKind, type PayrollInput, type PayrollParams } from "@/lib/payroll-calc";
+import { deleteEmployee, deleteEmployment, markExternal, postMonth, saveMonth, unpostMonth } from "@/lib/payroll";
+import { accountIdByCode } from "@/lib/ledger";
+import { KIND_LABEL, type EmploymentKind, type PayrollInput } from "@/lib/payroll-calc";
 import { withAudit } from "@/lib/audit";
 
 const isPeriod = (p: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(p);
@@ -160,26 +161,23 @@ async function deleteEmploymentActionImpl(fd: FormData) {
 }
 
 // --- paraméterek ---------------------------------------------------------------------------
+// v6.4.0 – a jogszabályi bérparamétereket az üzemeltető tartja karban (Admin › Jogszabályi paraméterek);
+// a cég csak a társas vállalkozó helyett viselt járulék költségszámláját állítja.
 
-export async function saveParamsAction(fd: FormData) {
-  return withAudit("saveParamsAction", fd, () => saveParamsActionImpl(fd));
+export async function saveMemberTbAccountAction(fd: FormData) {
+  return withAudit("saveMemberTbAccountAction", fd, () => saveMemberTbAccountActionImpl(fd));
 }
 
-async function saveParamsActionImpl(fd: FormData) {
-  const cid = Number(fd.get("cid")), year = Number(fd.get("year"));
-  const { role } = await requireCompany(cid, { write: true });
-  const back = `/c/${cid}/payroll/params?year=${year}`;
+async function saveMemberTbAccountActionImpl(fd: FormData) {
+  const cid = Number(fd.get("cid"));
+  const { role, company } = await requireCompany(cid, { write: true });
+  const back = `/c/${cid}/payroll/params`;
   await runOrRedirect(back, async () => {
-    if (role !== "owner") throw new Error("A paramétereket csak tulajdonos módosíthatja (minden cégre érvényesek).");
-    if (!(year >= 2020 && year <= 2100)) throw new Error("Hibás év.");
-    const base = defaultParams(year);
-    const v = { ...base } as Record<string, number | string>;
-    for (const { key } of PARAM_LABELS) {
-      if (typeof base[key] === "string") v[key] = str(fd, key) || String(base[key]);
-      else { const n = parseNumber(fd.get(key)); if (!(n >= 0)) throw new Error(`Hibás érték: ${key}`); v[key] = n; }
-    }
-    await saveParams(year, v as unknown as PayrollParams);
+    if (role !== "owner") throw new Error("Ezt csak tulajdonos módosíthatja.");
+    const code = str(fd, "account") || "551";
+    await accountIdByCode(db, cid, code).catch(() => { throw new Error(`A ${code} számla nincs a számlatükörben.`); });
+    await db.update(schema.companies).set({ settings: { ...company.settings, payrollMemberTbAccount: code } }).where(eq(schema.companies.id, cid));
     revalidatePath(`/c/${cid}/payroll`);
-    return ok(back, `${year}. évi paraméterek mentve.`);
+    return ok(back, "Költségszámla mentve.");
   });
 }

@@ -12,6 +12,7 @@
  */
 import { and, asc, eq, inArray, like, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { payrollParamsFor } from "./legal-params";
 import { accountIdByCode, postEntry, reverseEntry } from "./ledger";
 import { today } from "./dates";
 import {
@@ -23,15 +24,13 @@ const s = schema;
 const daysIn = (p: string) => { const [y, m] = p.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
 export const periodEnd = (p: string) => `${p}-${String(daysIn(p)).padStart(2, "0")}`;
 
-export async function getParams(year: number): Promise<PayrollParams> {
-  const [row] = await db.select().from(s.payrollParams).where(eq(s.payrollParams.year, year));
-  return { ...defaultParams(year), ...(row?.values ?? {}) } as PayrollParams;
-}
-export async function saveParams(year: number, values: PayrollParams) {
-  await db.insert(s.payrollParams).values({ year, values }).onConflictDoUpdate({ target: s.payrollParams.year, set: { values, updatedAt: new Date() } });
-}
-export async function customizedYears() {
-  return (await db.select({ year: s.payrollParams.year }).from(s.payrollParams)).map((r) => r.year);
+/**
+ * v6.4.0 – A bérparaméterek a központi, dátumtól hatályos jogszabályi paraméterekből jönnek (lib/legal-params);
+ * a hónap utolsó napján hatályos értékkel. A korábbi, cégtulajdonos által szerkeszthető évenkénti tábla megszűnt.
+ */
+export async function getParamsAt(date: string, companyId?: number): Promise<PayrollParams> {
+  const [c] = companyId ? await db.select({ settings: s.companies.settings }).from(s.companies).where(eq(s.companies.id, companyId)) : [];
+  return payrollParamsFor(date, c ?? null);
 }
 
 // --- dolgozók és jogviszonyok ------------------------------------------------------------------
@@ -61,7 +60,7 @@ export async function loadMonth(companyId: number, period: string) {
   const year = Number(period.slice(0, 4));
   const first = `${period}-01`, last = periodEnd(period);
   const [params, people, runs] = await Promise.all([
-    getParams(year),
+    getParamsAt(last, companyId),
     listPeople(companyId),
     db.select().from(s.payrollRuns).where(and(eq(s.payrollRuns.companyId, companyId), like(s.payrollRuns.period, `${year}-%`))),
   ]);
