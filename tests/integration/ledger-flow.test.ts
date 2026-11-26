@@ -367,4 +367,33 @@ describe.skipIf(!URL)("könyvelési folyamat (integráció)", () => {
     const st = await O.onboardingStatus(c2);
     expect(st.steps.opening && st.steps.partners).toBe(true);
   }, 120_000);
+  it("v6.6.0 – évnyitás: az előző év eredménye a 414-re kerül, a mérleg egyezik és nem duplázódik", async () => {
+    const Y = await import("@/lib/year-open");
+    const co = await m.L.createCompany(userId, { name: `IT Évnyitás Kft ${Date.now()}`, vatPeriod: "monthly", fiscalYearStartMonth: 1 } as never);
+    const c3 = co.id;
+    const a = (code: string) => m.db.db.transaction((tx) => m.L.accountIdByCode(tx, c3, code));
+    await m.L.manualEntry(c3, { journalCode: "VN", date: "2024-06-30", description: "Bevétel 2024", lines: [{ accountId: await a("384"), debit: 500_000, credit: 0 }, { accountId: await a("911"), debit: 0, credit: 500_000 }] }, userId);
+    await m.L.manualEntry(c3, { journalCode: "VN", date: "2025-03-31", description: "Költség 2025", lines: [{ accountId: await a("529"), debit: 200_000, credit: 0 }, { accountId: await a("384"), debit: 0, credit: 200_000 }] }, userId);
+    const bs = async () => {
+      const rows = await m.R.dailyRows(c3, "2026-01-31");
+      const st = m.S.buildBalanceSheet(rows, m.S.buckets("2026-01-01", "2026-01-31", "month"), 1, "2026-01-01");
+      const v = (k: string) => st.rows.find((r) => r.key === k)!.values.at(-1)!;
+      return { ok: st.checkOk, DIV: v("DIV"), DVII: v("DVII"), D: v("D") };
+    };
+    const before = await bs();
+    expect(before).toMatchObject({ ok: true, DIV: 300_000, DVII: 0, D: 300_000 });
+    await expect(Y.openYear(c3, 2025, { userId, lockMonths: false })).rejects.toThrow(/Előbb a 2024/);
+    const r24 = await Y.openYear(c3, 2024, { userId, lockMonths: true });
+    expect(r24.result).toBe(500_000);
+    const r25 = await Y.openYear(c3, 2025, { userId, lockMonths: false });
+    expect(r25.result).toBe(-200_000);
+    expect(await bs()).toEqual(before);
+    const t = await m.R.trialBalance(c3, "2026-01-01", "2026-12-31");
+    const b3 = (code: string) => Math.round(t.filter((x) => x.code === code).reduce((s, x) => s + x.closingDebit - x.closingCredit, 0));
+    expect(b3("414")).toBe(-300_000);
+    expect(b3("493")).toBe(300_000);
+    await expect(Y.openYear(c3, 2024, { userId, lockMonths: false })).rejects.toThrow(/már át van vezetve/);
+    const locks = await m.db.db.select().from(m.db.schema.periodLocks).where(m.eq(m.db.schema.periodLocks.companyId, c3));
+    expect(locks.filter((l) => l.year === 2024)).toHaveLength(12);
+  }, 120_000);
 });

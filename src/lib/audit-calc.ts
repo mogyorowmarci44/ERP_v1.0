@@ -95,6 +95,7 @@ export const ACTION_LABEL: Record<string, string> = {
   deleteStockMoveAction: "Készletmozgás törlése",
   postCogsAction: "ELÁBÉ könyvelése",
   "onboarding.opening": "Nyitómérleg betöltése",
+  openYearAction: "Évnyitás",
   "onboarding.partners": "Partnerek importja",
   "onboarding.accounts": "Számlatükör importja",
 };

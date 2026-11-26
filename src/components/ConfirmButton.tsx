@@ -2,13 +2,13 @@
 import { useFormStatus } from "react-dom";
 
 /** Veszélyes (törlő / visszaállító) művelet beküldő gombja: beküldés előtt megerősítést kér, a művelet alatt letiltódik. */
-export function ConfirmButton({ children, message, pendingText, className, formAction }: { children: React.ReactNode; message: string; pendingText?: string; className?: string; formAction?: (fd: FormData) => void | Promise<void> }) {
+export function ConfirmButton({ children, message, pendingText, className, formAction, disabled }: { children: React.ReactNode; message: string; pendingText?: string; className?: string; formAction?: (fd: FormData) => void | Promise<void>; disabled?: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button
       className={className ?? "danger"}
       formAction={formAction}
-      disabled={pending}
+      disabled={pending || disabled}
       aria-busy={pending}
       onClick={(e) => {
         if (!window.confirm(message)) e.preventDefault();
