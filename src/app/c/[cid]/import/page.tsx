@@ -80,7 +80,7 @@ export default async function ImportPage({ params, searchParams }: { params: Pro
         <form action={uploadSyncAction} className="card grid" style={{ gap: 10, marginBottom: 16 }}>
           <input type="hidden" name="cid" value={cid} />
           <strong>Vendégház-szinkronfájl (foglalások, értékelések)</strong>
-          <span className="muted">A „dezsavu-szinkron-….json” fájl ide tölthető be – akkor is, ha a cégben már vannak könyvelési tételek. Többször is betölthető, nem duplázódik.</span>
+          <span className="muted">A vendégház-szinkronfájl (…-szinkron-….json) ide tölthető be – akkor is, ha a cégben már vannak könyvelési tételek. Többször is betölthető, nem duplázódik.</span>
           <div className="row">
             <input type="file" name="file" accept="application/json,.json" required />
             <button className="primary">Szinkronfájl betöltése</button>

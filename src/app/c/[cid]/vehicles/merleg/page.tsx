@@ -177,7 +177,7 @@ export default async function KeszletMerlegPage({ params, searchParams }: { para
           )}
         </>
       )}
-      <p className="muted am-foot">Mogyorosi Holding™ · KészletMérleg · ugyanaz a számolás, mint az autók AutóMérlegén</p>
+      <p className="muted am-foot">mogyorosi.erp · KészletMérleg · ugyanaz a számolás, mint az autók AutóMérlegén</p>
     </div>
   );
 }

@@ -194,7 +194,7 @@ export async function createPrivateTaxpayerAction(fd: FormData) {
   const user = await requireUser();
   await runOrRedirect("/", async () => {
     const name = str(fd, "name");
-    if (!name) throw new Error("A név kötelező (pl. „Vendégház – Szigetvár”).");
+    if (!name) throw new Error("A név kötelező (pl. „Vendégház – <település>”).");
     const c = await createCompany(user.id, {
       name,
       taxNumber: optStr(fd, "taxNumber"),

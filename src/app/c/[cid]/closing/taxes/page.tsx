@@ -188,7 +188,7 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
                 const opts = s ? citiesForZip(s.zip) : [];
                 return (
                   <tr key={i}>
-                    <td><input name="zip" defaultValue={s?.zip ?? ""} placeholder="pl. 8060" inputMode="numeric" style={{ width: 90 }} disabled={!canWrite} /></td>
+                    <td><input name="zip" defaultValue={s?.zip ?? ""} placeholder="pl. 1051" inputMode="numeric" style={{ width: 90 }} disabled={!canWrite} /></td>
                     <td>{opts.length > 1
                       ? <select name="city" defaultValue={s?.city} disabled={!canWrite}>{opts.map((c) => <option key={c}>{c}</option>)}</select>
                       : <><input type="hidden" name="city" value={s?.city ?? ""} />{s?.city ?? <span className="muted">az irányítószámból</span>}</>}</td>

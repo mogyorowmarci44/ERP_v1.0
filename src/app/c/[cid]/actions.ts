@@ -36,6 +36,7 @@ import { updateEntryMeta, renameInvoiceLine, setEntryChecked, updateManualEntry,
 import { DEFAULT_TAX_PROFILE, isPrivate, taxProfileFromForm } from "@/lib/entity";
 import { cleanPartnerInput, findDuplicatePartner, type NewPartnerInput } from "@/lib/partner-input";
 import { withAudit } from "@/lib/audit";
+import { modulesFromForm } from "@/lib/modules";
 
 const cidOf = (fd: FormData) => Number(fd.get("cid"));
 
@@ -568,6 +569,7 @@ async function updateCompanyActionImpl(fd: FormData) {
         ...(fd.has("activityProfile") ? { activityProfile: parseActivityProfile(str(fd, "activityProfile")) } : {}),
       })
       .where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
     return `/c/${cid}/settings?ok=${encodeURIComponent("Cégadatok mentve.")}`;
   });
 }
@@ -1043,5 +1045,22 @@ async function deleteCompanyMemberActionImpl(fd: FormData) {
     await deleteMember(cid, Number(fd.get("id")));
     revalidatePath(`/c/${cid}`, "layout");
     return `/c/${cid}/settings?ok=${encodeURIComponent("Törölve")}#tagok`;
+  });
+}
+
+/** v6.2.0 – Modulkapcsolók mentése (csak a profil alapértelmezésétől eltérők tárolódnak). */
+export async function saveModulesAction(fd: FormData) {
+  return withAudit("saveModulesAction", fd, () => saveModulesActionImpl(fd));
+}
+
+async function saveModulesActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  const { role, company } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/settings`, async () => {
+    if (role !== "owner") throw new Error("Csak tulajdonos kapcsolhatja a modulokat.");
+    const modules = fd.get("reset") ? {} : modulesFromForm(company.activityProfile, (k) => fd.get(`mod_${k}`) === "on");
+    await db.update(schema.companies).set({ settings: { ...company.settings, modules } }).where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/settings?ok=${encodeURIComponent(fd.get("reset") ? "Modulok visszaállítva a profil alapbeállítására." : "Modulok mentve.")}#modulok`;
   });
 }

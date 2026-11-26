@@ -39,7 +39,7 @@ import {
   FileCheck2,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
-import { isCarDealer } from "@/lib/activity";
+import { moduleOn, type ModuleKey } from "@/lib/modules";
 import { APP_VERSION } from "@/lib/version";
 import { requireCompany } from "@/lib/auth";
 import { logoutAction } from "@/app/auth-actions";
@@ -56,8 +56,9 @@ export default async function CompanyLayout({ children, params }: { children: Re
   const b = `/c/${cid}`;
   const theme = normalizeTheme(company.theme);
   const priv = isPrivate(company);
-  // v5.0.1 – autókereskedés-specifikus menüpontok csak autókereskedés profilnál
-  const car = isCarDealer(company);
+  // v6.2.0 – a menü a cég modulkapcsolói szerint (a profil csak alapértelmezés)
+  const on = (k: ModuleKey) => moduleOn(company, k);
+  const car = on("vehicles");
   return (
     <div className="shell" style={themeVars(theme) as React.CSSProperties} data-mode={theme.mode}>
       <nav className="side" aria-label="Fő navigáció">
@@ -109,7 +110,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <NavLink href={b} exact><LayoutDashboard />Áttekintés</NavLink>
 
           <div className="group">Bizonylatok</div>
-          <NavLink href={`${b}/inbox`}><Inbox />Beérkező bizonylatok</NavLink>
+          {on("inbox") && <NavLink href={`${b}/inbox`}><Inbox />Beérkező bizonylatok</NavLink>}
           <NavLink href={`${b}/invoices?dir=out`} exact><FileOutput />Vevőszámlák</NavLink>
           <NavLink href={`${b}/invoices?dir=in`} exact><FileInput />Szállítói számlák</NavLink>
           <NavLink href={`${b}/invoices/new?dir=out`} exact><FilePlus2 />Új vevőszámla</NavLink>
@@ -118,12 +119,12 @@ export default async function CompanyLayout({ children, params }: { children: Re
 
           <div className="group">Pénzügy</div>
           <NavLink href={`${b}/money`}><Wallet />Pénztár és bank</NavLink>
-          <NavLink href={`${b}/member-loans`}><HandCoins />Tagi kölcsön</NavLink>
-          <NavLink href={`${b}/payroll`}><BadgeEuro />Bérszámfejtés</NavLink>
-          <NavLink href={`${b}/filings`}><FileCheck2 />NAV-bevallások (ÁNYK)</NavLink>
+          {on("memberLoans") && <NavLink href={`${b}/member-loans`}><HandCoins />Tagi kölcsön</NavLink>}
+          {on("payroll") && <NavLink href={`${b}/payroll`}><BadgeEuro />Bérszámfejtés</NavLink>}
+          {on("filings") && <NavLink href={`${b}/filings`}><FileCheck2 />NAV-bevallások (ÁNYK)</NavLink>}
 
-          <div className="group">Tervezés</div>
-          <NavLink href={`${b}/forecast`}><TrendingUp />Forecast</NavLink>
+          {(on("forecast") || car) && <div className="group">Tervezés</div>}
+          {on("forecast") && <NavLink href={`${b}/forecast`}><TrendingUp />Forecast</NavLink>}
           {car && <NavLink href={`${b}/arsugo`}><Tag />ÁrSugó</NavLink>}
 
           <div className="group">Kimutatások</div>
@@ -138,7 +139,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <div className="group">Főkönyv</div>
           <NavLink href={`${b}/journal`} exact><BookOpen />Napló</NavLink>
           <NavLink href={`${b}/reports/ledger`}><FileSpreadsheet />Számlakarton</NavLink>
-          <NavLink href={`${b}/assets`}><Package />Tárgyi eszközök</NavLink>
+          {on("assets") && <NavLink href={`${b}/assets`}><Package />Tárgyi eszközök</NavLink>}
           <NavLink href={`${b}/closing`}><BookOpenCheck />Évzárás</NavLink>
 
           <div className="group">Törzsadatok</div>
@@ -146,10 +147,10 @@ export default async function CompanyLayout({ children, params }: { children: Re
           {car && <NavLink href={`${b}/vehicles/merleg`}><Scale />KészletMérleg</NavLink>}
           <NavLink href={`${b}/partners`}><Users />Partnerek</NavLink>
           <NavLink href={`${b}/accounts`}><ListTree />Számlatükör</NavLink>
-          <NavLink href={`${b}/fx`}><Coins />Árfolyamok (MNB)</NavLink>
+          {on("fx") && <NavLink href={`${b}/fx`}><Coins />Árfolyamok (MNB)</NavLink>}
 
           <div className="group">Rendszer</div>
-          <NavLink href={`${b}/summary`}><Mail />Napi összefoglaló</NavLink>
+          {on("summary") && <NavLink href={`${b}/summary`}><Mail />Napi összefoglaló</NavLink>}
           <NavLink href={`${b}/appearance`}><Palette />Megjelenés</NavLink>
           <NavLink href={`${b}/settings`}><Settings />Beállítások</NavLink>
           <NavLink href={`${b}/import`}><Upload />Adatimport / export</NavLink>

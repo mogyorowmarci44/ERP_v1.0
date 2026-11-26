@@ -101,7 +101,7 @@ export default async function SummaryPage({ params, searchParams }: { params: Pr
       {canWrite && (
         <form action={addRecipientAction} className="card form-grid" style={{ marginTop: 12 }}>
           <input type="hidden" name="cid" value={cid} />
-          <label>Név<input name="name" required placeholder="Mogyorósi Bálint" /></label>
+          <label>Név<input name="name" required placeholder="pl. Kovács Anna" /></label>
           <label>E-mail<input name="email" type="email" required placeholder="nev@gmail.com" /></label>
           <label>Változat
             <select name="variant" defaultValue="ceo">{VARIANTS.map((v) => <option key={v} value={v}>{VARIANT_LABEL[v]}</option>)}</select>

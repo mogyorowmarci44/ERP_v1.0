@@ -239,6 +239,13 @@
       "when": 1795820000000,
       "tag": "0033_v6_1_privacy_backup",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795830000000,
+      "tag": "0034_v6_2_activity_profiles",
+      "breakpoints": true
     }
   ]
 }

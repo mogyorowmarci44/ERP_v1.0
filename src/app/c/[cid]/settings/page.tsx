@@ -1,10 +1,11 @@
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
-import { updateCompanyAction, lockPeriodAction, updateTaxProfileAction } from "../actions";
+import { updateCompanyAction, lockPeriodAction, updateTaxProfileAction, saveModulesAction } from "../actions";
 import { TaxProfileFields } from "@/components/TaxProfileFields";
 import { ENTITY_LABEL, isPrivate } from "@/lib/entity";
-import { ACTIVITY_LABEL, ACTIVITY_PROFILES } from "@/lib/activity";
+import { ACTIVITY_LABEL, ACTIVITY_PROFILES, isCarDealer } from "@/lib/activity";
+import { MODULES, moduleDefault, moduleOn } from "@/lib/modules";
 import { addMemberAction } from "@/app/auth-actions";
 import { Flash } from "@/components/Flash";
 import { today } from "@/lib/dates";
@@ -46,7 +47,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           </select>
         </label>
         {!priv && (
-          <label title="Autókereskedés profilnál látszik az ÁrSugó, AutóMérleg, KészletMérleg, Gépkocsi készlet, különbözeti ÁFA kartonok és a jármű-EPR.">Tevékenységprofil
+          <label title="A profil adja a modulok alapbeállítását; lent a Modulok résznél egyenként is kapcsolhatók.">Tevékenységprofil
             <select name="activityProfile" defaultValue={company.activityProfile}>
               {ACTIVITY_PROFILES.map((p) => <option key={p} value={p}>{ACTIVITY_LABEL[p]}</option>)}
             </select>
@@ -55,10 +56,10 @@ export default async function SettingsPage({ params, searchParams }: { params: P
         {!priv && <label>Üzleti év kezdő hónapja<input name="fiscalYearStartMonth" type="number" min={1} max={12} defaultValue={company.fiscalYearStartMonth} /></label>}
         {!priv && (
           <>
-            <label title="Ha a Tagok és tisztségviselők között van ügyvezető, az okiratokon ő szerepel.">Képviselő (szerződésekhez)<input name="representative" defaultValue={company.settings.representative ?? ""} placeholder="pl. Gálos Kristóf" /></label>
+            <label title="Ha a Tagok és tisztségviselők között van ügyvezető, az okiratokon ő szerepel.">Képviselő (szerződésekhez)<input name="representative" defaultValue={company.settings.representative ?? ""} placeholder="pl. Kovács Anna" /></label>
             <label>Beosztás<input name="representativeTitle" defaultValue={company.settings.representativeTitle ?? "ügyvezető"} /></label>
-            <label>Szerződéskötés helye<input name="signPlace" defaultValue={company.settings.signPlace ?? ""} placeholder="pl. Mór" /></label>
-            {company.activityProfile === "car_dealer" && (<>
+            <label>Szerződéskötés helye<input name="signPlace" defaultValue={company.settings.signPlace ?? ""} placeholder="pl. Budapest" /></label>
+            {isCarDealer(company) && (<>
             <label className="row" title="80/2023. Korm. r. 20. § (3a) – a választás egész naptári évre szól; tartalmazza az alkatrészek és a csomagolás díját is.">
               <input type="checkbox" name="eprFlatRate" defaultChecked={!!company.settings.eprFlatRate} /> EPR díjátalány (gépjármű)
             </label>
@@ -66,13 +67,39 @@ export default async function SettingsPage({ params, searchParams }: { params: P
             <label title="A KPI-Dashboard és a cégérték időszaka ennél korábban nem kezdődik (az évesítés és a tavalyi összevetés is ettől számol).">Működés kezdete
               <input type="date" name="operationStart" defaultValue={company.settings.operationStart ?? ""} />
             </label>
-            {company.activityProfile === "car_dealer" && <label title="A KF kód 8. karaktere külföldről behozott gépjárműre (80/2023. 1. melléklet 2.6).">EPR származáskód (KF 8. karakter)
+            {isCarDealer(company) && <label title="A KF kód 8. karaktere külföldről behozott gépjárműre (80/2023. 1. melléklet 2.6).">EPR származáskód (KF 8. karakter)
               <input name="eprOriginDigit" maxLength={1} pattern="[0-9]" defaultValue={company.settings.eprOriginDigit ?? ""} placeholder="80/2023. 1. mell. 2.6" />
             </label>}
           </>
         )}
         <div style={{ alignSelf: "end" }}><button className="primary" disabled={role !== "owner"}>Mentés</button></div>
       </form>
+
+      {!priv && (
+        <>
+          <h2 id="modulok">Modulok</h2>
+          <p className="muted" style={{ marginTop: -4 }}>
+            A kikapcsolt modul eltűnik a menüből és a nyitóoldalról; az adatai megmaradnak. Az alapértelmezést a tevékenységprofil adja
+            ({ACTIVITY_LABEL[company.activityProfile]}); az alap könyvelés mindig elérhető.
+          </p>
+          <form action={saveModulesAction} className="card">
+            <input type="hidden" name="cid" value={cid} />
+            <div className="form-grid">
+              {MODULES.map((m) => (
+                <label key={m.key} className="check" title={m.description}>
+                  <input type="checkbox" name={`mod_${m.key}`} defaultChecked={moduleOn(company, m.key)} disabled={role !== "owner"} />{" "}
+                  <span><strong>{m.label}</strong>{moduleOn(company, m.key) !== moduleDefault(company.activityProfile, m.key) && <span className="muted"> (eltér a profiltól)</span>}
+                  <br /><span className="muted" style={{ fontSize: 12 }}>{m.description}</span></span>
+                </label>
+              ))}
+            </div>
+            <div className="row" style={{ marginTop: 10, gap: 8 }}>
+              <button className="primary" disabled={role !== "owner"}>Modulok mentése</button>
+              <button name="reset" value="1" disabled={role !== "owner"}>Vissza a profil alapbeállítására</button>
+            </div>
+          </form>
+        </>
+      )}
 
       {priv && (
         <>
