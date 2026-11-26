@@ -34,3 +34,6 @@ services:
         sync: false
       - key: APP_URL
         sync: false
+      # v6.1.0 – érzékeny személyes adatok titkosítási kulcsa (openssl rand -base64 32) – őrizd meg külön is!
+      - key: DATA_ENCRYPTION_KEY
+        sync: false

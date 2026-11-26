@@ -8,6 +8,7 @@ import { runOrRedirect, str } from "@/lib/action-utils";
 import { setMfaRequired } from "@/lib/app-settings";
 import { audit } from "@/lib/audit";
 import { sendInvite } from "@/lib/user-tokens";
+import { setVendor } from "@/lib/vendor";
 
 const { users, memberships, companies } = schema;
 
@@ -183,5 +184,19 @@ export async function grantSupportAccessAction(fd: FormData) {
     await db.insert(schema.supportGrants).values({ userId: me.id, companyId, reason, expiresAt: new Date(Date.now() + hours * 3_600_000) });
     await audit({ action: "support.grant", companyId, organizationId: c.orgId, target: c.name, details: { reason, hours } });
     return `/c/${companyId}`;
+  });
+}
+
+/** v6.1.0 – Az üzemeltető (szolgáltató) adatai a jogi dokumentumokhoz. */
+export async function saveVendorAction(fd: FormData) {
+  await requirePlatformAdmin();
+  await runOrRedirect("/admin/platform", async () => {
+    const v = {
+      name: str(fd, "name"), seat: str(fd, "seat"), regNumber: str(fd, "regNumber"), taxNumber: str(fd, "taxNumber"),
+      email: str(fd, "email"), phone: str(fd, "phone"), web: str(fd, "web"), legalReviewed: fd.get("legalReviewed") === "on",
+    };
+    await setVendor(v);
+    await audit({ action: "vendor.update", details: { legalReviewed: v.legalReviewed } });
+    return `/admin/platform?ok=${encodeURIComponent("Szolgáltatói adatok mentve.")}`;
   });
 }

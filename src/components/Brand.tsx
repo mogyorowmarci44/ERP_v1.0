@@ -68,6 +68,7 @@ export function AppFooter({ company, version, dark, darkMark }: { company?: stri
       </span>
       <span>
         {company && <>Aktív cég: <span className="af-strong">{company}</span> · </>}v{version}
+        {" · "}<a href="/jogi/aszf">ÁSZF</a>{" · "}<a href="/jogi/adatkezeles">Adatkezelés</a>
       </span>
     </footer>
   );

@@ -12,6 +12,9 @@ async function main() {
   // v3.9.6 – egyszeri, idempotens adatjavítások (az app_settings.dataFixes-ben nyilvántartva)
   const { runDataFixes } = await import("./data-fixes");
   await runDataFixes();
+  // v6.1.0 – érzékeny személyes adatok titkosítása (csak ha van DATA_ENCRYPTION_KEY)
+  const { encryptPersonalFields } = await import("./encrypt-personal");
+  await encryptPersonalFields();
   process.exit(0);
 }
 

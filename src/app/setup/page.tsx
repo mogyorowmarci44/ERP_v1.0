@@ -24,6 +24,7 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
         <label>Név<input name="name" required /></label>
         <label>E-mail<input name="email" type="email" required /></label>
         <label>Jelszó (min. 10 karakter)<input name="password" type="password" minLength={10} required /></label>
+        <label className="check"><input type="checkbox" name="terms" required /> Elfogadom az <a href="/jogi/aszf" target="_blank">ÁSZF</a>-et (és az <a href="/jogi/adatfeldolgozas" target="_blank">adatfeldolgozói szerződést</a>), és megismertem az <a href="/jogi/adatkezeles" target="_blank">adatkezelési tájékoztatót</a>.</label>
         <button className="primary">Létrehozás</button>
       </form>
     </div>

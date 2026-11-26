@@ -232,6 +232,13 @@
       "when": 1795810000000,
       "tag": "0032_v6_0_tenancy_security",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795820000000,
+      "tag": "0033_v6_1_privacy_backup",
+      "breakpoints": true
     }
   ]
 }

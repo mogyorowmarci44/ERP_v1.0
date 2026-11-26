@@ -2,7 +2,8 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
-import { createCompanyAction, createPrivateTaxpayerAction, logoutAction, changePasswordAction, archiveCompanyAction, restoreCompanyAction, purgeCompanyAction } from "./auth-actions";
+import { createCompanyAction, createPrivateTaxpayerAction, logoutAction, changePasswordAction, archiveCompanyAction, restoreCompanyAction, purgeCompanyAction, acceptTermsAction } from "./auth-actions";
+import { TERMS_VERSION } from "@/lib/vendor";
 import { canPurge, daysUntilPurge, exportFresh, PURGE_GRACE_DAYS, EXPORT_MAX_AGE_HOURS } from "@/lib/archive-calc";
 import { TaxProfileFields } from "@/components/TaxProfileFields";
 import { ENTITY_LABEL } from "@/lib/entity";
@@ -62,6 +63,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         </form>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
+      {user.termsVersion !== TERMS_VERSION && (
+        <form action={acceptTermsAction} className="card" style={{ borderLeft: "4px solid var(--accent, #1f3a5f)" }}>
+          <strong>{user.termsVersion ? "Frissültek a felhasználási feltételek." : "Kérjük, fogadd el a felhasználási feltételeket."}</strong>
+          <div className="row" style={{ gap: 12, marginTop: 8 }}>
+            <label className="check"><input type="checkbox" name="terms" required /> Elfogadom az <a href="/jogi/aszf" target="_blank">ÁSZF</a>-et (és az <a href="/jogi/adatfeldolgozas" target="_blank">adatfeldolgozói szerződést</a>), és megismertem az <a href="/jogi/adatkezeles" target="_blank">adatkezelési tájékoztatót</a>.</label>
+            <button className="primary">Elfogadom</button>
+          </div>
+        </form>
+      )}
       {activeList.length === 0 && <p className="muted">Még nincs cég. Hozd létre az elsőt lent – a számlatükör, ÁFA-kódok és naplók automatikusan betöltődnek.</p>}
       <div className="company-grid">
         {activeList.map(({ c, role }) => {
@@ -134,12 +144,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           {activeList.some((x) => x.role === "owner") ? (
             <>
               <p className="muted" style={{ marginTop: -4 }}>
-                Archiválás előtt töltsd le a cég <strong>teljes könyvelési exportját</strong> (főkönyv, számlák, kiegyenlítések, partnerek, eszközök – JSON vagy Excel). Archiválás után a cég csak olvasható, kikerül a listákból és a
+                Archiválás előtt töltsd le a cég <strong>teljes mentését</strong> (minden adat, a beszkennelt bizonylatokkal és a bérszámfejtéssel együtt – később vissza is állítható). Archiválás után a cég csak olvasható, kikerül a listákból és a
                 napi összefoglalóból, és bármikor visszaállítható. Végleges törlés csak {PURGE_GRACE_DAYS} nap után kérhető.
               </p>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Cég</th><th>Teljes export</th><th>Archiválás</th></tr></thead>
+                  <thead><tr><th>Cég</th><th>Teljes mentés</th><th>Archiválás</th></tr></thead>
                   <tbody>
                     {activeList.filter((x) => x.role === "owner").map(({ c }) => {
                       const fresh = exportFresh(c.lastFullExportAt, now);
@@ -147,10 +157,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                         <tr key={c.id}>
                           <td><strong>{c.name}</strong><div className="muted" style={{ fontSize: 12 }}>{ENTITY_LABEL[c.entityType]}</div></td>
                           <td>
-                            <div className="row" style={{ gap: 6 }}>
-                              <a className="btn" href={`/c/${c.id}/import/export?full=1`}>JSON</a>
-                              <a className="btn" href={`/c/${c.id}/import/export?full=1&fmt=xlsx`}>Excel</a>
-                            </div>
+                            <a className="btn" href={`/c/${c.id}/backup`}>Teljes mentés letöltése</a>
                             <div className="muted" style={{ fontSize: 12 }}>
                               {c.lastFullExportAt ? `utoljára: ${dt(c.lastFullExportAt)}` : "még nem volt"}{!fresh && c.lastFullExportAt ? ` – ${EXPORT_MAX_AGE_HOURS} óránál régebbi` : ""}
                             </div>
@@ -159,7 +166,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                             <form action={archiveCompanyAction} className="row" style={{ gap: 6 }}>
                               <input type="hidden" name="companyId" value={c.id} />
                               <input name="password" type="password" autoComplete="current-password" placeholder="jelszavad" required disabled={!fresh} />
-                              <button className="danger" disabled={!fresh} title={fresh ? "" : "Előbb töltsd le a teljes exportot"}>Archiválás</button>
+                              <button className="danger" disabled={!fresh} title={fresh ? "" : "Előbb töltsd le a teljes mentést"}>Archiválás</button>
                             </form>
                           </td>
                         </tr>

@@ -39,6 +39,33 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.1.0 – Jogi háttér, adattitkosítás, teljes mentés
+
+**Jogi dokumentumok** (nyilvánosak: `/jogi/aszf`, `/jogi/adatkezeles`, `/jogi/adatfeldolgozas`, és minden oldal láblécéből elérhetők):
+- ÁSZF, adatkezelési tájékoztató a felhasználói fiókokról, és GDPR 28. cikk szerinti adatfeldolgozói szerződés az ügyfelek által rögzített adatokra.
+- Az adatfeldolgozók listája: Render (Frankfurt), Neon (AWS Frankfurt), Google (e-mail), Enable Banking (bank, csak bekapcsolva).
+- A szolgáltató adatai az *Admin › Ügyfélfiókok* oldalon állíthatók. Amíg nincs bepipálva, hogy jogász átnézte, „tervezet” sáv jelenik meg a dokumentumokon.
+- Elfogadás: az első beállításnál és a meghívó elfogadásakor kötelező. A meglévő felhasználók (és szövegváltozás után mindenki) a Cégeim oldalon kapnak elfogadó sávot. A változat és az időpont tárolódik és naplózódik.
+
+**Érzékeny adatok mezőszintű titkosítása (AES-256-GCM).**
+- Titkosítva tárolódik a dolgozók adóazonosító jele, valamint a tagok adóazonosító jele, anyja neve, születési helye és lakcíme. A program ezeket automatikusan visszafejti.
+- Kulcs: `DATA_ENCRYPTION_KEY`, létrehozása: `openssl rand -base64 32`. Szándékosan független a `SESSION_SECRET`-től.
+- Kulcs nélkül minden a régi módon, titkosítás nélkül működik, és az üzemeltetői oldal figyelmeztet.
+- A kulcs beállítása után a meglévő adatok a következő indításkor (`db:migrate`) titkosítódnak.
+- **A kulcsot külön is őrizd meg** – nélküle ezek a mezők nem olvashatók vissza.
+
+**Teljes mentés és visszaállítás** (*Admin › Mentés és visszaállítás*, illetve `/c/[cid]/backup`):
+- A mentés a cég minden adatát tartalmazza, a beszkennelt bizonylatokkal, a bérszámfejtéssel, a forecasttal és a beállításokkal együtt (.json.gz). A táblák listáját a program a sémából állítja össze, így új tábla automatikusan bekerül.
+- Letöltheti a tulajdonos vagy az ügyfélfiók adminja. A teljes mentés az archiválás előfeltétele (a korábbi könyvelési export helyett).
+- Visszaállításkor a sorok az eredeti azonosítókkal kerülnek vissza, egy tranzakcióban. Csak olyan cég állítható vissza, amely nincs az adatbázisban: véglegesen törölt cég, vagy katasztrófa után új adatbázis.
+- A titkosított mezők a mentésben visszafejtve szerepelnek, és visszaállításkor újra titkosítódnak.
+- Integrációs teszt ellenőrzi a folyamatot: mentés → törlés → visszaállítás után a főkönyvi kivonat azonos.
+
+**Katasztrófa utáni helyreállítás – sorrend:**
+1. Teljes adatbázis-hiba vagy rossz migráció esetén: Neon *Branches › Restore* – időpontra visszaállítás. Az ingyenes csomagban csak az elmúlt **6 órára** visszamenőleg.
+2. Ennél régebbi hiba vagy egy cég elvesztése esetén: a cég teljes mentése az *Admin › Mentés és visszaállítás* oldalon. Ehhez rendszeres mentés kell (javaslat: havonta és minden évzárás után).
+3. Új adatbázis esetén: `DATABASE_URL` átállítása → `npm run db:migrate` → `/setup` → cégenként visszaállítás a mentésből. A `DATA_ENCRYPTION_KEY` maradjon a régi.
+
 ## v6.0.0 – Ügyfélfiókok és biztonság (termékké tétel, 1. lépés)
 
 **Ügyfélfiókok (szervezetek).** Minden cég és felhasználó egy ügyfélfiókhoz tartozik; a fiókok egymás adatait nem látják.

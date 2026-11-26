@@ -2,7 +2,9 @@ import Link from "next/link";
 import { and, asc, count, desc, eq, gt, max } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requirePlatformAdmin } from "@/lib/auth";
-import { createOrganizationAction, grantSupportAccessAction } from "../actions";
+import { createOrganizationAction, grantSupportAccessAction, saveVendorAction } from "../actions";
+import { getVendor, vendorMissing } from "@/lib/vendor";
+import { encryptionKey } from "@/lib/field-crypto";
 import { actionLabel } from "@/lib/audit-calc";
 import { Flash } from "@/components/Flash";
 import { ErpLogo, AppFooter } from "@/components/Brand";
@@ -28,6 +30,11 @@ export default async function PlatformPage({ searchParams }: { searchParams: Pro
       .where(and(eq(supportGrants.userId, me.id), gt(supportGrants.expiresAt, new Date()))),
     db.select().from(auditLog).where(eq(auditLog.action, "support.grant")).orderBy(desc(auditLog.id)).limit(20),
   ]);
+  const vendor = await getVendor();
+  const vMissing = vendorMissing(vendor);
+  let keyOk = false;
+  let keyErr = "";
+  try { keyOk = !!encryptionKey(); } catch (e) { keyErr = e instanceof Error ? e.message : String(e); }
   const uc = new Map(userCounts.map((r) => [r.org, r]));
   const active = new Map(grants.map((g) => [g.companyId, g.expiresAt]));
   const coName = new Map(companyRows.map((c) => [c.id, c.name]));
@@ -94,6 +101,35 @@ export default async function PlatformPage({ searchParams }: { searchParams: Pro
         <div style={{ alignSelf: "end" }}><button className="primary">Létrehozás és meghívó</button></div>
       </form>
       <p className="muted" style={{ fontSize: 13 }}>Az admin meghívó linket kap (7 nap), azzal állítja be a jelszavát; utána ő hozza létre a cégeit és hívja meg a kollégáit.</p>
+
+      <h2>Szolgáltatói adatok és jogi dokumentumok</h2>
+      <p className="muted" style={{ marginTop: -4 }}>
+        Ezek jelennek meg az <a href="/jogi/aszf" target="_blank">ÁSZF</a>-ben, az <a href="/jogi/adatkezeles" target="_blank">adatkezelési tájékoztatóban</a> és
+        az <a href="/jogi/adatfeldolgozas" target="_blank">adatfeldolgozói szerződésben</a>. A szövegek minták: élesítés előtt jogász nézze át, és utána pipáld be az ellenőrzést –
+        addig „tervezet” sáv látszik rajtuk. {vMissing.length > 0 && <strong>Hiányzik: {vMissing.join(", ")}.</strong>}
+      </p>
+      <form action={saveVendorAction} className="card form-grid">
+        <label>Szolgáltató cégneve<input name="name" defaultValue={vendor.name} placeholder="pl. Mogyorosi Holding Kft." /></label>
+        <label>Székhely<input name="seat" defaultValue={vendor.seat} /></label>
+        <label>Cégjegyzékszám<input name="regNumber" defaultValue={vendor.regNumber} /></label>
+        <label>Adószám<input name="taxNumber" defaultValue={vendor.taxNumber} /></label>
+        <label>Ügyfélszolgálati e-mail<input name="email" type="email" defaultValue={vendor.email} /></label>
+        <label>Telefon<input name="phone" defaultValue={vendor.phone} /></label>
+        <label>Weboldal<input name="web" defaultValue={vendor.web} /></label>
+        <label className="check"><input type="checkbox" name="legalReviewed" defaultChecked={vendor.legalReviewed} /> Jogász átnézte, élesíthető</label>
+        <div style={{ alignSelf: "end" }}><button className="primary">Mentés</button></div>
+      </form>
+
+      <h2>Érzékeny adatok titkosítása</h2>
+      {keyErr ? <div className="flash error">{keyErr}</div> : keyOk ? (
+        <p><span className="badge posted">bekapcsolva</span> Az adóazonosító jel, anyja neve, születési hely és lakcím titkosítva tárolódik (AES-256-GCM).
+          A <code>DATA_ENCRYPTION_KEY</code> kulcsot őrizd meg biztonságos helyen is: nélküle ezek az adatok nem olvashatók vissza.</p>
+      ) : (
+        <div className="flash error">
+          Kikapcsolva – nincs <code>DATA_ENCRYPTION_KEY</code>. Állíts be egy 32 bájtos kulcsot a Renderen (<code>openssl rand -base64 32</code>), és mentsd el
+          egy biztonságos helyre is; a következő indításkor a meglévő adatok automatikusan titkosítódnak.
+        </div>
+      )}
 
       <h2>Támogatói hozzáférések (utolsó 20)</h2>
       <div className="table-wrap">
