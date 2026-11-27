@@ -120,6 +120,13 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
         </div>
         <Link className="btn" href={`${b}/reports/statements?type=pnl&gran=month`}>Havi eredménykimutatás</Link>
       </div>
+      {/* v6.5.0 – új cégnél: bevezető lépések */}
+      {!last?.at && (
+        <div className="card row" style={{ justifyContent: "space-between", borderLeft: "4px solid var(--accent)", marginBottom: 14 }}>
+          <span><strong>Új cég?</strong> Partnerek és nyitómérleg betöltése Excelből, bank összekötése, kollégák meghívása – lépésről lépésre.</span>
+          <Link className="btn primary" href={`${b}/start`}>Első lépések →</Link>
+        </div>
+      )}
 
       <div className="lp-top">
         <div className="card lp-todo">

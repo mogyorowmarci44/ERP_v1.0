@@ -14,7 +14,7 @@ const URL = process.env.TEST_DATABASE_URL;
 
 describe.skipIf(!URL)("könyvelési folyamat (integráció)", () => {
   // a modulok csak a DATABASE_URL beállítása után tölthetők be
-  let m: { eq: typeof import("drizzle-orm").eq;
+  let m: { eq: typeof import("drizzle-orm").eq; and: typeof import("drizzle-orm").and;
     db: typeof import("@/db"); L: typeof import("@/lib/ledger"); R: typeof import("@/lib/reports"); S: typeof import("@/lib/statements");
     A: typeof import("@/lib/assets"); P: typeof import("@/lib/payroll"); D: typeof import("@/lib/delta-import"); X: typeof import("@/lib/data-export");
     M: typeof import("@/lib/matching"); V: typeof import("@/lib/vat-closing"); AC: typeof import("@/lib/accruals"); ML: typeof import("@/lib/member-loans");
@@ -39,7 +39,7 @@ describe.skipIf(!URL)("könyvelési folyamat (integráció)", () => {
   beforeAll(async () => {
     process.env.DATABASE_URL = URL;
     m = {
-      eq: (await import("drizzle-orm")).eq,
+      eq: (await import("drizzle-orm")).eq, and: (await import("drizzle-orm")).and,
       db: await import("@/db"), L: await import("@/lib/ledger"), R: await import("@/lib/reports"), S: await import("@/lib/statements"),
       A: await import("@/lib/assets"), P: await import("@/lib/payroll"), D: await import("@/lib/delta-import"), X: await import("@/lib/data-export"),
       M: await import("@/lib/matching"), V: await import("@/lib/vat-closing"), AC: await import("@/lib/accruals"), ML: await import("@/lib/member-loans"),
@@ -332,5 +332,39 @@ describe.skipIf(!URL)("könyvelési folyamat (integráció)", () => {
     [row] = (await I.itemsWithBalance(cid)).filter((x) => x.id === it.id);
     expect(row.value).toBe(12_000);
     await expect(I.postMonthlyCogs(cid, "2026-11", userId)).rejects.toThrow(/Nincs könyvelendő/);
+  }, 120_000);
+  it("v6.5.0 – bevezetés: számlatükör, partnerek és nyitómérleg betöltése új cégbe", async () => {
+    const O = await import("@/lib/onboarding");
+    const s = m.db.schema;
+    const co = await m.L.createCompany(userId, { name: `IT Nyitó Kft ${Date.now()}`, vatPeriod: "monthly", fiscalYearStartMonth: 1 } as never);
+    const c2 = co.id;
+    const acc2 = await O.importAccounts(c2, [{ Számla: "3842", Megnevezés: "EUR bankszámla" }, { Számla: "384", Megnevezés: "Elszámolási betétszámla" }], true);
+    expect(acc2.ok).toBe(true);
+    await m.db.db.update(s.accounts).set({ currency: "EUR" }).where(m.and(m.eq(s.accounts.companyId, c2), m.eq(s.accounts.code, "3842")));
+    const prt = await O.importPartners(c2, [{ Név: "Hibás Kft", Adószám: "12345678-1-11" }], true);
+    expect(prt.ok).toBe(false); // hibás ellenőrző szám → semmi nem kerül be
+    const rows = [
+      { Számla: "384", Tartozik: "1 000 000" },
+      { Számla: "3842", Tartozik: "400 000", Devizaösszeg: "1 000" },
+      { Számla: "311", Tartozik: 250_000, Partner: "Nyitó Vevő Kft" },
+      { Számla: "4791", Megnevezés: "Tagi kölcsön", Követel: 150_000 },
+      { Számla: "411", Követel: 3_000_000 },
+      { Számla: "413", Tartozik: 1_500_000 },
+    ];
+    const check = await O.importOpening(c2, rows, { date: "2026-01-01", apply: false, userId });
+    expect(check.ok).toBe(true);
+    expect(check.messages.join(" ")).toMatch(/Nyitó Vevő Kft/);
+    expect((await m.db.db.select().from(s.journalEntries).where(m.eq(s.journalEntries.companyId, c2))).length).toBe(0);
+    const done = await O.importOpening(c2, rows, { date: "2026-01-01", apply: true, userId });
+    expect(done.ok).toBe(true);
+    const t = await m.R.trialBalance(c2, "2026-01-01", "2026-12-31");
+    const b2 = (code: string) => Math.round(t.filter((r) => r.code === code).reduce((x, r) => x + r.closingDebit - r.closingCredit, 0));
+    expect(b2("384")).toBe(1_000_000);
+    expect(b2("311")).toBe(250_000);
+    expect(b2("411")).toBe(-3_000_000);
+    const again = await O.importOpening(c2, rows, { date: "2026-01-01", apply: true, userId });
+    expect(again.ok).toBe(false);
+    const st = await O.onboardingStatus(c2);
+    expect(st.steps.opening && st.steps.partners).toBe(true);
   }, 120_000);
 });
