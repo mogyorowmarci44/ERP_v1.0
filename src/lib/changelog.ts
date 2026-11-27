@@ -2,6 +2,10 @@
 export type Release = { version: string; title: string; items: string[] };
 
 export const CHANGELOG: Release[] = [
+  { version: "7.4.0", title: "Globális kereső és PDF-kimutatások", items: [
+    "Kereső a menü tetején és a Cégeim oldalon: számlaszám, partner, adószám, összeg, naplószám, rendszám – az összes cégedben egyszerre.",
+    "PDF-ben letölthető, nyomtatható főkönyvi kivonat, eredménykimutatás, mérleg és nyitott tételek – Mogyorosi Holding™ lábléccel.",
+  ] },
   { version: "7.3.0", title: "Fizetési emlékeztető és banki szabályok", items: [
     "Nyitott tételek: lejárt vevőszámlákra egy gombbal udvarias fizetési emlékeztető megy a partnernek (a számlák listájával, a nyitott összeggel és a bankszámlaszámmal).",
     "Banki szabályok: „ha a kivonat szövegében X szerepel, könyveld Y-ra” – az ismétlődő, számla nélküli tételek (NAV, bankköltség, kamat) maguktól könyvelődnek.",

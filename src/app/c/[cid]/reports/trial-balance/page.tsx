@@ -32,6 +32,7 @@ export default async function TrialBalancePage({ params, searchParams }: { param
     <>
       <div className="topbar">
         <h1>Főkönyvi kivonat</h1>
+        <a className="btn no-print" href={`/c/${cid}/reports/pdf?type=tb&from=${from}&to=${to}`} target="_blank" rel="noreferrer">PDF</a>
         <span className="muted">{company.name} · {fmtDate(from)} – {fmtDate(to)}</span>
         <Link className="btn no-print" href={`/c/${cid}/closing`}>← Évzárás</Link>
       </div>

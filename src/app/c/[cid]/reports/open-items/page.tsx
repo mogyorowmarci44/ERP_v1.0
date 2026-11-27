@@ -55,7 +55,10 @@ export default async function OpenItemsPage({ params, searchParams }: { params: 
   );
   return (
     <>
-      <h1>Nyitott tételek</h1>
+      <div className="topbar">
+        <h1>Nyitott tételek</h1>
+        <a className="btn no-print" href={`/c/${cid}/reports/pdf?type=open`} target="_blank" rel="noreferrer">PDF</a>
+      </div>
       <Flash error={sp.error} ok={sp.ok} />
       {groups.length > 0 && (
         <div className="card" style={{ marginBottom: 14 }}>

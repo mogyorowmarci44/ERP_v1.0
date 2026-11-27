@@ -1213,3 +1213,9 @@ table.fc-plan tr.total td { border-top: 1px solid var(--line, currentColor); }
   input, select, textarea { max-width: 100%; }
   .topbar { flex-wrap: wrap; gap: 8px; }
 }
+
+/* v7.4.0 – globális kereső */
+.search-hits { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.search-hits li { padding: 6px 0; border-bottom: 1px solid var(--border, #eee); }
+.side-search { margin: 8px 0 4px; }
+.side-search input { width: 100%; }
