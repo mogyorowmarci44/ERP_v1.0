@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 
@@ -38,6 +38,24 @@ export async function putObject(key: string, base64: string, mime: string) {
 export async function getObjectBase64(key: string): Promise<string> {
   const r = await s3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
   return Buffer.from(await r.Body!.transformToByteArray()).toString("base64");
+}
+export async function putBuffer(key: string, body: Buffer, mime: string) {
+  await s3().send(new PutObjectCommand({ Bucket: bucket(), Key: key, Body: body, ContentType: mime }));
+}
+export async function getObjectBuffer(key: string): Promise<Buffer> {
+  const r = await s3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+  return Buffer.from(await r.Body!.transformToByteArray());
+}
+/** v7.2.0 – a tároló objektumai egy előtag alatt (lapozva). */
+export async function listObjects(prefix: string): Promise<Array<{ key: string; size: number; at: Date | null }>> {
+  const out: Array<{ key: string; size: number; at: Date | null }> = [];
+  let token: string | undefined;
+  do {
+    const r = await s3().send(new ListObjectsV2Command({ Bucket: bucket(), Prefix: prefix, ContinuationToken: token }));
+    for (const o of r.Contents ?? []) if (o.Key) out.push({ key: o.Key, size: Number(o.Size ?? 0), at: o.LastModified ?? null });
+    token = r.IsTruncated ? r.NextContinuationToken : undefined;
+  } while (token);
+  return out;
 }
 export async function deleteObject(key: string) {
   await s3().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
