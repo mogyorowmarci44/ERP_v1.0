@@ -49,3 +49,8 @@ export function modulesFromForm(profile: string | null | undefined, on: (key: Mo
   for (const k of MODULE_KEYS) if (on(k) !== moduleDefault(profile, k)) out[k] = on(k);
   return out;
 }
+
+/** v6.11.0 – a modul a cégnél be van kapcsolva ÉS a felhasználó elől nincs elrejtve (tulajdonos elől soha). */
+export function moduleVisible(c: CompanyLike, hidden: readonly string[] | null | undefined, key: ModuleKey): boolean {
+  return moduleOn(c, key) && !(hidden ?? []).includes(key);
+}

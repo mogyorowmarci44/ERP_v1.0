@@ -1,12 +1,20 @@
 import Link from "next/link";
 import { requireCompany } from "@/lib/auth";
-import { MODULES, moduleOn, type ModuleKey } from "@/lib/modules";
+import { MODULES, moduleOn, moduleVisible, type ModuleKey } from "@/lib/modules";
 
 /** v6.2.0 – Kikapcsolt modul oldalai nem nyílnak meg (az adatok megmaradnak). */
 export async function ModuleGate({ cid, module, children }: { cid: string; module: ModuleKey; children: React.ReactNode }) {
-  const { company, role } = await requireCompany(Number(cid));
-  if (moduleOn(company, module)) return <>{children}</>;
+  const { company, role, hidden } = await requireCompany(Number(cid));
+  if (moduleVisible(company, hidden, module)) return <>{children}</>;
   const def = MODULES.find((m) => m.key === module)!;
+  if (moduleOn(company, module)) {
+    return (
+      <div className="card" style={{ maxWidth: 640 }}>
+        <h1>{def.label}</h1>
+        <p>Ehhez a modulhoz ennél a cégnél nincs hozzáférésed. A cég tulajdonosa a Beállítások › Felhasználók részben adhat hozzáférést.</p>
+      </div>
+    );
+  }
   return (
     <div className="card" style={{ maxWidth: 640 }}>
       <h1>{def.label}</h1>

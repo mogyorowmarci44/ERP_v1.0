@@ -20,7 +20,7 @@ export async function savePayrollAction(cid: number, period: string, inputs: Rec
 }
 
 async function savePayrollActionImpl(cid: number, period: string, inputs: Record<number, PayrollInput>): Promise<{ error?: string }> {
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "payroll" });
   try {
     if (!isPeriod(period)) throw new Error("Hibás hónap.");
     await saveMonth(cid, period, inputs);
@@ -37,7 +37,7 @@ export async function postPayrollAction(fd: FormData) {
 
 async function postPayrollActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), period = str(fd, "period");
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "payroll" });
   const back = `/c/${cid}/payroll?period=${period}`;
   await runOrRedirect(back, async () => {
     const e = await postMonth(cid, period, user.id, { force: fd.get("force") === "1" });
@@ -52,7 +52,7 @@ export async function markExternalAction(fd: FormData) {
 
 async function markExternalActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), period = str(fd, "period"), on = fd.get("on") === "1";
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "payroll" });
   const back = `/c/${cid}/payroll?period=${period}`;
   await runOrRedirect(back, async () => {
     if (!isPeriod(period)) throw new Error("Hibás hónap.");
@@ -68,7 +68,7 @@ export async function unpostPayrollAction(fd: FormData) {
 
 async function unpostPayrollActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), period = str(fd, "period");
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "payroll" });
   const back = `/c/${cid}/payroll?period=${period}`;
   await runOrRedirect(back, async () => {
     const e = await unpostMonth(cid, period, user.id);
@@ -85,7 +85,7 @@ export async function saveEmployeeAction(fd: FormData) {
 
 async function saveEmployeeActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "payroll" });
   const back = `/c/${cid}/payroll/people`;
   await runOrRedirect(back, async () => {
     const id = Number(fd.get("id")) || null;
@@ -107,7 +107,7 @@ export async function deleteEmployeeAction(fd: FormData) {
 
 async function deleteEmployeeActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "payroll" });
   await runOrRedirect(`/c/${cid}/payroll/people`, async () => {
     await deleteEmployee(cid, Number(fd.get("id")));
     return ok(`/c/${cid}/payroll/people`, "Dolgozó törölve.");
@@ -120,7 +120,7 @@ export async function saveEmploymentAction(fd: FormData) {
 
 async function saveEmploymentActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "payroll" });
   const back = `/c/${cid}/payroll/people`;
   await runOrRedirect(back, async () => {
     const id = Number(fd.get("id")) || null;
@@ -153,7 +153,7 @@ export async function deleteEmploymentAction(fd: FormData) {
 
 async function deleteEmploymentActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "payroll" });
   await runOrRedirect(`/c/${cid}/payroll/people`, async () => {
     await deleteEmployment(cid, Number(fd.get("id")));
     return ok(`/c/${cid}/payroll/people`, "Jogviszony törölve.");
@@ -170,7 +170,7 @@ export async function saveMemberTbAccountAction(fd: FormData) {
 
 async function saveMemberTbAccountActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  const { role, company } = await requireCompany(cid, { write: true });
+  const { role, company } = await requireCompany(cid, { write: true, module: "payroll" });
   const back = `/c/${cid}/payroll/params`;
   await runOrRedirect(back, async () => {
     if (role !== "owner") throw new Error("Ezt csak tulajdonos módosíthatja.");

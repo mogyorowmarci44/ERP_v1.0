@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { ROLE_LABEL } from "@/lib/roles";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -41,6 +43,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   // v6.0.0 – archivált cégek külön, a lista alján
   const all = list;
   const activeList = all.filter((x) => !x.c.archivedAt);
+  // v6.11.0 – a csak bizonylatfeltöltő felhasználó egyből a mobilos portálra kerül
+  if (user.termsVersion === TERMS_VERSION && activeList.length === 1 && activeList[0].role === "uploader" && !sp.error && !sp.ok) redirect(`/p/${activeList[0].c.id}`);
   const archivedList = all.filter((x) => x.c.archivedAt);
   const now = new Date();
   const dt = (d: Date) => d.toLocaleString("hu-HU", { timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -56,7 +60,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           <a className="btn" href="/terkep">ERP-térkép</a>
         </div>
         <form action={logoutAction} className="row">
-          {list.length > 1 && <Link href="/iroda">Iroda – összes cég</Link>}
+          {list.filter((x) => x.role !== "uploader").length > 1 && <Link href="/iroda">Iroda – összes cég</Link>}
           {user.isAdmin && <Link href="/admin">Admin – hozzáférések</Link>}
           {user.isPlatformAdmin && <Link href="/admin/platform">Ügyfélfiókok</Link>}
           <span className="muted">{user.name}</span>
@@ -78,7 +82,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         {activeList.map(({ c, role }) => {
           const t = normalizeTheme(c.theme);
           return (
-            <Link key={c.id} href={`/c/${c.id}`} className="card company-card">
+            <Link key={c.id} href={role === "uploader" ? `/p/${c.id}` : `/c/${c.id}`} className="card company-card">
               <div className="band" style={{ background: t.sidebar }}>
                 <CompanyMark id={c.id} name={c.name} logoVersion={c.logoUpdatedAt ? c.logoUpdatedAt.getTime() : null} />
               </div>
@@ -86,7 +90,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
                 <strong>{c.name}</strong>
                 <span className="entity-tag">{ENTITY_LABEL[c.entityType]}{c.entityType === "company" ? ` · ${ACTIVITY_SHORT[c.activityProfile]}` : ""}</span>
                 <span className="muted">{c.taxNumber ?? "adószám nélkül"}</span>
-                <span className="muted">ÁFA: {{ monthly: "havi", quarterly: "negyedéves", yearly: "éves" }[c.vatPeriod]} bevalló, szerep: {{ owner: "tulajdonos", accountant: "könyvelő", viewer: "CEO - Ügyvezető" }[role]}</span>
+                <span className="muted">ÁFA: {{ monthly: "havi", quarterly: "negyedéves", yearly: "éves" }[c.vatPeriod]} bevalló, szerep: {ROLE_LABEL[role]}</span>
               </div>
               <div style={{ height: 4, background: t.accent }} />
             </Link>

@@ -231,13 +231,14 @@ export async function addMemberAction(fd: FormData) {
     if (m.archivedAt) throw new Error("Archivált céghez nem adható hozzá felhasználó.");
     const email = str(fd, "email").toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Adj meg érvényes e-mail címet.");
-    const role = (str(fd, "role") || "accountant") as "owner" | "accountant" | "viewer";
-    if (!["owner", "accountant", "viewer"].includes(role)) throw new Error("Ismeretlen szerepkör.");
+    const role = (str(fd, "role") || "accountant") as "owner" | "accountant" | "viewer" | "uploader";
+    if (!["owner", "accountant", "viewer", "uploader"].includes(role)) throw new Error("Ismeretlen szerepkör.");
     let [target] = await db.select().from(schema.users).where(eq(schema.users.email, email));
     let note = "Felhasználó hozzáadva.";
     if (target && target.organizationId !== m.orgId) throw new Error("Ez az e-mail cím egy másik ügyfélfiókhoz tartozik – nem adható hozzá.");
     if (!target) {
-      await assertUserLimit(m.orgId);
+      // v6.11.0 – a bizonylatfeltöltő (az ügyfél, aki csak fotóz) nem számít bele a csomag felhasználókeretébe
+      if (role !== "uploader") await assertUserLimit(m.orgId);
       [target] = await db
         .insert(schema.users)
         .values({ email, name: str(fd, "name") || email, passwordHash: await hashPassword(randomUnusablePassword()), organizationId: m.orgId })

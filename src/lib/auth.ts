@@ -1,3 +1,4 @@
+import type { ModuleKey } from "./modules";
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
@@ -144,8 +145,12 @@ export async function requirePlatformAdmin() {
 }
 
 /** Ellenőrzi, hogy a felhasználó tagja-e a cégnek; visszaadja a céget és a szerepkört. */
-export async function requireCompany(companyId: number, opts: { write?: boolean } = {}) {
+export async function requireCompany(companyId: number, opts: { write?: boolean; portal?: boolean; module?: ModuleKey } = {}) {
   const r = await companyMembership(companyId);
+  // v6.11.0 – a bizonylatfeltöltő csak a mobilos portált látja (/p/[cid])
+  if (r.role === "uploader" && !opts.portal) redirect(`/p/${companyId}`);
+  // v6.11.0 – modulonkénti jogosultság (a tulajdonos elől semmi sincs elrejtve)
+  if (opts.module && r.hidden.includes(opts.module)) throw new Error("Ehhez a modulhoz ennél a cégnél nincs hozzáférésed.");
   if (opts.write && r.role === "viewer") throw new Error(r.support ? "Támogatói hozzáféréssel csak olvasni lehet." : "Nincs írási jogosultságod ehhez a céghez.");
   if (opts.write && r.company.archivedAt) throw new Error("A cég archivált – csak olvasható. Módosításhoz előbb állítsd vissza a Cégeim oldalon.");
   // v6.8.0 – lejárt próbaidő / előfizetés: az ügyfélfiók csak olvasható (az adatok megmaradnak, letölthetők)
@@ -163,11 +168,11 @@ const companyMembership = cache(async (companyId: number) => {
   const { logoData: _omit, ...companyCols } = getTableColumns(schema.companies);
   void _omit;
   const [row] = await db
-    .select({ company: companyCols, role: schema.memberships.role })
+    .select({ company: companyCols, role: schema.memberships.role, hidden: schema.memberships.hiddenModules })
     .from(schema.memberships)
     .innerJoin(schema.companies, eq(schema.companies.id, schema.memberships.companyId))
     .where(and(eq(schema.memberships.userId, user.id), eq(schema.memberships.companyId, companyId)));
-  if (row) return { user, company: row.company, role: row.role, support: false };
+  if (row) return { user, company: row.company, role: row.role, support: false, hidden: (row.role === "owner" ? [] : row.hidden ?? []) as string[] };
   // v6.0.0 – üzemeltetői támogatói hozzáférés: időkorlátos, csak olvasás (a megadása naplózva)
   if (user.isPlatformAdmin) {
     const [g] = await db
@@ -176,7 +181,7 @@ const companyMembership = cache(async (companyId: number) => {
       .where(and(eq(schema.supportGrants.userId, user.id), eq(schema.supportGrants.companyId, companyId), gt(schema.supportGrants.expiresAt, new Date())));
     if (g) {
       const [company] = await db.select(companyCols).from(schema.companies).where(eq(schema.companies.id, companyId));
-      if (company) return { user, company, role: "viewer" as const, support: true };
+      if (company) return { user, company, role: "viewer" as const, support: true, hidden: [] as string[] };
     }
   }
   redirect("/");
@@ -188,5 +193,6 @@ export async function isMember(userId: number, companyId: number) {
     .select()
     .from(schema.memberships)
     .where(and(eq(schema.memberships.userId, userId), eq(schema.memberships.companyId, companyId)));
-  return m ?? null;
+  // v6.11.0 – a bizonylatfeltöltő az API-útvonalakat (logó, banki visszahívás) nem használhatja
+  return m && m.role !== "uploader" ? m : null;
 }

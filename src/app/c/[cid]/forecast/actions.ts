@@ -68,7 +68,7 @@ export async function savePlanAction(fd: FormData) {
 
 async function savePlanActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "stock"), async () => {
     await savePlanCore(cid, fd);
     refresh(cid);
@@ -83,7 +83,7 @@ export async function savePlansBulkAction(fd: FormData) {
 
 async function savePlansBulkActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "stock"), async () => {
     const rows = [...new Set(fd.getAll("row").map(String))];
     let saved = 0;
@@ -113,7 +113,7 @@ export async function deletePlanAction(fd: FormData) {
 
 async function deletePlanActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "stock"), async () => {
     const id = Number(fd.get("planId"));
     await ownPlan(cid, id);
@@ -131,7 +131,7 @@ export async function clearSalePlanAction(fd: FormData) {
 
 async function clearSalePlanActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "stock"), async () => {
     const id = Number(fd.get("planId"));
     const p = await ownPlan(cid, id);
@@ -152,7 +152,7 @@ export async function deleteAllPlannedAction(fd: FormData) {
 
 async function deleteAllPlannedActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "stock"), async () => {
     const del = await db.delete(forecastPlans).where(and(eq(forecastPlans.companyId, cid), isNull(forecastPlans.vehicleId))).returning({ id: forecastPlans.id });
     refresh(cid);
@@ -167,7 +167,7 @@ export async function linkPlanAction(fd: FormData) {
 
 async function linkPlanActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "stock"), async () => {
     const id = Number(fd.get("planId"));
     const vehicleId = Number(fd.get("vehicleId"));
@@ -188,7 +188,7 @@ export async function addPlanCostAction(fd: FormData) {
 
 async function addPlanCostActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "stock"), async () => {
     let planId = intOrNull(fd, "planId");
     const vehicleId = intOrNull(fd, "vehicleId");
@@ -223,7 +223,7 @@ export async function deletePlanCostAction(fd: FormData) {
 
 async function deletePlanCostActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "stock"), async () => {
     const id = Number(fd.get("costId"));
     const [c] = await db.select().from(forecastPlanCosts).where(eq(forecastPlanCosts.id, id));
@@ -242,7 +242,7 @@ export async function fillSuggestionsAction(fd: FormData) {
 
 async function fillSuggestionsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "stock"), async () => {
     const [{ stock }, hist] = await Promise.all([loadPlans(cid), soldHistory(cid)]);
     let n = 0;
@@ -270,7 +270,7 @@ export async function saveItemAction(fd: FormData) {
 
 async function saveItemActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "costs"), async () => {
     const id = intOrNull(fd, "id");
     const category = str(fd, "category");
@@ -308,7 +308,7 @@ export async function deleteItemAction(fd: FormData) {
 
 async function deleteItemActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "costs"), async () => {
     await db.delete(forecastItems).where(and(eq(forecastItems.id, Number(fd.get("id"))), eq(forecastItems.companyId, cid)));
     refresh(cid);
@@ -323,7 +323,7 @@ export async function deleteAllItemsAction(fd: FormData) {
 
 async function deleteAllItemsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "costs"), async () => {
     const del = await db.delete(forecastItems).where(eq(forecastItems.companyId, cid)).returning({ id: forecastItems.id });
     refresh(cid);
@@ -338,7 +338,7 @@ export async function acceptSuggestionsAction(fd: FormData) {
 
 async function acceptSuggestionsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "costs"), async () => {
     const keys = new Set(fd.getAll("key").map(String));
     const all = await costSuggestions(cid);
@@ -370,7 +370,7 @@ export async function refreshSuggestedAction(fd: FormData) {
 
 async function refreshSuggestedActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "costs"), async () => {
     const all = await costSuggestions(cid);
     const items = await db.select().from(forecastItems).where(and(eq(forecastItems.companyId, cid), eq(forecastItems.source, "suggested")));
@@ -396,7 +396,7 @@ export async function saveScenarioSettingsAction(fd: FormData) {
 
 async function saveScenarioSettingsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "settings"), async () => {
     const cur = await getForecastSettings(cid);
     await saveForecastSettings(cid, {
@@ -420,7 +420,7 @@ export async function calibrateAction(fd: FormData) {
 
 async function calibrateActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "settings"), async () => {
     const c = await calibrationFor(cid);
     if (!c.used) throw new Error(`Kevés a lezárt eladás a kalibráláshoz (${c.history.length} db, legalább 8 kell) – maradnak az alapértékek.`);
@@ -438,7 +438,7 @@ export async function resetScenarioAction(fd: FormData) {
 
 async function resetScenarioActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, "settings"), async () => {
     await db.delete(forecastSettings).where(eq(forecastSettings.companyId, cid));
     refresh(cid);
@@ -454,7 +454,7 @@ export async function resetForecastAction(fd: FormData) {
 
 async function resetForecastActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "forecast" });
   await runOrRedirect(back(cid, ""), async () => {
     await db.transaction(async (tx) => {
       await tx.delete(forecastPlans).where(eq(forecastPlans.companyId, cid));

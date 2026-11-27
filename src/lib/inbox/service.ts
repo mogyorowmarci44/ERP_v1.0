@@ -34,6 +34,8 @@ export async function addDocument(companyId: number, d: {
   filename: string; mime: string; data: string; emailFrom?: string | null; emailSubject?: string | null; emailDate?: string | null;
   /** v6.10.0: már kiolvasott adat (számlázóprogramból) – így nem kell szövegfelismerés. */
   extracted?: ExtractedDoc | null;
+  /** v6.11.0 – a feltöltő felhasználó (mobilos portál). */
+  uploadedBy?: number | null;
 }) {
   const hash = sha256(d.data);
   const [dupe] = await db.select({ id: inboxDocuments.id }).from(inboxDocuments).where(and(eq(inboxDocuments.companyId, companyId), eq(inboxDocuments.sha256, hash)));
@@ -41,7 +43,7 @@ export async function addDocument(companyId: number, d: {
     companyId, source: d.source, sourceRef: d.sourceRef, sourceUrl: d.sourceUrl ?? null, kind: d.kind, filename: d.filename.slice(0, 255), mime: d.mime || "application/octet-stream",
     sha256: hash, data: d.data, emailFrom: d.emailFrom ?? null, emailSubject: d.emailSubject ?? null, emailDate: d.emailDate ? new Date(d.emailDate) : null,
     status: dupe ? "duplicate" : d.extracted ? "extracted" : "new", error: dupe ? `Ugyanez a fájl már bent van (#${dupe.id}).` : null,
-    extracted: d.extracted ?? null,
+    extracted: d.extracted ?? null, uploadedBy: d.uploadedBy ?? null,
   }).onConflictDoNothing().returning({ id: inboxDocuments.id });
   // v6.7.0 – a nagy fájl a fájltárolóba kerül (hiba esetén az adatbázisban marad)
   if (row?.id) await offloadDoc(row.id).catch((e) => console.error("[file-store] feltöltési hiba:", e));

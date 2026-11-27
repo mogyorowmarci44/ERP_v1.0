@@ -1,6 +1,6 @@
 import "server-only";
 import Stripe from "stripe";
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { accessOf, limitError, stateFromStripe, type Access } from "@/lib/billing-calc";
 import { appBaseUrl } from "@/lib/user-tokens";
@@ -53,7 +53,9 @@ export async function assertCompanyLimit(organizationId: number | null | undefin
 export async function assertUserLimit(organizationId: number | null | undefined) {
   if (!organizationId) return;
   const plan = await orgPlan(organizationId);
-  const [{ n }] = await db.select({ n: count() }).from(schema.users).where(eq(schema.users.organizationId, organizationId));
+  // v6.11.0 – a csak bizonylatfeltöltő felhasználók nem számítanak bele
+  const [{ n }] = await db.select({ n: count() }).from(schema.users).where(and(eq(schema.users.organizationId, organizationId),
+    sql`not (exists (select 1 from memberships m where m.user_id = ${schema.users.id}) and not exists (select 1 from memberships m where m.user_id = ${schema.users.id} and m.role <> 'uploader'))`));
   const err = limitError("users", Number(n), plan?.maxUsers);
   if (err) throw new Error(err);
 }

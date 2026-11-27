@@ -59,7 +59,8 @@ export const vatKindEnum = pgEnum("vat_kind", [
 export const invoiceDirectionEnum = pgEnum("invoice_direction", ["out", "in"]); // out = vevő, in = szállító
 export const docStatusEnum = pgEnum("doc_status", ["draft", "posted", "cancelled"]);
 export const vatPeriodEnum = pgEnum("vat_period", ["monthly", "quarterly", "yearly"]);
-export const roleEnum = pgEnum("member_role", ["owner", "accountant", "viewer"]);
+/** v6.11.0: uploader = bizonylatfeltöltő (csak a mobilos portált látja). */
+export const roleEnum = pgEnum("member_role", ["owner", "accountant", "viewer", "uploader"]);
 export const vehicleStatusEnum = pgEnum("vehicle_status", ["in_stock", "reserved", "sold"]);
 export const vehicleVatEnum = pgEnum("vehicle_vat", ["margin", "normal"]);
 /** v2.0 – Az entitás jogi formája: társaság (Bt/Kft/Zrt) vagy adószámos magánszemély. */
@@ -397,6 +398,8 @@ export const memberships = pgTable(
     userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
     role: roleEnum("role").notNull().default("owner"),
+    /** v6.11.0 – a felhasználó elől elrejtett modulok ennél a cégnél (pl. bérszámfejtés); null = mind látszik. */
+    hiddenModules: jsonb("hidden_modules").$type<string[]>(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.companyId] })],
 );
@@ -1042,6 +1045,8 @@ export const inboxDocuments = pgTable(
     error: text("error"),
     /** v3.1.0: papír alapú bizonylat iktatószáma (P-ÉÉÉÉ-0001) – ezt kell ráírni a papírra, a lefűzés sorrendje. */
     filingNo: varchar("filing_no", { length: 20 }),
+    /** v6.11.0 – ki töltötte fel (a mobilos portálon a saját feltöltéseit látja). */
+    uploadedBy: integer("uploaded_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     processedAt: timestamp("processed_at", { withTimezone: true }),
   },

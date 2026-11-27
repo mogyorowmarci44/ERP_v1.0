@@ -21,6 +21,7 @@ export function RoleSelect({ value, label }: { value: string; label: string }) {
       <option value="owner">tulajdonos</option>
       <option value="accountant">könyvelő</option>
       <option value="viewer">CEO - Ügyvezető</option>
+      <option value="uploader">bizonylatfeltöltő</option>
     </select>
   );
 }

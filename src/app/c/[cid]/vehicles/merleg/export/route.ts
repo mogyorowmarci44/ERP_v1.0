@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 /** KészletMérleg Excel (készlet + eladott): /c/:cid/vehicles/merleg/export?p=…&g=… */
 export async function GET(req: Request, { params }: { params: Promise<{ cid: string }> }) {
   const cid = Number((await params).cid);
-  const { company } = await requireCompany(cid);
+  const { company } = await requireCompany(cid, { module: "vehicles" });
   await audit({ action: "export.file", companyId: cid, target: new URL(req.url).pathname.slice(0, 255) }); // v6.0.0
   const sp = Object.fromEntries(new URL(req.url).searchParams);
   const per = periodOf(sp);

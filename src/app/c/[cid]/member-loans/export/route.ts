@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 /** Tagi kölcsön Excel: /c/:cid/member-loans/export?date=… */
 export async function GET(req: Request, { params }: { params: Promise<{ cid: string }> }) {
   const cid = Number((await params).cid);
-  const { company } = await requireCompany(cid);
+  const { company } = await requireCompany(cid, { module: "memberLoans" });
   await audit({ action: "export.file", companyId: cid, target: new URL(req.url).pathname.slice(0, 255) }); // v6.0.0
   const sp = new URL(req.url).searchParams;
   const asOf = isDate(sp.get("date")) ? sp.get("date")! : today();
