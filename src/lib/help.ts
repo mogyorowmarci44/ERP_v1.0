@@ -14,11 +14,13 @@ export const HELP: HelpSection[] = [
     "Új számla: Számlák › Új. A sorokhoz főkönyvi számlát és ÁFA-kódot választasz; a rendszer a partner korábbi számlái alapján javasol.",
     "A piszkozat még szabadon javítható; „Könyvelés” után a napló tételei elkészülnek. Könyvelt számlát sztornóval vagy helyesbítéssel lehet javítani.",
     "Kiegyenlítés: a számla oldalán „Rendezés” (bank, pénztár, devizaszámla), vagy a bankkivonat párosításakor automatikusan.",
+    "Fizetési emlékeztető: Kimutatások › Nyitott tételek – partnerenként egy gombbal; a partner e-mail címe a Partnerek oldalon adható meg.",
   ] },
   { id: "bizonylatok", title: "Beérkező bizonylatok", paths: ["inbox"], body: [
     "Ide gyűlnek a számlák és kivonatok: feltöltésből, Gmailből / Drive-ból, a bankból (napi letöltés), a számlázóprogramból (számlázz.hu, Billingo) és a mobilos portálról.",
     "A „Beolvasás és könyvelés” gomb behozza az újakat, kiolvassa őket, és az egyértelműeket lekönyveli; a többi jóváhagyásra vár, a javaslattal együtt.",
     "Beállítások: forrás-kapcsolatok, automatikus könyvelés ki/be, számlázóprogram és bank összekapcsolása.",
+    "Banki szabályok (Beállítások): ha a kivonat szövegében a megadott szó szerepel és nincs hozzá nyitott számla, a tétel a megadott főkönyvi számlára könyvelődik. Kivonat-tételnél a „+ szabály ebből” link előtölti.",
   ] },
   { id: "penz", title: "Bank, pénztár, deviza", paths: ["money", "fx"], body: [
     "A pénzmozgások (bank, pénztár, átvezetés) a Pénzügy › Pénztár és bank oldalon könyvelhetők; a bankkivonat soraiból a rendszer párosít a nyitott számlákkal.",

@@ -1,6 +1,6 @@
 {
   "name": "mm-erp",
-  "version": "7.2.0",
+  "version": "7.3.0",
   "private": true,
   "description": "MM ERP – többcéges kettős könyvviteli rendszer (számlák, ÁFA, főkönyv, készlet, beszámoló)",
   "engines": {
@@ -15,7 +15,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed-demo": "tsx scripts/seed-demo.ts",
-    "test:integration": "vitest run tests/integration"
+    "test:integration": "vitest run tests/integration --no-file-parallelism"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.7.0",

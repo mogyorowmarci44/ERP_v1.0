@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { and, asc, eq } from "drizzle-orm";
+import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { getInboxSettings } from "@/lib/inbox/service";
 import { extractionAvailable, EXTRACT_MODEL } from "@/lib/inbox/extract";
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
-import { saveSettingsAction, newSecretAction, testConnectionAction, connectBankAction, bankSyncNowAction, saveBankAction, disconnectBankAction, saveInvoicingAction, removeInvoicingAction, invoicingSyncNowAction } from "../actions";
+import { saveSettingsAction, newSecretAction, testConnectionAction, connectBankAction, bankSyncNowAction, saveBankAction, disconnectBankAction, saveInvoicingAction, removeInvoicingAction, invoicingSyncNowAction, saveBankRuleAction, bankRuleToggleAction } from "../actions";
 import type { InvoicingLink } from "@/db/schema";
 import { ebConfigured } from "@/lib/bank/enable-banking";
 import { consentWarning } from "@/lib/bank/sync";
@@ -20,6 +22,11 @@ export default async function InboxSettingsPage({ params, searchParams }: { para
   const cid = Number((await params).cid);
   const sp = await searchParams;
   const { role } = await requireCompany(cid);
+  // v7.3.0 – banki szabályok
+  const rules = await db.select().from(schema.bankRules).where(eq(schema.bankRules.companyId, cid)).orderBy(asc(schema.bankRules.id));
+  const accs = await db.select({ code: schema.accounts.code, name: schema.accounts.name }).from(schema.accounts)
+    .where(and(eq(schema.accounts.companyId, cid), eq(schema.accounts.isPosting, true), eq(schema.accounts.isActive, true))).orderBy(asc(schema.accounts.code));
+  const accName = new Map(accs.map((a) => [a.code, a.name]));
   const canWrite = role !== "viewer";
   const { settings: s } = await getInboxSettings(cid);
   const newSecret = sp.secret;
@@ -137,6 +144,57 @@ export default async function InboxSettingsPage({ params, searchParams }: { para
             <div style={{ alignSelf: "end" }}><button className="primary">Összekapcsolás a bankkal →</button></div>
           </form>
         ) : <p className="muted">Nincs banki kapcsolat.</p>}
+      </div>
+
+      <h2 id="szabalyok">Banki szabályok</h2>
+      <div className="card" style={{ marginBottom: 14 }}>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Számla nélküli, ismétlődő banki tételekhez (pl. NAV-befizetés, bankköltség, kamat, hiteltörlesztés). Ha a kivonat szövegében szerepel a megadott szöveg, és nincs hozzá
+          nyitott számla, a tétel a megadott főkönyvi számlára könyvelődik. Kis- és nagybetű, ékezet nem számít; az első illeszkedő szabály érvényes.
+        </p>
+        {rules.length > 0 && (
+          <table style={{ marginBottom: 10 }}>
+            <thead><tr><th>Ha a szövegben szerepel</th><th>Irány</th><th>Könyvelés</th><th className="num">Használva</th><th /></tr></thead>
+            <tbody>
+              {rules.map((r) => (
+                <tr key={r.id} className={r.active ? undefined : "muted"}>
+                  <td><strong>{r.pattern}</strong>{r.label && <div className="muted" style={{ fontSize: 12 }}>{r.label}</div>}</td>
+                  <td>{r.direction === "in" ? "kiadás" : r.direction === "out" ? "bevétel" : "mindkettő"}</td>
+                  <td className="mono">{r.accountCode} <span className="muted">{accName.get(r.accountCode) ?? "?"}</span></td>
+                  <td className="num">{r.hits}</td>
+                  <td className="nowrap">
+                    {canWrite && (
+                      <form action={bankRuleToggleAction} className="row" style={{ gap: 4 }}>
+                        <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={r.id} />
+                        <button name="op" value={r.active ? "off" : "on"}>{r.active ? "Kikapcsol" : "Bekapcsol"}</button>
+                        <button name="op" value="delete" className="danger">Törlés</button>
+                      </form>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {canWrite && (
+          <form action={saveBankRuleAction} className="form-grid">
+            <input type="hidden" name="cid" value={cid} />
+            <label>Ha a szövegben szerepel<input name="pattern" required minLength={2} maxLength={120} defaultValue={sp.rulePattern ?? ""} placeholder="pl. NAV, kamat, Telekom" /></label>
+            <label>Irány
+              <select name="direction" defaultValue={sp.ruleDir === "in" || sp.ruleDir === "out" ? sp.ruleDir : "any"}>
+                <option value="in">kiadás (terhelés)</option><option value="out">bevétel (jóváírás)</option><option value="any">mindkettő</option>
+              </select>
+            </label>
+            <label>Főkönyvi számla
+              <select name="accountCode" defaultValue={sp.ruleAcc ?? ""} required>
+                <option value="">– válassz –</option>
+                {accs.filter((a) => !a.code.startsWith("38")).map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
+              </select>
+            </label>
+            <label>Megjegyzés<input name="label" maxLength={120} placeholder="pl. havi ÁFA-befizetés" /></label>
+            <div style={{ alignSelf: "end" }}><SubmitButton>Szabály mentése</SubmitButton></div>
+          </form>
+        )}
       </div>
 
       <h2 id="szamlazo">Számlázóprogram – kiállított számlák automatikusan</h2>

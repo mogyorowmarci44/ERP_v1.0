@@ -278,6 +278,8 @@ export const appSettings = pgTable("app_settings", {
 export type CompanySettings = {
   /** v6.12.0 – bemutató cég (mintaadatok; nem számít a keretbe, azonnal törölhető). */
   demo?: boolean;
+  /** v7.3.0 – a fizetési emlékeztetőben megadott bankszámlaszám. */
+  reminderBankAccount?: string | null;
   receivableDomestic: string; // 311
   receivableForeign: string; // 316
   payableDomestic: string; // 454
@@ -1009,7 +1011,7 @@ export type InboxProposal = {
   } | null;
   statement?: {
     moneyAccountCode: string;
-    rows: Array<{ idx: number; date: string; amount: number; text: string; action: "pay_invoice" | "entry" | "transfer" | "skip" | "review"; invoiceId?: number | null; invoiceLabel?: string | null; accountCode?: string | null; done?: boolean; reason?: string | null }>;
+    rows: Array<{ idx: number; date: string; amount: number; text: string; action: "pay_invoice" | "entry" | "transfer" | "skip" | "review"; invoiceId?: number | null; invoiceLabel?: string | null; accountCode?: string | null; done?: boolean; reason?: string | null; /** v7.3.0 */ ruleId?: number | null }>;
   } | null;
   /** Ami miatt nem könyvelhető automatikusan. */
   issues: string[];
@@ -1464,3 +1466,35 @@ export const stripeEvents = pgTable("stripe_events", {
   type: varchar("type", { length: 80 }).notNull(),
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** v7.3.0 – Banki párosítási szabályok: „ha a kivonat szövegében X szerepel, könyveld Y főkönyvi számlára” (számla nélküli tételek). */
+export const bankRules = pgTable(
+  "bank_rules",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    pattern: varchar("pattern", { length: 120 }).notNull(),
+    /** in = kiadás (terhelés), out = bevétel (jóváírás), any = mindkettő */
+    direction: varchar("direction", { length: 3 }).notNull().default("any"),
+    accountCode: varchar("account_code", { length: 10 }).notNull(),
+    label: varchar("label", { length: 120 }),
+    active: boolean("active").notNull().default(true),
+    hits: integer("hits").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("bank_rules_company").on(t.companyId)],
+);
+
+/** v7.3.0 – kiküldött fizetési emlékeztetők (lejárt vevőszámlákra). */
+export const paymentReminders = pgTable(
+  "payment_reminders",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    invoiceId: integer("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    sentTo: varchar("sent_to", { length: 200 }).notNull(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [index("payment_reminders_invoice").on(t.invoiceId)],
+);

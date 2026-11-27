@@ -201,6 +201,9 @@ export default async function InboxDocPage({ params, searchParams }: { params: P
                             </form>
                           ) : r.reason}
                         {!r.done && r.reason && r.action !== "skip" && <div className="muted">{r.reason}</div>}
+                        {editable && !r.done && r.action !== "skip" && !r.invoiceId && (
+                          <a className="muted" style={{ fontSize: 12 }} href={`/c/${cid}/inbox/settings?rulePattern=${encodeURIComponent(r.text.split(" · ")[0].slice(0, 60))}&ruleDir=${r.amount < 0 ? "in" : "out"}${r.accountCode ? `&ruleAcc=${r.accountCode}` : ""}#szabalyok`}>+ szabály ebből</a>
+                        )}
                       </td>
                     </tr>
                   ))}

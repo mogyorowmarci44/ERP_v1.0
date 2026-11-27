@@ -1086,3 +1086,24 @@ async function saveMemberModulesActionImpl(fd: FormData) {
     return `/c/${cid}/settings?ok=${encodeURIComponent(r[0].role === "owner" ? "Mentve – a tulajdonos elől nem rejthető el modul." : "Jogosultság mentve.")}#felhasznalok`;
   });
 }
+
+/** v7.3.0 – fizetési emlékeztető egy partner lejárt vevőszámláiról. */
+export async function sendReminderAction(fd: FormData) {
+  return withAudit("sendReminderAction", fd, () => sendReminderActionImpl(fd));
+}
+
+async function sendReminderActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user, company } = await requireCompany(cid, { write: true });
+  const back = `/c/${cid}/reports/open-items`;
+  await runOrRedirect(back, async () => {
+    const bank = (optStr(fd, "bankAccount") ?? "").slice(0, 60) || null;
+    if (bank !== (company.settings.reminderBankAccount ?? null)) {
+      await db.update(schema.companies).set({ settings: { ...company.settings, reminderBankAccount: bank } }).where(eq(schema.companies.id, cid));
+    }
+    const { sendPaymentReminder } = await import("@/lib/payment-reminder");
+    const r = await sendPaymentReminder(cid, Number(fd.get("partnerId")), user, { bankAccount: bank, force: fd.get("force") === "1" });
+    revalidatePath(back);
+    return `${back}?ok=${encodeURIComponent(`Emlékeztető elküldve: ${r.partner} (${r.to}), ${r.count} számla.`)}`;
+  });
+}
