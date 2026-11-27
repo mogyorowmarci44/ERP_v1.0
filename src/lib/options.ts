@@ -39,6 +39,9 @@ export async function formOptions(cid: number, includeVehicleIds: number[] = [])
     vatCodes: vatCodes.map((v) => ({ id: v.id, code: v.code, name: v.name, rate: Number(v.rate), kind: v.kind })) as VatOpt[],
     vehicles: vehicleOpts,
     items: items.map((i) => ({ id: i.id, label: i.sku ? `${i.name} (${i.sku})` : i.name, unit: i.unit, stockAccount: i.stockAccount, cogsAccount: i.cogsAccount })) as ItemOpt[],
+    // v7.5.0 – aktív költséghelyek
+    costCenters: (await db.select().from(schema.costCenters).where(and(eq(schema.costCenters.companyId, cid), eq(schema.costCenters.active, true))).orderBy(asc(schema.costCenters.code)))
+      .map((c) => ({ id: c.id, label: `${c.code} – ${c.name}` })),
   };
 }
 

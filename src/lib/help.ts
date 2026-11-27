@@ -57,6 +57,7 @@ export const HELP: HelpSection[] = [
   ] },
   { id: "beallitas", title: "Beállítások, modulok, felhasználók", paths: ["settings", "appearance", "import"], body: [
     "Modulok: a kiegészítő modulok (gépkocsi, készlet, bér, …) a cégnél egyenként be- és kikapcsolhatók.",
+    "Jóváhagyás kifizetés előtt: bekapcsolva a szállítói számlát a tulajdonos vagy az ügyvezető hagyja jóvá (a számla oldalán vagy a Nyitott tételek között); addig nem rendezhető. Költséghelyek: kód + név, a számlasoron választható; eredmény: Kimutatások › Költséghelyek.",
     "Felhasználók: tulajdonos (mindent lát és állít), könyvelő (könyvel), CEO – Ügyvezető (csak olvas), bizonylatfeltöltő (csak telefonról tölt fel bizonylatot). A kiegészítő modulok felhasználónként elrejthetők.",
   ] },
   { id: "mentes", title: "Mentés és export", paths: ["backup"], body: [

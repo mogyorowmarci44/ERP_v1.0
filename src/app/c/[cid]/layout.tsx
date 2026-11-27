@@ -143,6 +143,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <div className="group">Kimutatások</div>
           <NavLink href={`${b}/reports/kpi`}><Gauge />KPI-Dashboard</NavLink>
           <NavLink href={`${b}/reports/statements`}><ChartNoAxesCombined />P&amp;L, cash-flow, mérleg</NavLink>
+          <NavLink href={`${b}/reports/cost-centers`}><ChartNoAxesCombined />Költséghelyek</NavLink>
           <NavLink href={`${b}/reports/vat`}><Percent />ÁFA analitika</NavLink>
           {car && <NavLink href={`${b}/vehicles/kartonok`}><ReceiptText />Különbözeti ÁFA kartonok</NavLink>}
           {car && <NavLink href={`${b}/vehicles/epr`}><Recycle />EPR összesítő</NavLink>}

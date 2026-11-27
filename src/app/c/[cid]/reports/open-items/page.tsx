@@ -8,7 +8,8 @@ import { fmtDate, today } from "@/lib/dates";
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
 import { lastReminders } from "@/lib/payment-reminder";
-import { sendReminderAction } from "../../actions";
+import { sendReminderAction, approveInvoiceAction } from "../../actions";
+import { needsApproval, canApprove } from "@/lib/approval-calc";
 
 export default async function OpenItemsPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
@@ -30,6 +31,14 @@ export default async function OpenItemsPage({ params, searchParams }: { params: 
     const sent = rows.map((r) => last.get(r.id)).filter((x): x is Date => !!x).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
     return { pid, name: rows[0].partnerName, rows, email: emails.get(pid) ?? null, sent };
   });
+  // v7.5.0 – jóváhagyásra váró szállítói számlák
+  const appr = company.settings.approval;
+  const payIds = pay.map((r) => r.id);
+  const pendingRows = appr?.on && payIds.length
+    ? await db.select({ id: schema.invoices.id, approvedAt: schema.invoices.approvedAt, grossHuf: schema.invoices.grossHuf, direction: schema.invoices.direction, status: schema.invoices.status })
+        .from(schema.invoices).where(and(eq(schema.invoices.companyId, cid), inArray(schema.invoices.id, payIds)))
+    : [];
+  const pendingIds = new Set(pendingRows.filter((r) => needsApproval(appr, r)).map((r) => r.id));
   const dt = (d: Date) => d.toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest" });
 
   const table = (rows: typeof recv, withReminder: boolean) => (
@@ -91,6 +100,21 @@ export default async function OpenItemsPage({ params, searchParams }: { params: 
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {pendingIds.size > 0 && (
+        <div className="card fc-warn" style={{ marginBottom: 14 }}>
+          <strong>{pendingIds.size} szállítói számla fizetés előtt jóváhagyásra vár</strong>
+          <ul style={{ margin: "6px 0 0" }}>
+            {pay.filter((r) => pendingIds.has(r.id)).map((r) => (
+              <li key={r.id} className="row" style={{ gap: 8, alignItems: "center" }}>
+                <Link href={`/c/${cid}/invoices/${r.id}`}>{r.invoiceNumber}</Link> – {r.partnerName} – {fmtMoney(r.openFx, r.currency)}, esedékes {fmtDate(r.dueDate)}
+                {canApprove(role) && (
+                  <form action={approveInvoiceAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value="open" /><button>Jóváhagyom</button></form>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       <h2>Vevők</h2>

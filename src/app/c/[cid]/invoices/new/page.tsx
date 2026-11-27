@@ -43,7 +43,7 @@ export default async function NewInvoicePage({ params, searchParams }: { params:
           rateManual: orig.currency !== "HUF",
           periodic: orig.periodic,
           note: `Helyesbítés: ${orig.invoiceNumber}`,
-          lines: origLines.map((l) => ({ description: `Helyesbítés: ${l.description}`, quantity: "1", unitPrice: String(-Number(l.unitPrice) * Number(l.quantity)), vatCodeId: l.vatCodeId, accountId: l.accountId, vehicleId: l.vehicleId, itemId: null })),
+          lines: origLines.map((l) => ({ description: `Helyesbítés: ${l.description}`, quantity: "1", unitPrice: String(-Number(l.unitPrice) * Number(l.quantity)), vatCodeId: l.vatCodeId, accountId: l.accountId, vehicleId: l.vehicleId, itemId: null, costCenterId: l.costCenterId })),
         } : {
           partnerId: null,
           invoiceNumber: "",

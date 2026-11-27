@@ -2,7 +2,7 @@ import { ROLE_LABEL } from "@/lib/roles";
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
-import { updateCompanyAction, lockPeriodAction, updateTaxProfileAction, saveModulesAction, saveMemberModulesAction } from "../actions";
+import { updateCompanyAction, lockPeriodAction, updateTaxProfileAction, saveModulesAction, saveMemberModulesAction, saveApprovalSettingsAction, saveCostCenterAction } from "../actions";
 import { TaxProfileFields } from "@/components/TaxProfileFields";
 import { ENTITY_LABEL, isPrivate } from "@/lib/entity";
 import { ACTIVITY_LABEL, ACTIVITY_PROFILES, isCarDealer } from "@/lib/activity";
@@ -27,6 +27,8 @@ export default async function SettingsPage({ params, searchParams }: { params: P
     .where(eq(schema.memberships.companyId, cid));
   // v4.5.0 – Tagok és tisztségviselők (cégeknél)
   const people = priv ? [] : await listMembers(cid);
+  const centers = await db.select().from(schema.costCenters).where(eq(schema.costCenters.companyId, cid)).orderBy(asc(schema.costCenters.code));
+  const appr = company.settings.approval ?? { on: false, threshold: 0 };
   const loanPartners = priv ? [] : ((await db.execute(sql`select distinct p.id, p.name from partners p
     where p.company_id = ${cid} and (p.id in (select l.partner_id from journal_lines l join accounts a on a.id = l.account_id where l.company_id = ${cid} and a.code like '479%')
       or p.id in (select partner_id from company_members where company_id = ${cid} and partner_id is not null)) order by p.name`)) as unknown as Array<{ id: number; name: string }>);
@@ -114,6 +116,49 @@ export default async function SettingsPage({ params, searchParams }: { params: P
       )}
 
       {!priv && <CompanyMembers cid={cid} list={people} selected={sp.member ?? null} partners={loanPartners} canWrite={role !== "viewer"} />}
+
+      {/* v7.5.0 – jóváhagyás kifizetés előtt */}
+      <h2 id="jovahagyas">Jóváhagyás kifizetés előtt</h2>
+      <form action={saveApprovalSettingsAction} className="card row" style={{ gap: 14, alignItems: "end", flexWrap: "wrap" }}>
+        <input type="hidden" name="cid" value={cid} />
+        <label className="check"><input type="checkbox" name="on" defaultChecked={appr.on} disabled={role !== "owner"} /> Bejövő számla csak jóváhagyás után fizethető</label>
+        <label>Ennyi bruttó forinttól (0 = mindegyik)<input name="threshold" inputMode="numeric" defaultValue={String(appr.threshold)} disabled={role !== "owner"} style={{ width: 140 }} /></label>
+        {role === "owner" && <button>Mentés</button>}
+        <p className="muted" style={{ flexBasis: "100%", margin: 0 }}>
+          Bekapcsolva a könyvelt szállítói számlát a tulajdonos vagy az ügyvezető (CEO) hagyja jóvá a számla oldalán vagy a Nyitott tételek között; addig sem kézzel, sem a bankkivonat
+          párosításával nem rendezhető. A könyvelő nem hagyhat jóvá (négy szem elve).
+        </p>
+      </form>
+
+      {/* v7.5.0 – költséghelyek / projektek */}
+      <h2 id="koltseghely">Költséghelyek / projektek</h2>
+      <div className="card">
+        <p className="muted" style={{ marginTop: 0 }}>Címke a számlasorokon és a vegyes tételeken (pl. telephely, autó, rendezvény, projekt). Az eredmény címkénként: Kimutatások › Költséghelyek.</p>
+        {centers.length > 0 && (
+          <table style={{ marginBottom: 10 }}>
+            <thead><tr><th>Kód</th><th>Megnevezés</th><th>Állapot</th><th /></tr></thead>
+            <tbody>
+              {centers.map((c) => (
+                <tr key={c.id} className={c.active ? undefined : "muted"}>
+                  <td className="mono">{c.code}</td><td>{c.name}</td><td>{c.active ? "aktív" : "inaktív"}</td>
+                  <td>{role !== "viewer" && (
+                    <form action={saveCostCenterAction}><input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={c.id} />
+                      <button name="op" value={c.active ? "off" : "on"}>{c.active ? "Inaktiválás" : "Aktiválás"}</button></form>
+                  )}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {role !== "viewer" && (
+          <form action={saveCostCenterAction} className="row" style={{ gap: 8, alignItems: "end" }}>
+            <input type="hidden" name="cid" value={cid} />
+            <label>Kód<input name="code" required maxLength={20} style={{ width: 110 }} placeholder="pl. SZIG" /></label>
+            <label style={{ flex: 1 }}>Megnevezés<input name="name" required maxLength={120} placeholder="pl. Szigetvári telephely" /></label>
+            <button>Új költséghely</button>
+          </form>
+        )}
+      </div>
 
       <h2>Időszak zárás</h2>
       <p className="muted">Lezárt hónapba (pl. beadott ÁFA bevallás után) nem lehet könyvelni. Visszanyitni csak tulajdonos tud.</p>

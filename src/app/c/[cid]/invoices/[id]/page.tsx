@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { needsApproval, canApprove } from "@/lib/approval-calc";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, inArray, like, or } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { invoiceOpenAmount } from "@/lib/ledger";
 import { invoicePayments } from "@/lib/reports";
-import { postInvoiceAction, cancelInvoiceAction, voidInvoiceAction, renameInvoiceLineAction, reopenInvoiceAction, editPaymentAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction, linkEntryAction, offsetInvoiceAction } from "../../actions";
+import { postInvoiceAction, cancelInvoiceAction, voidInvoiceAction, renameInvoiceLineAction, reopenInvoiceAction, editPaymentAction, reversePaymentAction, toggleInvoiceCheckAction, saveInvoiceCheckNoteAction, linkEntryAction, offsetInvoiceAction, approveInvoiceAction } from "../../actions";
 import { matchCandidates, offsetCandidates } from "@/lib/matching";
 import { invoiceAudit } from "@/lib/invoice-audit";
 import { vehicleIdent, vehicleTitle } from "@/lib/vehicle-id";
@@ -21,7 +22,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
   const sp = await searchParams;
   const cid = Number(p.cid);
   const id = Number(p.id);
-  const { role } = await requireCompany(cid);
+  const { role, company } = await requireCompany(cid);
   const canWrite = role !== "viewer";
   const [row] = await db
     .select({ i: schema.invoices, partner: schema.partners })
@@ -30,6 +31,8 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
     .where(and(eq(schema.invoices.id, id), eq(schema.invoices.companyId, cid)));
   if (!row) notFound();
   const { i: inv, partner } = row;
+  const [approver] = inv.approvedBy ? await db.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, inv.approvedBy)) : [];
+  const approverName = approver?.name ?? null;
 
   const lines = await db
     .select({ l: schema.invoiceLines, vat: schema.vatCodes, acc: schema.accounts, veh: schema.vehicles })
@@ -104,6 +107,22 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         </div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
+
+      {/* v7.5.0 – jóváhagyás kifizetés előtt */}
+      {inv.direction === "in" && inv.status === "posted" && (needsApproval(company.settings.approval, inv) || inv.approvedAt) && (
+        <div className={`card check-panel${inv.approvedAt ? " ok" : ""}`} style={{ marginBottom: 14 }}>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <strong>{inv.approvedAt ? `✓ Fizetésre jóváhagyva – ${approverName ?? ""}, ${fmtDate(inv.approvedAt.toISOString().slice(0, 10))}` : "Fizetés előtt jóváhagyásra vár"}</strong>
+            {canApprove(role) && (
+              <form action={approveInvoiceAction}>
+                <input type="hidden" name="cid" value={cid} /><input type="hidden" name="id" value={id} />
+                {inv.approvedAt ? <><input type="hidden" name="undo" value="1" /><button>Jóváhagyás visszavonása</button></> : <button className="primary">Jóváhagyom a kifizetést</button>}
+              </form>
+            )}
+          </div>
+          {!inv.approvedAt && !canApprove(role) && <p className="muted" style={{ margin: "6px 0 0" }}>A tulajdonos vagy az ügyvezető (CEO) hagyhatja jóvá; addig a számla nem rendezhető.</p>}
+        </div>
+      )}
 
       {audit && (
         <div className={`card check-panel${audit.check.checked ? " ok" : ""}`} style={{ marginBottom: 14 }}>

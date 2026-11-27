@@ -39,6 +39,18 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v7.5.0 – Jóváhagyás kifizetés előtt, költséghelyek
+
+- **Jóváhagyás** (Beállítások › Jóváhagyás kifizetés előtt):
+  - Bekapcsolva a könyvelt szállítói számla egy összeghatár felett (0 = mindegyik) csak jóváhagyás után rendezhető. A `payInvoice` tilt, így a bankkivonat-párosítás is: az ilyen tétel jóváhagyásra kerül, a hibaüzenettel.
+  - Jóváhagyhat a tulajdonos vagy az ügyvezető (CEO), a könyvelő nem (négy szem elve). Ez a számla oldalán vagy a Nyitott tételek között tehető meg, és visszavonható.
+- **Költséghelyek / projektek:**
+  - `cost_centers` tábla; `invoice_lines.cost_center_id` → `journal_lines.cost_center_id` (a kontírozás viszi tovább).
+  - Választható a számlasoron, az Ellenszámla alatt.
+  - Kimutatások › Költséghelyek: bevétel (9), költség (5, 8) és eredmény költséghelyenként, „költséghely nélkül” sorral; az összesen sor a könyvelés szerinti eredmény.
+  - Az adatelkülönítési trigger a költséghelyre is ellenőriz.
+- **Migráció:** `0043`.
+
 ## v7.4.0 – Globális kereső és PDF-kimutatások
 
 - **Kereső** (`/kereses`, a cég menüjének tetején és a Cégeim oldalon):

@@ -52,6 +52,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ ci
             accountId: l.accountId,
             vehicleId: l.vehicleId,
             itemId: l.itemId,
+            costCenterId: l.costCenterId,
           })),
         }}
       />

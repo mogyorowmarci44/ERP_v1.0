@@ -183,6 +183,7 @@ export async function postEntry(tx: Tx, input: PostEntryInput) {
         partnerId: l.partnerId ?? null,
         vehicleId: l.vehicleId ?? null,
         vatCodeId: l.vatCodeId ?? null,
+        costCenterId: l.costCenterId ?? null,
         currency: l.currency ?? null,
         amountFx: l.amountFx ?? null,
         fxRate: l.fxRate ?? null,
@@ -314,6 +315,8 @@ export type InvoiceLineInput = {
   vehicleId?: number | null;
   /** v6.3.0 – cikk (készletnyilvántartás) */
   itemId?: number | null;
+  /** v7.5.0 – költséghely / projekt */
+  costCenterId?: number | null;
 };
 
 export type InvoiceInput = {
@@ -402,6 +405,11 @@ async function buildFromInput(tx: DbOrTx, companyId: number, input: InvoiceInput
   const accIds = [...new Set(input.lines.map((l) => l.accountId))];
   const ownAcc = await tx.select({ id: accounts.id }).from(accounts).where(and(eq(accounts.companyId, companyId), inArray(accounts.id, accIds)));
   if (ownAcc.length !== accIds.length) throw new Error("Ismeretlen főkönyvi számla a számlán.");
+  const ccIds = [...new Set(input.lines.map((l) => l.costCenterId).filter((x): x is number => !!x))];
+  if (ccIds.length) {
+    const own = await tx.select({ id: schema.costCenters.id }).from(schema.costCenters).where(and(eq(schema.costCenters.companyId, companyId), inArray(schema.costCenters.id, ccIds)));
+    if (own.length !== ccIds.length) throw new Error("Ismeretlen költséghely a számlán.");
+  }
   const vehIds = [...new Set(input.lines.map((l) => l.vehicleId).filter((x): x is number => !!x))];
   if (vehIds.length) {
     const ownVeh = await tx.select({ id: schema.vehicles.id }).from(schema.vehicles).where(and(eq(schema.vehicles.companyId, companyId), inArray(schema.vehicles.id, vehIds)));
@@ -506,6 +514,7 @@ export async function saveInvoiceDraft(companyId: number, input: InvoiceInput, i
         accountId: l.accountId,
         vehicleId: l.vehicleId ?? null,
         itemId: l.itemId ?? null,
+        costCenterId: l.costCenterId ?? null,
         netHuf: posting.computed[i].netHuf,
         vatHuf: posting.computed[i].vatHuf,
         grossHuf: posting.computed[i].grossHuf,
@@ -543,6 +552,7 @@ async function loadInvoiceInput(tx: DbOrTx, companyId: number, invoiceId: number
       accountId: l.accountId,
       vehicleId: l.vehicleId,
       itemId: l.itemId,
+      costCenterId: l.costCenterId,
     })),
   };
   return { inv, input };
@@ -694,6 +704,12 @@ export async function payInvoice(companyId: number, invoiceId: number, input: Pa
     await tx.execute(sql`select id from invoices where id = ${invoiceId} for update`);
     const [inv] = await tx.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)));
     if (!inv || inv.status !== "posted") throw new Error("Csak könyvelt számla rendezhető.");
+    // v7.5.0 – jóváhagyás kifizetés előtt (bejövő számla, ha a cégnél be van kapcsolva)
+    if (inv.direction === "in" && !inv.approvedAt) {
+      const [co] = await tx.select({ s: companies.settings }).from(companies).where(eq(companies.id, companyId));
+      const { needsApproval } = await import("./approval-calc");
+      if (needsApproval(co?.s?.approval, inv)) throw new Error(`A(z) ${inv.invoiceNumber} számla fizetés előtt jóváhagyásra vár (tulajdonos vagy ügyvezető hagyhatja jóvá a számla oldalán).`);
+    }
     const open = await invoiceOpenAmount(tx, invoiceId);
     const [moneyAcc0] = await tx.select().from(accounts).where(and(eq(accounts.id, input.moneyAccountId), eq(accounts.companyId, companyId)));
     // v3.9.6 – forintos számla készpénzes kiegyenlítése pénztárból: a ténylegesen átadott összeg 0 / 5 Ft-ra kerekül.
