@@ -44,6 +44,10 @@ import { isPrivate } from "@/lib/entity";
 import { moduleVisible, type ModuleKey } from "@/lib/modules";
 import { APP_VERSION } from "@/lib/version";
 import { requireCompany } from "@/lib/auth";
+import { isDemo } from "@/lib/demo";
+import { deleteDemoCompanyAction } from "@/app/auth-actions";
+import { ConfirmButton } from "@/components/ConfirmButton";
+import { HelpLink } from "@/components/HelpLink";
 import { logoutAction } from "@/app/auth-actions";
 import { NavLink } from "@/components/NavLink";
 import { CompanyMark, AppFooter } from "@/components/Brand";
@@ -55,7 +59,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CompanyLayout({ children, params }: { children: React.ReactNode; params: Promise<{ cid: string }> }) {
   const { cid } = await params;
-  const { company, user, support, hidden } = await requireCompany(Number(cid));
+  const { company, user, support, hidden, role } = await requireCompany(Number(cid));
   const access = await orgAccess(company.organizationId); // v6.8.0
   const b = `/c/${cid}`;
   const theme = normalizeTheme(company.theme);
@@ -167,6 +171,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
         <div className="foot">
           <UnitSwitcher userId={user.id} currentId={company.id} />
           <span>Bejelentkezve: {user.name} · <span className="version-tag">v{APP_VERSION}</span></span>
+          <HelpLink />
           <form action={logoutAction}><button>Kilépés</button></form>
         </div>
       </nav>
@@ -177,6 +182,14 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <div className="flash error" role="status">
             {access.writable ? (access.reason ?? `A próbaidő ${access.daysLeft} nap múlva lejár.`) : `${access.reason} Az ügyfélfiók csak olvasható.`}{" "}
             {user.isAdmin ? <a href="/admin/billing">Előfizetés →</a> : "Szólj az ügyfélfiók adminjának."}
+          </div>
+        )}
+        {isDemo(company) && (
+          <div className="flash demo-banner" role="status">
+            <span><strong>Bemutató cég</strong> – mintaadatokkal. Nyugodtan próbálj ki bármit, nem kerül semmi a NAV-hoz.</span>
+            {role === "owner" && (
+              <form action={deleteDemoCompanyAction}><input type="hidden" name="companyId" value={company.id} /><ConfirmButton message="Biztosan törlöd a bemutató céget és minden adatát?" pendingText="Törlés…">Bemutató cég törlése</ConfirmButton></form>
+            )}
           </div>
         )}
         {support && <div className="flash error" role="status">Támogatói hozzáférés (üzemeltető) – csak olvasás, időkorlátos, és az ügyfél tevékenységnaplójában is megjelenik.</div>}

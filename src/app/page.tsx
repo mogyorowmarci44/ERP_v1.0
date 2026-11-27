@@ -1,10 +1,14 @@
+import { SubmitButton } from "@/components/SubmitButton";
+import { cookies } from "next/headers";
+import { isDemo } from "@/lib/demo";
+import { LATEST } from "@/lib/changelog";
 import { redirect } from "next/navigation";
 import { ROLE_LABEL } from "@/lib/roles";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
-import { createCompanyAction, createPrivateTaxpayerAction, logoutAction, changePasswordAction, archiveCompanyAction, restoreCompanyAction, purgeCompanyAction, acceptTermsAction } from "./auth-actions";
+import { createDemoCompanyAction, createCompanyAction, createPrivateTaxpayerAction, logoutAction, changePasswordAction, archiveCompanyAction, restoreCompanyAction, purgeCompanyAction, acceptTermsAction } from "./auth-actions";
 import { TERMS_VERSION } from "@/lib/vendor";
 import { canPurge, daysUntilPurge, exportFresh, PURGE_GRACE_DAYS, EXPORT_MAX_AGE_HOURS } from "@/lib/archive-calc";
 import { TaxProfileFields } from "@/components/TaxProfileFields";
@@ -33,6 +37,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         logoUpdatedAt: schema.companies.logoUpdatedAt,
         archivedAt: schema.companies.archivedAt,
         lastFullExportAt: schema.companies.lastFullExportAt,
+        settings: schema.companies.settings,
       },
       role: schema.memberships.role,
     })
@@ -42,6 +47,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     .orderBy(schema.companies.name);
   // v6.0.0 – archivált cégek külön, a lista alján
   const all = list;
+  const seenNews = (await cookies()).get("seen_news")?.value;
+  const hasDemo = list.some((x) => isDemo(x.c));
   const activeList = all.filter((x) => !x.c.archivedAt);
   // v6.11.0 – a csak bizonylatfeltöltő felhasználó egyből a mobilos portálra kerül
   if (user.termsVersion === TERMS_VERSION && activeList.length === 1 && activeList[0].role === "uploader" && !sp.error && !sp.ok) redirect(`/p/${activeList[0].c.id}`);
@@ -58,6 +65,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           <span className="version-tag">v{APP_VERSION}</span>
           {/* v4.1.0 – ERP-térkép: a modulok és kapcsolataik, cégválasztás előtt is */}
           <a className="btn" href="/terkep">ERP-térkép</a>
+          {/* v6.12.0 */}
+          <Link href="/ujdonsagok">Újdonságok{seenNews !== LATEST && <span className="news-dot" aria-label="új" />}</Link>
+          <Link href="/sugo">Súgó</Link>
         </div>
         <form action={logoutAction} className="row">
           {list.filter((x) => x.role !== "uploader").length > 1 && <Link href="/iroda">Iroda – összes cég</Link>}
@@ -97,6 +107,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           );
         })}
       </div>
+
+      {!hasDemo && (
+        <form action={createDemoCompanyAction} className="card demo-banner" style={{ marginBottom: 14 }}>
+          <span><strong>Először csak körülnéznél?</strong> Hozz létre egy bemutató céget kitöltött mintaadatokkal (számlák, kintlévőségek, ÁFA, kimutatások) – nem számít bele az előfizetésbe, és egy gombbal törölhető.</span>
+          <SubmitButton pendingText="Létrehozás…">Bemutató cég létrehozása</SubmitButton>
+        </form>
+      )}
 
       <h2>Új cég (Bt / Kft / Zrt)</h2>
       <form action={createCompanyAction} className="card form-grid">
