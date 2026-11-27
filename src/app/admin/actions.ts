@@ -9,6 +9,7 @@ import { setMfaRequired } from "@/lib/app-settings";
 import { audit } from "@/lib/audit";
 import { sendInvite } from "@/lib/user-tokens";
 import { setVendor } from "@/lib/vendor";
+import { assertUserLimit, trialStart } from "@/lib/billing";
 
 const { users, memberships, companies } = schema;
 
@@ -110,6 +111,7 @@ export async function inviteUserAction(fd: FormData) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Adj meg érvényes e-mail címet.");
     const [exists] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
     if (exists) throw new Error("Ezzel az e-mail címmel már van felhasználó.");
+    await assertUserLimit(admin.organizationId);
     const [org] = await db.select().from(schema.organizations).where(eq(schema.organizations.id, admin.organizationId));
     const [u] = await db.insert(users).values({
       email, name: str(fd, "name") || email, organizationId: admin.organizationId, isAdmin: fd.get("isAdmin") === "on",
@@ -159,7 +161,8 @@ export async function createOrganizationAction(fd: FormData) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Adj meg érvényes e-mail címet az adminnak.");
     const [exists] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
     if (exists) throw new Error("Ezzel az e-mail címmel már van felhasználó.");
-    const [org] = await db.insert(schema.organizations).values({ name }).returning();
+    const trialDays = Math.max(0, Math.min(365, Number(fd.get("trialDays") ?? 14) || 14));
+    const [org] = await db.insert(schema.organizations).values({ name, ...trialStart(trialDays), billingEmail: email }).returning();
     const [u] = await db.insert(users).values({
       email, name: str(fd, "adminName") || email, organizationId: org.id, isAdmin: true,
       passwordHash: await hashPassword(crypto.randomUUID() + crypto.randomUUID()),
@@ -243,5 +246,50 @@ export async function resolveErrorAction(fd: FormData) {
   await runOrRedirect("/admin/errors", async () => {
     await db.update(schema.errorLog).set({ resolvedAt: new Date() }).where(eq(schema.errorLog.id, Number(fd.get("id"))));
     return "/admin/errors?ok=" + encodeURIComponent("Megoldottnak jelölve.");
+  });
+}
+
+// ---------------------------------------------------------------------------
+// v6.8.0 – Csomagok és ügyfélfiókonkénti előfizetés (üzemeltető)
+// ---------------------------------------------------------------------------
+
+export async function savePlanAction(fd: FormData) {
+  await requirePlatformAdmin();
+  await runOrRedirect("/admin/plans", async () => {
+    const num = (k: string) => { const v = str(fd, k); return v === "" ? null : Math.round(Number(v.replace(/\s/g, ""))); };
+    const v = {
+      code: str(fd, "code").toLowerCase(), name: str(fd, "name"), description: str(fd, "description") || null,
+      priceHuf: num("priceHuf") ?? 0, interval: (str(fd, "interval") === "year" ? "year" : "month") as "month" | "year",
+      stripePriceId: str(fd, "stripePriceId") || null, maxCompanies: num("maxCompanies"), maxUsers: num("maxUsers"),
+      sortOrder: num("sortOrder") ?? 0, isActive: fd.get("isActive") === "on",
+    };
+    if (!v.code || !v.name) throw new Error("A kód és a név kötelező.");
+    if (v.stripePriceId && !/^price_[A-Za-z0-9]+$/.test(v.stripePriceId)) throw new Error("A Stripe Price ID „price_” kezdetű.");
+    const id = Number(fd.get("id")) || 0;
+    if (id) await db.update(schema.plans).set(v).where(eq(schema.plans.id, id));
+    else await db.insert(schema.plans).values(v);
+    await audit({ action: "plan.save", target: v.code, details: { priceHuf: v.priceHuf, interval: v.interval } });
+    return "/admin/plans?ok=" + encodeURIComponent(`„${v.name}” mentve.`);
+  });
+}
+
+/** Ügyfélfiók előfizetésének kézi beállítása (díjmentes, próbaidő hosszabbítása, csomag) – pl. átutalásos ügyfélnél. */
+export async function setOrgBillingAction(fd: FormData) {
+  await requirePlatformAdmin();
+  await runOrRedirect("/admin/platform", async () => {
+    const orgId = Number(fd.get("orgId"));
+    const status = str(fd, "subStatus") as "trialing" | "active" | "past_due" | "canceled" | "comped";
+    if (!["trialing", "active", "past_due", "canceled", "comped"].includes(status)) throw new Error("Ismeretlen állapot.");
+    const until = str(fd, "until");
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(until) ? new Date(`${until}T23:59:59+01:00`) : null;
+    const planId = Number(fd.get("planId")) || null;
+    await db.update(schema.organizations).set({
+      subStatus: status, planId,
+      ...(status === "trialing" ? { trialEndsAt: date } : {}),
+      ...(status === "active" ? { currentPeriodEnd: date } : {}),
+      pastDueSince: status === "past_due" ? new Date() : null,
+    }).where(eq(schema.organizations.id, orgId));
+    await audit({ action: "billing.override", organizationId: orgId, details: { status, until, planId } });
+    return "/admin/platform?ok=" + encodeURIComponent("Előfizetés módosítva.");
   });
 }

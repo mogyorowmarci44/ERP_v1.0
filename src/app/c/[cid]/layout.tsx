@@ -49,12 +49,14 @@ import { NavLink } from "@/components/NavLink";
 import { CompanyMark, AppFooter } from "@/components/Brand";
 import { UnitSwitcher } from "@/components/UnitSwitcher";
 import { normalizeTheme, themeVars } from "@/lib/themes";
+import { orgAccess } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
 
 export default async function CompanyLayout({ children, params }: { children: React.ReactNode; params: Promise<{ cid: string }> }) {
   const { cid } = await params;
   const { company, user, support } = await requireCompany(Number(cid));
+  const access = await orgAccess(company.organizationId); // v6.8.0
   const b = `/c/${cid}`;
   const theme = normalizeTheme(company.theme);
   const priv = isPrivate(company);
@@ -171,6 +173,12 @@ export default async function CompanyLayout({ children, params }: { children: Re
       <main className="main">
         {/* v6.0.0 – archivált cég / üzemeltetői támogatói hozzáférés jelzése */}
         {company.archivedAt && <div className="flash error" role="status">Archivált cég – csak olvasható. Visszaállítás a Cégeim oldalon (tulajdonosként).</div>}
+        {(access.warn || !access.writable) && !support && (
+          <div className="flash error" role="status">
+            {access.writable ? (access.reason ?? `A próbaidő ${access.daysLeft} nap múlva lejár.`) : `${access.reason} Az ügyfélfiók csak olvasható.`}{" "}
+            {user.isAdmin ? <a href="/admin/billing">Előfizetés →</a> : "Szólj az ügyfélfiók adminjának."}
+          </div>
+        )}
         {support && <div className="flash error" role="status">Támogatói hozzáférés (üzemeltető) – csak olvasás, időkorlátos, és az ügyfél tevékenységnaplójában is megjelenik.</div>}
         {children}
         <AppFooter company={company.name} version={APP_VERSION} darkMark={theme.mode === "dark"} />

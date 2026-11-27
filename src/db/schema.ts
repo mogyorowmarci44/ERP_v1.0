@@ -78,6 +78,16 @@ export const organizations = pgTable("organizations", {
   /** Kötelező-e a kétlépcsős azonosítás ennek az ügyfélfióknak a felhasználóira. */
   mfaRequired: boolean("mfa_required").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /** v6.8.0 – előfizetés */
+  planId: integer("plan_id").references((): AnyPgColumn => plans.id, { onDelete: "set null" }),
+  subStatus: varchar("sub_status", { length: 12 }).$type<import("../lib/billing-calc").SubStatus>().notNull().default("trialing"),
+  trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  pastDueSince: timestamp("past_due_since", { withTimezone: true }),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 64 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 64 }),
+  billingEmail: varchar("billing_email", { length: 255 }),
 });
 
 export const users = pgTable("users", {
@@ -1407,4 +1417,27 @@ export const errorLog = pgTable("error_log", {
   count: integer("count").notNull().default(1),
   lastAt: timestamp("last_at", { withTimezone: true }).notNull().defaultNow(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+});
+
+/** v6.8.0 – Előfizetési csomagok (az üzemeltető állítja; az ár a Stripe-ban is). */
+export const plans = pgTable("plans", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 32 }).notNull().unique(),
+  name: varchar("name", { length: 120 }).notNull(),
+  description: text("description"),
+  priceHuf: integer("price_huf").notNull(),
+  interval: varchar("interval", { length: 8 }).$type<"month" | "year">().notNull().default("month"),
+  stripePriceId: varchar("stripe_price_id", { length: 120 }),
+  maxCompanies: integer("max_companies"),
+  maxUsers: integer("max_users"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** v6.8.0 – Feldolgozott Stripe-események (egy esemény csak egyszer fut le). */
+export const stripeEvents = pgTable("stripe_events", {
+  id: varchar("id", { length: 80 }).primaryKey(),
+  type: varchar("type", { length: 80 }).notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 });

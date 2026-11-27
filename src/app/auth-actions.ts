@@ -12,6 +12,7 @@ import { ACCOUNT_LIMIT, IP_LIMIT, RESET_LIMIT } from "@/lib/throttle-calc";
 import { consumeUserToken, createUserToken, mailTokenLink, tokenLink, sendInvite } from "@/lib/user-tokens";
 import { canPurge, daysUntilPurge, exportFresh, EXPORT_MAX_AGE_HOURS } from "@/lib/archive-calc";
 import { TERMS_VERSION } from "@/lib/vendor";
+import { assertUserLimit } from "@/lib/billing";
 import { createCompany } from "@/lib/ledger";
 import { taxProfileFromForm } from "@/lib/entity";
 import { parseActivityProfile } from "@/lib/activity";
@@ -158,7 +159,8 @@ export async function setupAction(fd: FormData) {
     if (pw.length < 10) throw new Error("A jelszó legalább 10 karakter legyen.");
     if (fd.get("terms") !== "on") throw new Error("Az ÁSZF és az adatkezelési tájékoztató elfogadása szükséges.");
     // v6.0.0 – az első felhasználó az üzemeltető és az első ügyfélfiók adminja
-    const [org] = await db.insert(schema.organizations).values({ name: str(fd, "orgName") || str(fd, "name") }).returning();
+    // az üzemeltető saját ügyfélfiókja díjmentes
+    const [org] = await db.insert(schema.organizations).values({ name: str(fd, "orgName") || str(fd, "name"), subStatus: "comped" }).returning();
     const [u] = await db
       .insert(schema.users)
       .values({ email: str(fd, "email").toLowerCase(), name: str(fd, "name"), passwordHash: await hashPassword(pw), isAdmin: true, isPlatformAdmin: true, organizationId: org.id, termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION })
@@ -174,6 +176,7 @@ export async function createCompanyAction(fd: FormData) {
   await runOrRedirect("/", async () => {
     const name = str(fd, "name");
     if (!name) throw new Error("A cégnév kötelező.");
+    await assertCanCreateCompany(user.organizationId);
     const c = await createCompany(user.id, {
       name,
       taxNumber: optStr(fd, "taxNumber"),
@@ -195,6 +198,7 @@ export async function createPrivateTaxpayerAction(fd: FormData) {
   await runOrRedirect("/", async () => {
     const name = str(fd, "name");
     if (!name) throw new Error("A név kötelező (pl. „Vendégház – <település>”).");
+    await assertCanCreateCompany(user.organizationId);
     const c = await createCompany(user.id, {
       name,
       taxNumber: optStr(fd, "taxNumber"),
@@ -233,6 +237,7 @@ export async function addMemberAction(fd: FormData) {
     let note = "Felhasználó hozzáadva.";
     if (target && target.organizationId !== m.orgId) throw new Error("Ez az e-mail cím egy másik ügyfélfiókhoz tartozik – nem adható hozzá.");
     if (!target) {
+      await assertUserLimit(m.orgId);
       [target] = await db
         .insert(schema.users)
         .values({ email, name: str(fd, "name") || email, passwordHash: await hashPassword(randomUnusablePassword()), organizationId: m.orgId })
@@ -388,4 +393,12 @@ export async function acceptTermsAction(fd: FormData) {
     await audit({ action: "terms.accept", details: { version: TERMS_VERSION } });
     return `/?ok=${encodeURIComponent("Köszönjük, elfogadva.")}`;
   });
+}
+
+/** v6.8.0 – új cég: írható ügyfélfiók és a csomag cégszám-korlátja. */
+async function assertCanCreateCompany(organizationId: number | null) {
+  const { orgAccess, assertCompanyLimit } = await import("@/lib/billing");
+  const a = await orgAccess(organizationId);
+  if (!a.writable) throw new Error(`${a.reason} Új cég nem hozható létre – előfizetés: Admin › Előfizetés.`);
+  await assertCompanyLimit(organizationId);
 }

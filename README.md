@@ -39,6 +39,38 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.8.0 – Előfizetés-kezelés (Stripe)
+
+**Csomagok** (*Admin › Csomagok*, üzemeltető): név, nettó ár, havi vagy éves időszak, cég- és felhasználókorlát, Stripe Price ID.
+
+**Ügyfélfiókonkénti állapot:**
+- próbaidő (új fióknál 14 nap, létrehozáskor állítható)
+- aktív
+- fizetés elmaradt (7 nap türelmi idő)
+- lejárt / lemondva
+- díjmentes (a meglévő fiókok, az üzemeltetőé is)
+
+Lejárat után az ügyfélfiók **csak olvasható**: minden adat megmarad és letölthető, de új könyvelés és új cég nem rögzíthető. Minden oldalon sáv jelzi a lejáratot, 5 nappal előtte is.
+
+**Fizetés** (*Admin › Előfizetés*, az ügyfélfiók adminjának):
+- Stripe Checkout bankkártyával. A hátralévő próbaidő megmarad, a terhelés annak végén indul.
+- A Stripe ügyfélportálon intézhető a kártyacsere, a számlák, a csomagváltás és a lemondás.
+- Az üzemeltető kézzel is beállíthatja az állapotot (pl. átutalásos ügyfélnél).
+
+**Webhook** (`/api/stripe/webhook`): aláírás-ellenőrzéssel dolgozik, minden eseményt csak egyszer dolgoz fel, és hiba esetén a Stripe újraküldi. A kezelt események:
+- `checkout.session.completed`
+- `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
+
+**Beállítás:**
+1. Stripe-ban: termék és ismétlődő ár (HUF) csomagonként, majd a `price_…` azonosító az *Admin › Csomagok* oldalra.
+2. Stripe *Settings › Billing › Customer portal* bekapcsolása.
+3. Webhook-végpont: `<APP_URL>/api/stripe/webhook`, a fenti eseményekkel.
+4. Render: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
+
+A Stripe nyugtája nem magyar számla: a díjról a számlát a saját számlázóprogramodból kell kiállítani.
+
+Migráció: `0038_v6_8_billing.sql`.
+
 ## v6.7.0 – Üzemeltetési alapok
 
 **Bizonylatfájlok a Neon fájltárolóban** (Object Storage, S3-kompatibilis, Frankfurt):
