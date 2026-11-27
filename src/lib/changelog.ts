@@ -2,6 +2,11 @@
 export type Release = { version: string; title: string; items: string[] };
 
 export const CHANGELOG: Release[] = [
+  { version: "7.1.0", title: "Gyorsabb nyitóoldal, biztonságosabb feltöltés, jobb mobilnézet", items: [
+    "A nyitóoldal, az Adók és a Napi összefoglaló nagy cégnél többszörösen gyorsabban töltődik be.",
+    "A feltöltött bizonylatok közül csak a PDF és a kép nyílik meg a böngészőben; minden más fájl letöltésként érkezik.",
+    "Telefonon a széles táblázatok önmagukban görgethetők, az oldal nem lóg ki.",
+  ] },
   { version: "7.0.0", title: "Adatbiztonság és nagy listák", items: [
     "Az ügyfélfiókok adatai adatbázis-szinten is el vannak választva: egy cég könyvelése semmilyen módon nem hivatkozhat másik cég számlájára, partnerére vagy főkönyvi számlájára.",
     "Keresés és lapozás a Beérkező bizonylatok és a Partnerek listájában – nagy adatmennyiségnél sem vágódik le semmi.",

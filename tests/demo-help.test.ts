@@ -45,3 +45,16 @@ describe("v7.0.0 – adatbázis-védelmi üzenetek", () => {
     expect(errMsg(new Error("sima hiba"))).toBe("sima hiba");
   });
 });
+
+describe("v7.1.0 – feltöltött fájlok kiszolgálása", () => {
+  it("csak a biztonságos típusok nyílnak meg, a többi letöltés", async () => {
+    const { servedAs } = await import("@/lib/file-serve");
+    expect(servedAs("application/pdf")).toEqual({ type: "application/pdf", inline: true });
+    expect(servedAs("IMAGE/JPEG")).toEqual({ type: "image/jpeg", inline: true });
+    expect(servedAs("text/csv")).toEqual({ type: "text/csv; charset=utf-8", inline: true });
+    expect(servedAs("text/html")).toEqual({ type: "application/octet-stream", inline: false });
+    expect(servedAs("image/svg+xml").inline).toBe(false);
+    expect(servedAs("application/xml").inline).toBe(false);
+    expect(servedAs("").inline).toBe(false);
+  });
+});

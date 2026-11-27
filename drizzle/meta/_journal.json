@@ -288,6 +288,13 @@
       "when": 1795890000000,
       "tag": "0040_v7_0_tenant_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795900000000,
+      "tag": "0041_v7_1_indexes",
+      "breakpoints": true
     }
   ]
 }

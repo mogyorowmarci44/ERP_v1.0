@@ -15,7 +15,7 @@ import {
   type FcOpening, type FcPlan, type FcItem, type SoldHistory, type Channel, type FcMonth, type Granularity,
 } from "./forecast";
 
-const { accounts, journalEntries, journalLines, vehicles, invoices, invoiceLines, vatCodes, partners, payments, companies, forecastPlans, forecastPlanCosts, forecastItems, forecastSettings } = schema;
+const { accounts, journalEntries, journalLines, vehicles, invoices, invoiceLines, vatCodes, partners, companies, forecastPlans, forecastPlanCosts, forecastItems, forecastSettings } = schema;
 
 export async function getForecastSettings(companyId: number): Promise<ForecastSettings> {
   const [row] = await db.select().from(forecastSettings).where(eq(forecastSettings.companyId, companyId));

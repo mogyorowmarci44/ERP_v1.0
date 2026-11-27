@@ -16,7 +16,7 @@ import { payrollParamsFor } from "./legal-params";
 import { accountIdByCode, postEntry, reverseEntry } from "./ledger";
 import { today } from "./dates";
 import {
-  attendanceOf, calcPayroll, calendarOvertimeHours, defaultParams, isEfo, prorateOf, sumResults, DAY_CODE_LABEL,
+  attendanceOf, calcPayroll, calendarOvertimeHours, isEfo, prorateOf, sumResults, DAY_CODE_LABEL,
   type Employment, type EmploymentKind, type PayrollInput, type PayrollParams, type PayrollResult, type YearToDate,
 } from "./payroll-calc";
 
