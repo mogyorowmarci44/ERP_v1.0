@@ -2,6 +2,9 @@
 export type Release = { version: string; title: string; items: string[] };
 
 export const CHANGELOG: Release[] = [
+  { version: "7.6.0", title: "Fiókom és adataim (GDPR)", items: [
+    "Saját adataid letöltése egy kattintással (JSON), a fiókod törlése, és – adminként – az ügyfélfiók megszüntetése, ügyfélszolgálat nélkül.",
+  ] },
   { version: "7.5.0", title: "Jóváhagyás kifizetés előtt, költséghelyek", items: [
     "Beállítások › Jóváhagyás: a szállítói számla csak a tulajdonos vagy az ügyvezető jóváhagyása után fizethető (összeghatárral is).",
     "Költséghelyek / projektek: címke a számlasorokon, és eredménykimutatás költséghelyenként.",

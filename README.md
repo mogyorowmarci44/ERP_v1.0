@@ -39,6 +39,20 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v7.6.0 – Fiókom és adataim (önkiszolgáló GDPR)
+
+- **`/fiokom`** (link a Cégeim oldalon):
+  - **Saját adataim letöltése** (`/fiokom/adataim`, JSON): fiókadatok jelszó és titkok nélkül, cégek és szerepek, napi összefoglaló-címzettség, tevékenységnapló.
+  - **Fiók törlése:** jelszóval és a „TÖRLÖM” szóval. Álnevesít: a név, az e-mail, a jelszó és a 2FA törlődik, a tagságok és a meghívó-tokenek megszűnnek, a tevékenységnaplóban az e-mail álnevesítve marad, a munkamenetek érvénytelenek. A könyvelési tételek megmaradnak (számviteli megőrzés).
+  - **Mikor nem törölhető a fiók:**
+    - üzemeltetői fiók;
+    - egyedüli tulajdonos olyan cégnél, ahol mások is dolgoznak;
+    - egyetlen felhasználó egy cégnél (előbb a cég archiválása és törlése);
+    - egyedüli admin egy több felhasználós ügyfélfiókban.
+  - **Ügyfélfiók megszüntetése** (admin): csak cégek nélkül. A Stripe-előfizetést lemondja, minden felhasználót álnevesít, az ügyfélfiók „Megszüntetett” lesz.
+- Az adatkezelési tájékoztató kiegészült az önkiszolgáló lehetőségekkel. Ez nem lényeges változás, ezért a `TERMS_VERSION` nem változott, és újra elfogadni sem kell.
+- Nincs migráció.
+
 ## v7.5.0 – Jóváhagyás kifizetés előtt, költséghelyek
 
 - **Jóváhagyás** (Beállítások › Jóváhagyás kifizetés előtt):

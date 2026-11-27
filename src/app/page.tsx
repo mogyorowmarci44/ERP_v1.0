@@ -154,6 +154,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       <p className="muted">Egyszerű, szálláshely-szolgáltatásra szabott számlatükör (szállásdíj csatornánként, rezsi, platform jutalék, magánszféra), alanyi mentes ÁFA-kódok és SZJA / tételes adó modul töltődik be. Mérleg és tagi kölcsön itt nincs.</p>
 
       <h2>Jelszócsere</h2>
+      <p className="muted" style={{ marginTop: -4 }}>Saját adataid letöltése, a fiókod vagy az ügyfélfiók megszüntetése: <Link href="/fiokom">Fiókom és adataim</Link>.</p>
       <form action={changePasswordAction} className="card form-grid">
         <label>Jelenlegi jelszó<input name="current" type="password" required /></label>
         <label>Új jelszó<input name="password" type="password" minLength={10} required /></label>

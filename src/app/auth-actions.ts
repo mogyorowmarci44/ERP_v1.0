@@ -439,3 +439,34 @@ export async function deleteDemoCompanyAction(fd: FormData) {
     return `/?ok=${encodeURIComponent("A bemutató cég törölve.")}`;
   });
 }
+
+// ---------------------------------------------------------------------------
+// v7.6.0 – Önkiszolgáló fióktörlés és ügyfélfiók-megszüntetés (GDPR)
+// ---------------------------------------------------------------------------
+
+export async function deleteMyAccountAction(fd: FormData) {
+  const user = await requireUser();
+  await runOrRedirect("/fiokom", async () => {
+    if (!(await verifyPassword(str(fd, "password"), user.passwordHash))) throw new Error("A jelszó hibás.");
+    if (str(fd, "confirm").trim().toUpperCase() !== "TÖRLÖM") throw new Error("A megerősítéshez írd be: TÖRLÖM");
+    const { deleteOwnAccount } = await import("@/lib/privacy");
+    await audit({ action: "account.delete", user: actorOf(user) });
+    await deleteOwnAccount(user.id);
+    await destroySession();
+    return `/login?ok=${encodeURIComponent("A fiókodat töröltük. A személyes adataidat álnevesítettük; a könyvelési tételek a cégnél maradnak.")}`;
+  });
+}
+
+export async function closeOrganizationAction(fd: FormData) {
+  const user = await requireUser();
+  await runOrRedirect("/fiokom", async () => {
+    if (!user.isAdmin || !user.organizationId) throw new Error("Az ügyfélfiókot csak az adminja szüntetheti meg.");
+    if (!(await verifyPassword(str(fd, "password"), user.passwordHash))) throw new Error("A jelszó hibás.");
+    if (str(fd, "confirm").trim().toUpperCase() !== "MEGSZÜNTETEM") throw new Error("A megerősítéshez írd be: MEGSZÜNTETEM");
+    const { closeOrganization } = await import("@/lib/privacy");
+    await audit({ action: "org.close", user: actorOf(user), organizationId: user.organizationId });
+    await closeOrganization(user.organizationId);
+    await destroySession();
+    return `/login?ok=${encodeURIComponent("Az ügyfélfiókot megszüntettük, az előfizetést lemondtuk, a felhasználókat álnevesítettük.")}`;
+  });
+}
