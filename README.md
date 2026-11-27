@@ -39,6 +39,33 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.7.0 – Üzemeltetési alapok
+
+**Bizonylatfájlok a Neon fájltárolóban** (Object Storage, S3-kompatibilis, Frankfurt):
+- A beszkennelt és feltöltött bizonylatok nem az adatbázisban tárolódnak, így az 1 GB-os ingyenes adatbázis-keret nem telik be.
+- Az adatbázisban csak a fájl helye marad (`inbox_documents.storage_key`). A kis fájlok, például a banki letöltések JSON-jai, szándékosan az adatbázisban maradnak.
+- A meglévő fájlokat telepítéskor a `db:migrate` költözteti át.
+- A teljes mentés a tárolóbeli fájlokat is tartalmazza, visszaállításkor visszakerülnek a tárolóba. A végleges cégtörlés a tárolóból is töröl.
+- Beállítás: `FILES_BUCKET`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. Nélkülük minden a régi módon, az adatbázisban marad.
+
+**Lapozás:**
+- A számlalista eddig 1000 tételnél levágott, most 100-asával lapoz; az összesítő a teljes szűrésre szól.
+- A napló eddig 500 tételnél vágott le, most szintén 100-asával lapoz, és a lekérdezés is lapozva fut az adatbázisban.
+
+**E-mail saját domainről:** tranzakciós e-mail szolgáltató HTTPS-API-ján át, mert a Render ingyenes csomagja tiltja az SMTP-t.
+- Választható szolgáltató: Brevo (300 levél/nap ingyen) vagy Resend.
+- Beállítás: `MAIL_PROVIDER=brevo|resend`, `MAIL_API_KEY`, `MAIL_FROM` (pl. `mogyorosi.erp <noreply@sajatdomain.hu>`). A domaint a szolgáltatónál hitelesíteni kell (SPF / DKIM).
+- Ha ez be van állítva, megelőzi a Gmail-továbbítót.
+
+**Hibanapló** (*Admin › Hibanapló*, üzemeltetőnek):
+- Minden kezeletlen szerveroldali hiba bekerül (Next.js `onRequestError`), és azok a programhibák is, amelyeket a műveletek eddig hibaüzenetként nyeltek el.
+- Az azonos hibák egy sorba kerülnek, számlálóval, veremmel, útvonallal; megoldottnak jelölhetők.
+- Ugyanitt látszik, mely beállítások (környezeti változók) aktívak.
+
+**Állapot-végpont:** az `/api/health` a verziót és az adatbázis válaszidejét is visszaadja. Elérhetőség-figyelőnek (pl. UptimeRobot, ingyenes) ezt érdemes beállítani; ez egyben ébren is tartja a Render ingyenes példányát.
+
+Migráció: `0037_v6_7_file_store_errors.sql`. Integrációs teszt (S3-kompatibilis tesztszerverrel): feltöltés a tárolóba, olvasás, mentés, törlés, visszaállítás.
+
 ## v6.6.0 – Évnyitás egy gombbal
 
 Helye: *Évzárás › Évnyitás*. A program eddig is így kezelte az évfordulót:

@@ -20,7 +20,8 @@ const DOCS: Record<string, { title: string; body: (v: Vendor) => ReactNode }> = 
 const SUBPROCESSORS = [
   ["Render Services, Inc. (USA)", "alkalmazásszerver – az adatok az EU-ban, Frankfurtban futó szerveren kerülnek feldolgozásra", "EU általános szerződési feltételek (SCC) / EU–USA adatvédelmi keretrendszer"],
   ["Neon (Databricks, Inc., USA)", "adatbázis-tárhely – AWS eu-central-1 (Frankfurt) régió", "EU általános szerződési feltételek (SCC) / EU–USA adatvédelmi keretrendszer"],
-  ["Google LLC (USA)", "e-mail kézbesítés (meghívó, jelszó-visszaállítás, napi összefoglaló), ha be van kapcsolva", "EU általános szerződési feltételek (SCC) / EU–USA adatvédelmi keretrendszer"],
+  ["Sendinblue SAS – Brevo (Franciaország)", "e-mail kézbesítés (meghívó, jelszó-visszaállítás, napi összefoglaló), ha ez a beállított küldő", "EU-n belüli adattovábbítás"],
+  ["Google LLC (USA)", "e-mail kézbesítés Gmail-továbbítón át, ha ez a beállított küldő", "EU általános szerződési feltételek (SCC) / EU–USA adatvédelmi keretrendszer"],
   ["Enable Banking Oy (Finnország)", "banki tranzakciók letöltése (PSD2) – csak ha az Ügyfél bekapcsolja", "EU-n belüli adattovábbítás"],
 ];
 

@@ -10,6 +10,7 @@ import { db, schema } from "@/db";
 import { today } from "@/lib/dates";
 import { companySnapshot, holdingCompanies, holdingSnapshot, type CompanySnapshot } from "./data";
 import { renderCompanyMail, renderHoldingMail, type Mail, type Variant } from "./render";
+import { deliverApi, mailApiConfigured } from "@/lib/mail-api";
 
 export type RunLog = { date: string; at: string; trigger: string; sent: number; failed: number; errors: string[] };
 /**
@@ -53,7 +54,7 @@ export function relayConfigured(): boolean {
 
 /** Be van-e állítva valamilyen küldési mód (HTTPS-továbbító vagy SMTP). */
 export function smtpConfigured(): boolean {
-  return relayConfigured() || !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+  return mailApiConfigured() || relayConfigured() || !!(process.env.SMTP_USER && process.env.SMTP_PASS);
 }
 
 type Attachment = { filename: string; content: string };
@@ -77,6 +78,8 @@ async function deliverRelay(to: string, mail: Mail, attachments: Attachment[]) {
 }
 
 export async function deliver(to: string, mail: Mail, attachments: Attachment[] = []) {
+  // v6.7.0 – elsőként a saját domaines tranzakciós szolgáltató (Brevo / Resend), utána a Gmail-továbbító, végül SMTP
+  if (mailApiConfigured()) return deliverApi(to, mail, attachments.map((a) => ({ ...a, mime: "text/csv" })));
   if (relayConfigured()) return deliverRelay(to, mail, attachments);
   if (!smtpConfigured()) throw new Error("Az e-mail küldés nincs beállítva (MAIL_RELAY_URL / MAIL_RELAY_SECRET, vagy SMTP_USER / SMTP_PASS a Render környezeti változói között).");
   const port = Number(process.env.SMTP_PORT || 465);

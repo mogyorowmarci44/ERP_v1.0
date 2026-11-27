@@ -37,3 +37,21 @@ services:
       # v6.1.0 – érzékeny személyes adatok titkosítási kulcsa (openssl rand -base64 32) – őrizd meg külön is!
       - key: DATA_ENCRYPTION_KEY
         sync: false
+      # v6.7.0 – Neon fájltároló (bizonylatfájlok)
+      - key: FILES_BUCKET
+        sync: false
+      - key: AWS_ENDPOINT_URL_S3
+        sync: false
+      - key: AWS_REGION
+        value: eu-central-1
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      # v6.7.0 – e-mail saját domainről (brevo | resend)
+      - key: MAIL_PROVIDER
+        sync: false
+      - key: MAIL_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false

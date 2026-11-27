@@ -423,6 +423,9 @@ export async function importLoanTermsOnly(companyId: number, bundle: ImportBundl
 
 /** A cég összes könyvelési adatának törlése (számlák, tételek, partnerek, gépkocsik). A cég, a számlatükör és a beállítások maradnak. */
 export async function wipeCompanyData(companyId: number) {
+  // v6.7.0 – a fájltárolóban lévő bizonylatfájlok is törlődnek (a sorok törlése után)
+  const fs = await import("./file-store");
+  const fileKeys = await fs.companyFileKeys(companyId);
   await db.transaction(async (tx) => {
     await tx.delete(schema.ghReservations).where(eq(schema.ghReservations.companyId, companyId));
     await tx.delete(schema.ghReviews).where(eq(schema.ghReviews.companyId, companyId));
@@ -443,4 +446,5 @@ export async function wipeCompanyData(companyId: number) {
     await tx.delete(schema.payrollRuns).where(eq(schema.payrollRuns.companyId, companyId));
     await tx.delete(schema.employees).where(eq(schema.employees.companyId, companyId));
   });
+  await fs.deleteKeys(fileKeys).catch((e) => console.error("[file-store] törlés:", e));
 }

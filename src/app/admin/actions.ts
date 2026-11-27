@@ -236,3 +236,12 @@ export async function deleteLegalParamAction(fd: FormData) {
     return `/admin/params?ok=${encodeURIComponent("Érték törölve.")}`;
   });
 }
+
+/** v6.7.0 – Hibanapló: hiba megoldottnak jelölése (ha újra előfordul, új sorként jelenik meg). */
+export async function resolveErrorAction(fd: FormData) {
+  await requirePlatformAdmin();
+  await runOrRedirect("/admin/errors", async () => {
+    await db.update(schema.errorLog).set({ resolvedAt: new Date() }).where(eq(schema.errorLog.id, Number(fd.get("id"))));
+    return "/admin/errors?ok=" + encodeURIComponent("Megoldottnak jelölve.");
+  });
+}
