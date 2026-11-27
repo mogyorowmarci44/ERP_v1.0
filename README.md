@@ -39,6 +39,24 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.9.0 – Könyvelőirodai nézet
+
+Az **Iroda – összes cég** oldal (`/iroda`) a Cégeim oldalról érhető el, ha legalább két céged van. Egy táblázatban mutatja az összes (nem archivált) céget, a legsürgősebbel elöl.
+
+**Oszlopok:**
+- következő ÁFA-bevallási határidő (a bevallási gyakoriság szerint)
+- záratlan ÁFA-időszakok
+- következő járulékbevallási határidő (csak bekapcsolt bérszámfejtésnél, ha van dolgozó)
+- beérkező bizonylatok
+- számlapiszkozatok
+- lejárt vevőszámlák
+- utolsó könyvelés
+- meddig van zárolva az időszak, és hány hónap a lemaradás
+
+Szűrhető a teendős cégekre. Alatta az összes cég határidői a következő 30 napra, egy listában. Minden szám a cég megfelelő oldalára visz.
+
+Könyvelőirodai felállásnál az iroda egy ügyfélfiók: az ügyfelei cégei ebben vannak, az ügyfeleket csak olvasó (vagy a következő verziótól bizonylatfeltöltő) jogosultsággal lehet meghívni.
+
 ## v6.8.0 – Előfizetés-kezelés (Stripe)
 
 **Csomagok** (*Admin › Csomagok*, üzemeltető): név, nettó ár, havi vagy éves időszak, cég- és felhasználókorlát, Stripe Price ID.
