@@ -32,7 +32,7 @@ export async function syncAction(fd: FormData) {
 
 async function syncActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(base(cid), async () => {
     const s = await runSync(cid, user.id);
     refresh(cid);
@@ -48,7 +48,7 @@ export async function uploadAction(fd: FormData) {
 
 async function uploadActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(base(cid), async () => {
     const kind = str(fd, "kind") === "statement" ? "statement" : "invoice";
     const files = fd.getAll("files").filter((f): f is File => typeof f === "object" && "arrayBuffer" in f && (f as File).size > 0);
@@ -57,7 +57,7 @@ async function uploadActionImpl(fd: FormData) {
     for (const f of files) {
       if (f.size > 20 * 1024 * 1024) throw new Error(`${f.name}: túl nagy (max. 20 MB).`);
       const data = Buffer.from(await f.arrayBuffer()).toString("base64");
-      const id = await addDocument(cid, { source: "upload", sourceRef: `upload:${Date.now()}:${randomBytes(4).toString("hex")}`, kind, filename: f.name || "feltoltes", mime: f.type || "application/octet-stream", data });
+      const id = await addDocument(cid, { source: "upload", sourceRef: `upload:${Date.now()}:${randomBytes(4).toString("hex")}`, kind, filename: f.name || "feltoltes", mime: f.type || "application/octet-stream", data, uploadedBy: user.id });
       if (id) ids.push(id);
     }
     let msg = `${ids.length} fájl feltöltve.`;
@@ -88,7 +88,7 @@ export async function saveSettingsAction(fd: FormData) {
 
 async function saveSettingsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
     const { settings } = await getInboxSettings(cid);
     const url = optStr(fd, "scriptUrl");
@@ -118,7 +118,7 @@ export async function newSecretAction(fd: FormData) {
 
 async function newSecretActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
     const { settings } = await getInboxSettings(cid);
     const secret = randomBytes(18).toString("base64url");
@@ -133,7 +133,7 @@ export async function testConnectionAction(fd: FormData) {
 
 async function testConnectionActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
     const { settings } = await getInboxSettings(cid);
     const r = await pingRemote(settings);
@@ -147,7 +147,7 @@ export async function ignoreDocAction(fd: FormData) {
 
 async function ignoreDocActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(base(cid), async () => {
     const id = Number(fd.get("id"));
     await ownDoc(cid, id);
@@ -164,7 +164,7 @@ export async function filingNoAction(fd: FormData) {
 
 async function filingNoActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "inbox" });
   const id = Number(fd.get("id"));
   await runOrRedirect(`${base(cid)}/${id}`, async () => {
     await ownDoc(cid, id);
@@ -181,7 +181,7 @@ export async function reprocessAction(fd: FormData) {
 
 async function reprocessActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inbox" });
   const id = Number(fd.get("id"));
   await runOrRedirect(`${base(cid)}/${id}`, async () => {
     const d = await ownDoc(cid, id);
@@ -200,7 +200,7 @@ export async function bookInvoiceAction(fd: FormData) {
 
 async function bookInvoiceActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inbox" });
   const id = Number(fd.get("id"));
   await runOrRedirect(`${base(cid)}/${id}`, async () => {
     const d = await ownDoc(cid, id);
@@ -256,7 +256,7 @@ export async function statementRowAction(fd: FormData) {
 
 async function statementRowActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inbox" });
   const id = Number(fd.get("id"));
   await runOrRedirect(`${base(cid)}/${id}`, async () => {
     const d = await ownDoc(cid, id);
@@ -284,7 +284,7 @@ export async function repairStatementAction(fd: FormData) {
 
 async function repairStatementActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inbox" });
   const id = Number(fd.get("id"));
   await runOrRedirect(`${base(cid)}/${id}`, async () => {
     const d = await ownDoc(cid, id);
@@ -309,7 +309,7 @@ export async function connectBankAction(fd: FormData) {
 
 async function connectBankActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
     const { listAspsps, startAuthorization } = await import("@/lib/bank/enable-banking");
     const { signState, appBaseUrl } = await import("@/lib/bank/state");
@@ -337,7 +337,7 @@ export async function bankSyncNowAction(fd: FormData) {
 
 async function bankSyncNowActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
     const { runBankSync } = await import("@/lib/bank/sync");
     const r = await runBankSync(cid, user.id);
@@ -355,7 +355,7 @@ export async function saveBankAction(fd: FormData) {
 
 async function saveBankActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
     const { settings } = await getInboxSettings(cid);
     if (!settings.bank) throw new Error("Nincs banki kapcsolat.");
@@ -374,7 +374,7 @@ export async function disconnectBankAction(fd: FormData) {
 
 async function disconnectBankActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
     const { settings } = await getInboxSettings(cid);
     if (settings.bank) {
@@ -396,7 +396,7 @@ export async function saveInvoicingAction(fd: FormData) {
 
 async function saveInvoicingActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
     const provider = str(fd, "provider") === "billingo" ? "billingo" : "szamlazz";
     const { settings } = await getInboxSettings(cid);
@@ -442,7 +442,7 @@ export async function removeInvoicingAction(fd: FormData) {
 
 async function removeInvoicingActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
     const provider = str(fd, "provider");
     const { settings } = await getInboxSettings(cid);
@@ -459,7 +459,7 @@ export async function invoicingSyncNowAction(fd: FormData) {
 
 async function invoicingSyncNowActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inbox" });
   await runOrRedirect(`${base(cid)}/settings`, async () => {
     const { syncInvoicing } = await import("@/lib/invoicing-sync");
     const r = await syncInvoicing(cid);

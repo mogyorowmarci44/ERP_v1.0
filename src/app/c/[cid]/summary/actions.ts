@@ -21,7 +21,7 @@ export async function addRecipientAction(fd: FormData) {
 
 async function addRecipientActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "summary" });
   await runOrRedirect(back(cid), async () => {
     const email = str(fd, "email").toLowerCase();
     const name = str(fd, "name");
@@ -39,7 +39,7 @@ export async function updateRecipientAction(fd: FormData) {
 
 async function updateRecipientActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "summary" });
   await runOrRedirect(back(cid), async () => {
     const id = intOrNull(fd, "id");
     if (!id) throw new Error("Hiányzó címzett.");
@@ -64,7 +64,7 @@ export async function testRecipientAction(fd: FormData) {
 
 async function testRecipientActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "summary" });
   await runOrRedirect(back(cid), async () => {
     const id = intOrNull(fd, "id");
     const [r] = await db.select().from(schema.summaryRecipients).where(and(eq(schema.summaryRecipients.id, id ?? 0), eq(schema.summaryRecipients.companyId, cid)));
@@ -81,7 +81,7 @@ export async function toggleCompanySummaryAction(fd: FormData) {
 
 async function toggleCompanySummaryActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "summary" });
   await runOrRedirect(back(cid), async () => {
     const on = fd.get("on") === "1";
     await setSummaryToggle({ company: { id: cid, on } });
@@ -97,7 +97,7 @@ export async function saveSummaryExcludeAction(fd: FormData) {
 
 async function saveSummaryExcludeActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "summary" });
   await runOrRedirect(back(cid), async () => {
     const ids = fd.getAll("exclude").map(Number).filter((n) => Number.isInteger(n) && n > 0);
     const [c] = await db.select({ s: schema.companies.settings }).from(schema.companies).where(eq(schema.companies.id, cid));

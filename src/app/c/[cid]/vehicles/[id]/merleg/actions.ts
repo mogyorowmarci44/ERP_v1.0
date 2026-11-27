@@ -13,7 +13,7 @@ export async function saveHoldingAction(fd: FormData) {
 
 async function saveHoldingActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), vid = Number(fd.get("vehicle"));
-  const { company } = await requireCompany(cid, { write: true });
+  const { company } = await requireCompany(cid, { write: true, module: "vehicles" });
   const n = (k: string) => Number(String(fd.get(k) ?? "").replace(",", ".").replace(/[^0-9.]/g, ""));
   const rate = n("rate"), fix = n("fix");
   const back = `/c/${cid}/vehicles/${vid}/merleg`;

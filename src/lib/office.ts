@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, eq, inArray, isNull, max } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, max, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { today } from "@/lib/dates";
 import { nextVatDeadline } from "@/lib/vat-deadline";
@@ -30,7 +30,7 @@ export async function officeOverview(userId: number): Promise<Pulse[]> {
     .select({ c: schema.companies, role: schema.memberships.role })
     .from(schema.memberships)
     .innerJoin(schema.companies, eq(schema.companies.id, schema.memberships.companyId))
-    .where(and(eq(schema.memberships.userId, userId), isNull(schema.companies.archivedAt)));
+    .where(and(eq(schema.memberships.userId, userId), isNull(schema.companies.archivedAt), ne(schema.memberships.role, "uploader")));
   if (!cos.length) return [];
   const ids = cos.map((x) => x.c.id);
   const [inbox, last, locks, emps] = await Promise.all([

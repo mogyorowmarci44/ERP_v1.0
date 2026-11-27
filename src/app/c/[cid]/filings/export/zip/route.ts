@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 /** ÁNYK Export ZIP: ?kind=vat (ÁFA önellenőrzés / eredeti) vagy ?kind=payroll (2608, be nem küldött hónapok). */
 export async function GET(req: Request, { params }: { params: Promise<{ cid: string }> }) {
   const cid = Number((await params).cid);
-  const { company } = await requireCompany(cid);
+  const { company } = await requireCompany(cid, { module: "filings" });
   await audit({ action: "export.file", companyId: cid, target: new URL(req.url).pathname.slice(0, 255) }); // v6.0.0
   const sp = new URL(req.url).searchParams;
   const date = isDate(sp.get("date")) ? sp.get("date")! : today();

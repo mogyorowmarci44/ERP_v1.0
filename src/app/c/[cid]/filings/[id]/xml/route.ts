@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, { params }: { params: Promise<{ cid: string; id: string }> }) {
   const p = await params;
   const cid = Number(p.cid);
-  const { company } = await requireCompany(cid);
+  const { company } = await requireCompany(cid, { module: "filings" });
   await audit({ action: "export.file", companyId: cid, target: new URL(_req.url).pathname.slice(0, 255) }); // v6.0.0
   const f = await getFiling(cid, Number(p.id));
   if (!f) return new Response("Nincs ilyen bevallás.", { status: 404 });

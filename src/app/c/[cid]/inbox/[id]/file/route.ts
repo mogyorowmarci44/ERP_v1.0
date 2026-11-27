@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request, { params }: { params: Promise<{ cid: string; id: string }> }) {
   const p = await params;
   const cid = Number(p.cid);
-  await requireCompany(cid);
+  await requireCompany(cid, { module: "inbox" });
   const [d] = await db.select().from(schema.inboxDocuments).where(and(eq(schema.inboxDocuments.id, Number(p.id)), eq(schema.inboxDocuments.companyId, cid)));
   if (!d) return new Response("Nem található", { status: 404 });
   const original = new URL(req.url).searchParams.get("original") === "1";

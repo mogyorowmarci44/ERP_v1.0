@@ -8,7 +8,7 @@ import { requireCompany } from "@/lib/auth";
 import { trialBalance, openItems, vehicleStock, vatAnalytics } from "@/lib/reports";
 import { fmtDate, monthEnd, monthStart, today, yearStart } from "@/lib/dates";
 import { isPrivate } from "@/lib/entity";
-import { moduleOn, type ModuleKey } from "@/lib/modules";
+import { moduleVisible, type ModuleKey } from "@/lib/modules";
 import { nextVatDeadline } from "@/lib/vat-deadline";
 import { GhOverview } from "./gh/Overview";
 import { cashSplit } from "@/lib/cash-split";
@@ -45,7 +45,7 @@ const eurFmt = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0, useGro
 
 export default async function Dashboard({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
-  const { company } = await requireCompany(cid);
+  const { company, hidden } = await requireCompany(cid);
   const t = today();
   if (isPrivate(company)) return <GhOverview cid={cid} profile={company.taxProfile} sp={await searchParams} />;
   const [tb, recv, pay, stock, vat, [inbox], drafts, [last], money] = await Promise.all([
@@ -82,7 +82,7 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   const vatDays = daysBetween(t, vatDue);
   const b = `/c/${cid}`;
   // v6.2.0 – csak a bekapcsolt modulok elemei
-  const on = (k: ModuleKey) => moduleOn(company, k);
+  const on = (k: ModuleKey) => moduleVisible(company, hidden, k);
   const car = on("vehicles");
   const carLinks = (...l: [string, string][]): [string, string][] => (car ? l : []);
   const mod = (k: ModuleKey, ...l: [string, string][]): [string, string][] => (on(k) ? l : []);

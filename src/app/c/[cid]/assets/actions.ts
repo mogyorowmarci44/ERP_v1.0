@@ -17,7 +17,7 @@ export async function registerLineAction(fd: FormData) {
 
 async function registerLineActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "assets" });
   await runOrRedirect(back(cid), async () => {
     const a = await registerFromLine(cid, Number(fd.get("lineId")), user.id);
     revalidatePath(`/c/${cid}`, "layout");
@@ -33,7 +33,7 @@ export async function createAssetAction(fd: FormData) {
 
 async function createAssetActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "assets" });
   await runOrRedirect(back(cid, "/new"), async () => {
     const activationDate = str(fd, "activationDate");
     if (!isDate(activationDate)) throw new Error("Hibás aktiválási dátum.");
@@ -57,7 +57,7 @@ export async function updateAssetAction(fd: FormData) {
 
 async function updateAssetActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), id = Number(fd.get("id"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "assets" });
   await runOrRedirect(back(cid, `/${id}`), async () => {
     const tax = str(fd, "taxRatePct");
     const life = Math.round(parseNumber(fd.get("lifeYears")) * 12);
@@ -77,7 +77,7 @@ export async function deleteAssetAction(fd: FormData) {
 
 async function deleteAssetActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), id = Number(fd.get("id"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "assets" });
   await runOrRedirect(back(cid, `/${id}`), async () => {
     await deleteAsset(cid, id);
     revalidatePath(`/c/${cid}`, "layout");
@@ -91,7 +91,7 @@ export async function postDepreciationAction(fd: FormData) {
 
 async function postDepreciationActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "assets" });
   await runOrRedirect(back(cid), async () => {
     const r = await postDepreciation(cid, str(fd, "to"), user.id);
     revalidatePath(`/c/${cid}`, "layout");

@@ -16,7 +16,7 @@ export async function uploadFilingsAction(fd: FormData) {
 
 async function uploadFilingsActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid"));
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "filings" });
   await runOrRedirect(back(cid), async () => {
     const files = fd.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
     if (!files.length) throw new Error("Nincs kiválasztott fájl.");
@@ -45,7 +45,7 @@ export async function markSubmittedAction(fd: FormData) {
 
 async function markSubmittedActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), id = Number(fd.get("id")), on = fd.get("on") === "1", tab = str(fd, "tab");
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "filings" });
   await runOrRedirect(back(cid, tab), async () => {
     const receipt = str(fd, "receiptNo");
     await setSubmitted(cid, id, on, fd.has("receiptNo") ? (receipt || null) : undefined);
@@ -60,7 +60,7 @@ export async function deleteFilingAction(fd: FormData) {
 
 async function deleteFilingActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), id = Number(fd.get("id")), tab = str(fd, "tab");
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "filings" });
   await runOrRedirect(back(cid, tab), async () => {
     await deleteFiling(cid, id);
     revalidatePath(`/c/${cid}/filings`);
@@ -74,7 +74,7 @@ export async function markLatestAction(fd: FormData) {
 
 async function markLatestActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), tab = str(fd, "tab");
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "filings" });
   await runOrRedirect(back(cid, tab), async () => {
     const n = await markLatestSubmitted(cid, tab === "payroll" ? "payroll" : "vat");
     revalidatePath(`/c/${cid}/filings`);
@@ -88,7 +88,7 @@ export async function fillPartnerTaxAction(fd: FormData) {
 
 async function fillPartnerTaxActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), tab = str(fd, "tab");
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "filings" });
   await runOrRedirect(back(cid, tab), async () => {
     const r = await fillPartnerTaxFromFilings(cid);
     revalidatePath(`/c/${cid}`, "layout");
@@ -107,7 +107,7 @@ export async function markExportSubmittedAction(fd: FormData) {
 async function markExportSubmittedActionImpl(fd: FormData) {
   const cid = Number(fd.get("cid")), period = str(fd, "period"), kind = str(fd, "kind") === "payroll" ? "payroll" : "vat";
   const date = str(fd, "date"), place = str(fd, "place");
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "filings" });
   const url = `/c/${cid}/filings?tab=revise&kind=${kind}${date ? `&date=${date}` : ""}${place ? `&place=${encodeURIComponent(place)}` : ""}`;
   await runOrRedirect(url, async () => {
     if (!/^\d{4}-\d{2}$/.test(period)) throw new Error("Hibás időszak.");

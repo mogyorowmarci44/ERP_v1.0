@@ -1,7 +1,8 @@
+import { ROLE_LABEL } from "@/lib/roles";
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
-import { updateCompanyAction, lockPeriodAction, updateTaxProfileAction, saveModulesAction } from "../actions";
+import { updateCompanyAction, lockPeriodAction, updateTaxProfileAction, saveModulesAction, saveMemberModulesAction } from "../actions";
 import { TaxProfileFields } from "@/components/TaxProfileFields";
 import { ENTITY_LABEL, isPrivate } from "@/lib/entity";
 import { ACTIVITY_LABEL, ACTIVITY_PROFILES, isCarDealer } from "@/lib/activity";
@@ -20,7 +21,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
   const priv = isPrivate(company);
   const locks = await db.select().from(schema.periodLocks).where(eq(schema.periodLocks.companyId, cid)).orderBy(asc(schema.periodLocks.year), asc(schema.periodLocks.month));
   const members = await db
-    .select({ name: schema.users.name, email: schema.users.email, role: schema.memberships.role })
+    .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email, role: schema.memberships.role, hidden: schema.memberships.hiddenModules })
     .from(schema.memberships)
     .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
     .where(eq(schema.memberships.companyId, cid));
@@ -124,11 +125,38 @@ export default async function SettingsPage({ params, searchParams }: { params: P
       </form>
       <p>Lezárt időszakok: {locks.length ? locks.map((l) => `${l.year}.${String(l.month).padStart(2, "0")}`).join(", ") : <span className="muted">nincs</span>}</p>
 
-      <h2>Felhasználók</h2>
+      <h2 id="felhasznalok">Felhasználók</h2>
       <table>
-        <thead><tr><th>Név</th><th>E-mail</th><th>Szerep</th></tr></thead>
-        <tbody>{members.map((m) => <tr key={m.email}><td>{m.name}</td><td>{m.email}</td><td>{{ owner: "tulajdonos", accountant: "könyvelő", viewer: "CEO - Ügyvezető" }[m.role]}</td></tr>)}</tbody>
+        <thead><tr><th>Név</th><th>E-mail</th><th>Szerep</th><th>Látható modulok</th></tr></thead>
+        <tbody>{members.map((m) => {
+          const avail = MODULES.filter((x) => moduleOn(company, x.key));
+          const hid = m.hidden ?? [];
+          return (
+            <tr key={m.email}>
+              <td>{m.name}</td><td>{m.email}</td><td>{ROLE_LABEL[m.role]}</td>
+              <td>
+                {m.role === "owner" ? <span className="muted">mind</span>
+                  : m.role === "uploader" ? <span className="muted">csak a mobilos feltöltés (/p/{cid})</span>
+                  : role === "owner" ? (
+                    <details>
+                      <summary>{avail.filter((x) => !hid.includes(x.key)).length} / {avail.length} modul</summary>
+                      <form action={saveMemberModulesAction} style={{ marginTop: 6 }}>
+                        <input type="hidden" name="cid" value={cid} /><input type="hidden" name="userId" value={m.id} />
+                        {avail.map((x) => (
+                          <label key={x.key} className="check" style={{ display: "block" }}>
+                            <input type="checkbox" name={`see_${x.key}`} defaultChecked={!hid.includes(x.key)} /> {x.label}
+                          </label>
+                        ))}
+                        <button style={{ marginTop: 6 }}>Mentés</button>
+                      </form>
+                    </details>
+                  ) : <span className="muted">{avail.filter((x) => !hid.includes(x.key)).map((x) => x.label).join(", ") || "–"}</span>}
+              </td>
+            </tr>
+          );
+        })}</tbody>
       </table>
+      <p className="muted" style={{ fontSize: 13 }}>Az alap könyvelés (számlák, napló, ÁFA, kimutatások) mindenkinek látszik; a kiegészítő modulokat (pl. Bérszámfejtés) felhasználónként elrejtheted. A <strong>bizonylatfeltöltő</strong> csak telefonról tölthet fel számlát, a könyveléshez nem fér hozzá.</p>
       {role === "owner" && (
         <form action={addMemberAction} className="card form-grid" style={{ marginTop: 12 }}>
           <input type="hidden" name="companyId" value={cid} />
@@ -136,7 +164,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           <label>Név (új felhasználónál)<input name="name" /></label>
           <label>Szerep
             <select name="role" defaultValue="accountant">
-              <option value="owner">tulajdonos</option><option value="accountant">könyvelő</option><option value="viewer">CEO - Ügyvezető</option>
+              <option value="owner">tulajdonos</option><option value="accountant">könyvelő</option><option value="viewer">CEO - Ügyvezető</option><option value="uploader">bizonylatfeltöltő (csak mobilos feltöltés)</option>
             </select>
           </label>
           <div style={{ alignSelf: "end" }}><button>Hozzáadás</button></div>

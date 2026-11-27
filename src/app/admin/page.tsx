@@ -1,3 +1,4 @@
+import { ROLE_LABEL } from "@/lib/roles";
 import Link from "next/link";
 import { asc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -14,7 +15,7 @@ import { APP_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
-const ROLE_HU: Record<string, string> = { owner: "tulajdonos", accountant: "könyvelő", viewer: "CEO - Ügyvezető" };
+const ROLE_HU: Record<string, string> = ROLE_LABEL;
 const dt = (d: Date | null) => (d ? d.toLocaleString("hu-HU", { timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–");
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {

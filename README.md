@@ -39,6 +39,21 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.11.0 – Modulonkénti jogosultság és mobilos bizonylatfeltöltő portál
+
+- **Modulonkénti jogosultság:**
+  - A cég Beállítások › Felhasználók részében a tulajdonos felhasználónként elrejtheti a kiegészítő modulokat (pl. Bérszámfejtés, Tagi kölcsön).
+  - Az elrejtett modul eltűnik a menüből és a nyitóoldalról, az oldalai nem nyílnak meg. A modul műveletei és letöltései (XML, ZIP, export) is tiltottak.
+  - Az alap könyvelés mindenkinek látszik, a tulajdonos elől semmi sem rejthető el.
+- **Új szerep – bizonylatfeltöltő:**
+  - Pl. az ügyfél, a sofőr vagy a beszerző: csak a mobilos portált (`/p/[cid]`) látja, a könyveléshez, a listákhoz és az Iroda nézethez nem fér hozzá.
+  - Nem számít bele a csomag felhasználókeretébe.
+- **Mobilos portál:**
+  - Egy gombbal megnyílik a telefon kamerája, vagy PDF / kép választható. Megjegyzés is írható („tankolás”).
+  - A feltöltés a Beérkező bizonylatok közé kerül, és a feltöltő látja a saját bizonylatai állapotát (beérkezett / a könyvelőnél / lekönyvelve).
+  - A portál a telefon kezdőképernyőjére is kitehető (web app manifest).
+- **Migráció:** `0039` – új `uploader` szerep, `memberships.hidden_modules`, `inbox_documents.uploaded_by`.
+
 ## v6.10.0 – Számlázóprogram-integráció (számlázz.hu, Billingo)
 
 A számlázóprogramban kiállított számlák maguktól bejönnek a Beérkező bizonylatok közé, a PDF-fel és a pontos tételadatokkal (vevő, adószám, tételek, ÁFA-kulcs, fizetési mód, sztornó-hivatkozás). Nincs szövegfelismerés, ezért nincs kiolvasási hiba. A meglévő javaslat- és könyvelési logika dolgozza fel őket: az egyértelműeket lekönyveli, a többi jóváhagyásra vár.

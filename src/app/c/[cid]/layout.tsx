@@ -41,7 +41,7 @@ import {
   FileCheck2,
 } from "lucide-react";
 import { isPrivate } from "@/lib/entity";
-import { moduleOn, type ModuleKey } from "@/lib/modules";
+import { moduleVisible, type ModuleKey } from "@/lib/modules";
 import { APP_VERSION } from "@/lib/version";
 import { requireCompany } from "@/lib/auth";
 import { logoutAction } from "@/app/auth-actions";
@@ -55,13 +55,13 @@ export const dynamic = "force-dynamic";
 
 export default async function CompanyLayout({ children, params }: { children: React.ReactNode; params: Promise<{ cid: string }> }) {
   const { cid } = await params;
-  const { company, user, support } = await requireCompany(Number(cid));
+  const { company, user, support, hidden } = await requireCompany(Number(cid));
   const access = await orgAccess(company.organizationId); // v6.8.0
   const b = `/c/${cid}`;
   const theme = normalizeTheme(company.theme);
   const priv = isPrivate(company);
   // v6.2.0 – a menü a cég modulkapcsolói szerint (a profil csak alapértelmezés)
-  const on = (k: ModuleKey) => moduleOn(company, k);
+  const on = (k: ModuleKey) => moduleVisible(company, hidden, k); // v6.11.0 – felhasználónként elrejtett modulok
   const car = on("vehicles");
   return (
     <div className="shell" style={themeVars(theme) as React.CSSProperties} data-mode={theme.mode}>

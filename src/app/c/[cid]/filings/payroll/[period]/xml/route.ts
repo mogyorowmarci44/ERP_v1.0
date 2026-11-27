@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, { params }: { params: Promise<{ cid: string; period: string }> }) {
   const p = await params;
   const cid = Number(p.cid);
-  await requireCompany(cid);
+  await requireCompany(cid, { module: "filings" });
   await audit({ action: "export.file", companyId: cid, target: new URL(_req.url).pathname.slice(0, 255) }); // v6.0.0
   if (!/^\d{4}-\d{2}$/.test(p.period)) return new Response("Hibás időszak.", { status: 400 });
   try {

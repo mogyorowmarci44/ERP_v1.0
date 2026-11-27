@@ -1064,3 +1064,25 @@ async function saveModulesActionImpl(fd: FormData) {
     return `/c/${cid}/settings?ok=${encodeURIComponent(fd.get("reset") ? "Modulok visszaállítva a profil alapbeállítására." : "Modulok mentve.")}#modulok`;
   });
 }
+
+/** v6.11.0 – modulonkénti jogosultság: melyik modult látja az adott felhasználó ennél a cégnél (csak tulajdonos állíthatja). */
+export async function saveMemberModulesAction(fd: FormData) {
+  return withAudit("saveMemberModulesAction", fd, () => saveMemberModulesActionImpl(fd));
+}
+
+async function saveMemberModulesActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  const { role, user } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/settings`, async () => {
+    if (role !== "owner") throw new Error("Csak tulajdonos állíthatja a jogosultságokat.");
+    const uid = Number(fd.get("userId"));
+    if (!uid || uid === user.id) throw new Error("Érvénytelen felhasználó.");
+    const { MODULE_KEYS } = await import("@/lib/modules");
+    const hidden = MODULE_KEYS.filter((k) => fd.get(`see_${k}`) !== "on");
+    const r = await db.update(schema.memberships).set({ hiddenModules: hidden.length ? hidden : null })
+      .where(and(eq(schema.memberships.companyId, cid), eq(schema.memberships.userId, uid))).returning({ role: schema.memberships.role });
+    if (!r.length) throw new Error("A felhasználó nem tagja a cégnek.");
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/settings?ok=${encodeURIComponent(r[0].role === "owner" ? "Mentve – a tulajdonos elől nem rejthető el modul." : "Jogosultság mentve.")}#felhasznalok`;
+  });
+}

@@ -24,7 +24,7 @@ async function orgCompany(orgId: number, companyId: number) {
   if (!c) throw new Error("A cég nem található ebben az ügyfélfiókban.");
   return c;
 }
-const ROLES = new Set(["owner", "accountant", "viewer"]);
+const ROLES = new Set(["owner", "accountant", "viewer", "uploader"]);
 const ok = (msg: string) => `/admin?ok=${encodeURIComponent(msg)}`;
 
 /** Hozzáférés beállítása egy felhasználónak egy céghez: szerepkör megadása / módosítása, vagy „none” = elvétel. */
@@ -47,7 +47,7 @@ export async function setAccessAction(fd: FormData) {
       if (cur) await db.delete(memberships).where(and(eq(memberships.userId, userId), eq(memberships.companyId, companyId)));
     } else {
       if (!ROLES.has(role)) throw new Error("Ismeretlen szerepkör.");
-      const r = role as "owner" | "accountant" | "viewer";
+      const r = role as "owner" | "accountant" | "viewer" | "uploader";
       await db.insert(memberships).values({ userId, companyId, role: r }).onConflictDoUpdate({ target: [memberships.userId, memberships.companyId], set: { role: r } });
     }
     await audit({ action: "access.set", companyId, target: target.email, details: { role } });

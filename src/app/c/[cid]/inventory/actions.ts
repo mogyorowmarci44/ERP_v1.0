@@ -27,7 +27,7 @@ export async function saveItemAction(fd: FormData) {
 }
 async function saveItemActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  await requireCompany(cid, { write: true });
+  await requireCompany(cid, { write: true, module: "inventory" });
   const id = Number(fd.get("id")) || 0;
   await runOrRedirect(id ? `/c/${cid}/inventory/${id}` : `/c/${cid}/inventory`, async () => {
     const name = str(fd, "name");
@@ -65,7 +65,7 @@ export async function stockMoveAction(fd: FormData) {
 }
 async function stockMoveActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inventory" });
   const itemId = Number(fd.get("itemId"));
   await runOrRedirect(`/c/${cid}/inventory/${itemId}`, async () => {
     const it = await ownItem(cid, itemId);
@@ -109,7 +109,7 @@ export async function deleteStockMoveAction(fd: FormData) {
 }
 async function deleteStockMoveActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inventory" });
   const id = Number(fd.get("id"));
   const [mv] = await db.select().from(schema.stockMoves).where(and(eq(schema.stockMoves.id, id), eq(schema.stockMoves.companyId, cid)));
   await runOrRedirect(`/c/${cid}/inventory/${mv?.itemId ?? ""}`, async () => {
@@ -128,7 +128,7 @@ export async function postCogsAction(fd: FormData) {
 }
 async function postCogsActionImpl(fd: FormData) {
   const cid = cidOf(fd);
-  const { user } = await requireCompany(cid, { write: true });
+  const { user } = await requireCompany(cid, { write: true, module: "inventory" });
   const period = str(fd, "period");
   await runOrRedirect(`/c/${cid}/inventory?year=${period.slice(0, 4)}`, async () => {
     if (!/^\d{4}-\d{2}$/.test(period)) throw new Error("Ismeretlen időszak.");
