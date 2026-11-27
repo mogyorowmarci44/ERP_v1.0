@@ -7,7 +7,7 @@ import { fmtHuf } from "@/lib/money";
 import { fmtDate, today } from "@/lib/dates";
 import { companyTax, fyOf } from "@/lib/corp-tax-data";
 import { citiesForZip, loadImportLog, POSTAL_SOURCE } from "@/lib/hipa-rules";
-import { LOSS_USE_CAP, TAO_RATE, taxReturnDue } from "@/lib/corp-tax";
+import { LOSS_USE_CAP, taxReturnDue } from "@/lib/corp-tax";
 import { loadForecastInput } from "@/lib/forecast-data";
 import { runForecast } from "@/lib/forecast";
 import { refreshHakkaAction, saveHipaSitesAction, saveTaxAdjustmentsAction, uploadHakkaAction } from "./actions";
@@ -127,7 +127,7 @@ export default async function TaxesPage({ params, searchParams }: { params: Prom
                   <tr className="k-subtotal"><td>Adóalap a veszteség leírása előtt</td><td className="num">{ft(row.tao.baseBeforeLoss)}</td></tr>
                   <tr><td className="indent-1">− Elhatárolt veszteség felhasználása (legfeljebb az adóalap {pct(LOSS_USE_CAP)}-a; rendelkezésre állt {ft(row.tao.lossAvailable)})</td><td className="num">−{ft(row.tao.lossUsed)}</td></tr>
                   <tr className="k-total"><td>Adóalap</td><td className="num">{ft(row.tao.base)}</td></tr>
-                  <tr className="k-total"><td>Társasági adó ({pct(TAO_RATE)})</td><td className="num">{ft(row.tao.tax)}</td></tr>
+                  <tr className="k-total"><td>Társasági adó ({pct(row.tao.rate)})</td><td className="num">{ft(row.tao.tax)}</td></tr>
                   {row.tao.newLoss > 0 && <tr className="k-check"><td>Az év elhatárolható vesztesége (a következő 5 adóévben használható fel)</td><td className="num">{ft(row.tao.newLoss)}</td></tr>}
                 </tbody>
               </table>

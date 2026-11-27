@@ -253,6 +253,13 @@
       "when": 1795840000000,
       "tag": "0035_v6_3_inventory",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795850000000,
+      "tag": "0036_v6_4_legal_params",
+      "breakpoints": true
     }
   ]
 }

@@ -200,3 +200,39 @@ export async function saveVendorAction(fd: FormData) {
     return `/admin/platform?ok=${encodeURIComponent("Szolgáltatói adatok mentve.")}`;
   });
 }
+
+// ---------------------------------------------------------------------------
+// v6.4.0 – Jogszabályi paraméterek (üzemeltető)
+// ---------------------------------------------------------------------------
+
+export async function saveLegalParamAction(fd: FormData) {
+  const me = await requirePlatformAdmin();
+  await runOrRedirect("/admin/params", async () => {
+    const { paramDef } = await import("@/lib/legal-params-calc");
+    const { parseNumber } = await import("@/lib/money");
+    const key = str(fd, "key");
+    const def = paramDef(key);
+    if (!def) throw new Error("Ismeretlen paraméter.");
+    const validFrom = str(fd, "validFrom");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(validFrom)) throw new Error("Adj meg hatálybalépési dátumot.");
+    const value = parseNumber(fd.get("value"));
+    if (!Number.isFinite(value) || value < 0) throw new Error("Érvénytelen érték.");
+    const note = str(fd, "note") || null;
+    await db.insert(schema.legalParams).values({ key, validFrom, value, note, updatedBy: me.id })
+      .onConflictDoUpdate({ target: [schema.legalParams.key, schema.legalParams.validFrom], set: { value, note, updatedBy: me.id, updatedAt: new Date() } });
+    await audit({ action: "legalParam.set", target: key, details: { validFrom, value, note } });
+    revalidatePath("/", "layout");
+    return `/admin/params?key=${encodeURIComponent(key)}&ok=${encodeURIComponent(`${def.label}: ${value} ${def.unit} – ${validFrom}-tól.`)}`;
+  });
+}
+
+export async function deleteLegalParamAction(fd: FormData) {
+  await requirePlatformAdmin();
+  await runOrRedirect("/admin/params", async () => {
+    const key = str(fd, "key"), validFrom = str(fd, "validFrom");
+    await db.delete(schema.legalParams).where(and(eq(schema.legalParams.key, key), eq(schema.legalParams.validFrom, validFrom)));
+    await audit({ action: "legalParam.delete", target: key, details: { validFrom } });
+    revalidatePath("/", "layout");
+    return `/admin/params?ok=${encodeURIComponent("Érték törölve.")}`;
+  });
+}

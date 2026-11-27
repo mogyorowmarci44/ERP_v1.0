@@ -39,6 +39,21 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.4.0 – Központi jogszabályi paraméterek dátumhatállyal
+
+**Admin › Jogszabályi paraméterek** (csak az üzemeltetőnek):
+- Mindegyik paraméter teljes története látható: a beépített értékek és az üzemeltető által rögzítettek. Jelenleg a TAO-kulcs és a 17 bér- és járulékparaméter (minimálbér, garantált bérminimum, SZJA, TB, szocho, EFO stb.).
+- Új érték egy hatálybalépési dátummal vihető fel, és **minden ügyfélnél** attól a naptól érvényes. Törölhető is, és minden módosítás naplózódik.
+
+**Hol használja a program:**
+- Bérszámfejtés: a hónap utolsó napján hatályos értékek, így az évközi változás is helyesen érvényesül.
+- TAO: évenként, az üzleti év utolsó napján hatályos kulccsal.
+- Magánszemély SZJA- és szocho-összehasonlítás: az év végén hatályos kulccsal.
+
+**Javítás:** eddig bármelyik cégtulajdonos módosíthatta a mindenkire érvényes bérparamétereket. Ez megszűnt: a cégnél a paraméterek csak megtekinthetők (bármely napra, a következő változással együtt). A cégenkénti beállítás egyedül a társas vállalkozó helyett viselt járulék költségszámlája lett.
+
+**Migráció:** `0036_v6_4_legal_params.sql`. A korábbi évenkénti bérparaméterek átkerülnek, január 1-jei hatállyal. A költségszámla, ha eltért az 551-estől, cégbeállításba kerül.
+
 ## v6.3.0 – Általános készletnyilvántartás (cikkek)
 
 A *Készlet (cikkek)* modul alapból a *Kereskedelem* profilnál van bekapcsolva; bármelyik cégnél bekapcsolható a *Beállítások › Modulok* résznél.

@@ -118,6 +118,8 @@ export type TaoResult = {
   baseBeforeLoss: number;
   lossAvailable: number; lossUsed: number;
   base: number; tax: number;
+  /** v6.4.0 – az alkalmazott adókulcs (0–1). */
+  rate: number;
   /** Ha az adóalap negatív: az év elhatárolható vesztesége. */
   newLoss: number;
   /** A fel nem használt, továbbvihető veszteségek (az évvel). */
@@ -142,7 +144,7 @@ export function taoCalc(i: TaoInput): TaoResult {
   const newLoss = baseBeforeLoss < 0 ? -baseBeforeLoss : 0;
   return {
     preTax: r0(i.preTax), increases, decreases, baseBeforeLoss, lossAvailable, lossUsed, base,
-    tax: r0(base * (i.rate ?? TAO_RATE)), newLoss,
+    tax: r0(base * (i.rate ?? TAO_RATE)), rate: i.rate ?? TAO_RATE, newLoss,
     lossesAfter: losses.filter((l) => l.amount > 0),
   };
 }
@@ -151,11 +153,15 @@ export function taoCalc(i: TaoInput): TaoResult {
  * Évek sorozata: minden év a korábbi évek elhatárolt veszteségével számol (legfeljebb 5 évig vihető tovább).
  * `years` időrendben; a visszaadott sor ugyanígy.
  */
-export function taoSeries(years: { year: string; preTax: number; increases?: number; decreases?: number }[], rate = TAO_RATE): (TaoResult & { year: string })[] {
+export function taoSeries(
+  years: { year: string; preTax: number; increases?: number; decreases?: number }[],
+  /** v6.4.0 – egységes kulcs, vagy évenkénti (a központi jogszabályi paraméterekből) */
+  rate: number | ((year: string) => number) = TAO_RATE,
+): (TaoResult & { year: string })[] {
   let pool: LossEntry[] = [];
   return years.map((y) => {
     pool = pool.filter((l) => Number(y.year) - Number(l.year) <= LOSS_CARRY_YEARS);
-    const r = taoCalc({ preTax: y.preTax, increases: y.increases, decreases: y.decreases, losses: pool, rate });
+    const r = taoCalc({ preTax: y.preTax, increases: y.increases, decreases: y.decreases, losses: pool, rate: typeof rate === "function" ? rate(y.year) : rate });
     pool = [...r.lossesAfter, ...(r.newLoss ? [{ year: y.year, amount: r.newLoss }] : [])];
     return { ...r, year: y.year, lossesAfter: pool.map((l) => ({ ...l })) };
   });

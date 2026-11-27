@@ -47,7 +47,7 @@ export default async function PlatformPage({ searchParams }: { searchParams: Pro
           <h1>Üzemeltetés – ügyfélfiókok</h1>
           <span className="version-tag">v{APP_VERSION}</span>
         </div>
-        <div className="row"><Link href="/admin">← Admin</Link><Link href="/">Cégeim</Link></div>
+        <div className="row"><Link href="/admin">← Admin</Link><Link href="/admin/params">Jogszabályi paraméterek</Link><Link href="/">Cégeim</Link></div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
       <p className="muted" style={{ marginTop: -4 }}>

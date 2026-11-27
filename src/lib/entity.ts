@@ -214,11 +214,16 @@ export type MethodResult = {
  * SZJA-módszerek összehasonlítása ugyanarra a bevételre / költségre (becslés).
  * A szocho éves felső határát és a más jogviszonyból eredő biztosítást nem modellezi.
  */
-export function compareSzjaMethods(p: { revenue: number; costs: number; rooms: number; flatRatePerRoom: number }): MethodResult[] {
+export function compareSzjaMethods(
+  p: { revenue: number; costs: number; rooms: number; flatRatePerRoom: number },
+  /** v6.4.0 – a központi jogszabályi paraméterekből (0–1); alapérték a beépített kulcs */
+  rates: { szja?: number; szocho?: number } = {},
+): MethodResult[] {
+  const szjaRate = rates.szja ?? SZJA_RATE, szochoRate = rates.szocho ?? SZOCHO_RATE;
   const contrib = (income: number) => {
     const inc = Math.max(0, round2(income));
-    const szja = Math.round(inc * SZJA_RATE);
-    const szocho = Math.round(inc * SZOCHO_BASE_RATIO * SZOCHO_RATE);
+    const szja = Math.round(inc * szjaRate);
+    const szocho = Math.round(inc * SZOCHO_BASE_RATIO * szochoRate);
     return { income: inc, szja, szocho, total: szja + szocho };
   };
   const flat = Math.max(1, p.rooms) * p.flatRatePerRoom;

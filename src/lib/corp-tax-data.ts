@@ -9,6 +9,8 @@ import { today } from "./dates";
 import { hipaBase, hipaTax, taoSeries, type HipaBase, type HipaSiteCalc, type LossEntry, type TaoResult } from "./corp-tax";
 import { resolveHipaSites, type HipaSite } from "./hipa-rules";
 import type { HipaRule } from "./corp-tax";
+import { operatorParams } from "@/lib/legal-params";
+import { history, resolveAt } from "@/lib/legal-params-calc";
 
 const { accounts, journalLines, journalEntries, companies } = schema;
 
@@ -97,7 +99,10 @@ export type CompanyTax = {
  */
 export async function companyTax(company: TaxCompany, override?: { fy: string; preTaxAdd: number; revenueAdd: number; cogsAdd: number; materialsAdd: number }): Promise<CompanyTax> {
   const startMonth = company.fiscalYearStartMonth;
-  const [{ sites, calc, fromAddress, store }, fys] = await Promise.all([resolveHipaSites(company), companyFiscalYears(company.id, startMonth)]);
+  const [{ sites, calc, fromAddress, store }, fys, op] = await Promise.all([resolveHipaSites(company), companyFiscalYears(company.id, startMonth), operatorParams()]);
+  // v6.4.0 – a TAO-kulcs évenként a központi jogszabályi paraméterből (az üzleti év utolsó napján hatályos)
+  const taoHist = history("tax.tao", op);
+  const taoRateFor = (fy: string) => (resolveAt(taoHist, `${fy.slice(0, 4)}-12-31`)?.value ?? 9) / 100;
   const figs = await Promise.all(fys.map((fy) => fyFigures(company.id, fy, startMonth)));
   const adjAll = company.settings.taxAdjustments ?? {};
   const openingLosses = (company.settings.openingLosses ?? []).filter((l) => l.amount > 0);
@@ -116,6 +121,7 @@ export async function companyTax(company: TaxCompany, override?: { fy: string; p
   // a nyitó (ERP előtti) veszteségeket az első év elé tesszük, hogy a sorozat továbbvigye őket
   const series = taoSeries(
     [...openingLosses.map((l) => ({ year: l.year, preTax: -l.amount })), ...pre.map((p) => ({ year: p.fig.fy, preTax: p.preTaxForTao, increases: p.adj.taoIncrease, decreases: p.adj.taoDecrease }))],
+    taoRateFor,
   ).slice(openingLosses.length);
   return {
     sites, siteCalc: calc, sitesFromAddress: fromAddress,
