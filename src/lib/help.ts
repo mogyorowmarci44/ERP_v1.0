@@ -35,7 +35,8 @@ export const HELP: HelpSection[] = [
     "Hibás tételt sztornóval (ellentétes tétellel) javíts; a lezárt időszak tételei nem módosíthatók.",
   ] },
   { id: "kimutatasok", title: "Kimutatások, évzárás", paths: ["reports", "closing", "value", "forecast", "summary"], body: [
-    "Kimutatások: főkönyvi kivonat, eredménykimutatás, mérleg, cash flow, kintlévőségek – Excelbe exportálhatók.",
+    "Kimutatások: főkönyvi kivonat, eredménykimutatás, mérleg, cash flow, kintlévőségek – Excelbe exportálhatók; a főkönyvi kivonat, az eredménykimutatás, a mérleg és a nyitott tételek PDF-ben is (nyomtatáshoz, banknak, ügyfélnek).",
+    "Kereső: a menü tetején lévő mezővel számlaszámra, partnerre, adószámra, összegre, naplószámra vagy rendszámra kereshetsz az összes cégedben.",
     "Évzárás: a zárási lépések (értékcsökkenés, átértékelés, adó, eredmény) sorban végigvihetők; utána az évnyitás a nyitómérleget automatikusan elkészíti.",
   ] },
   { id: "ber", title: "Bérszámfejtés", paths: ["payroll"], body: [

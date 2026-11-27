@@ -39,6 +39,17 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v7.4.0 – Globális kereső és PDF-kimutatások
+
+- **Kereső** (`/kereses`, a cég menüjének tetején és a Cégeim oldalon):
+  - Keres számlára (szám, partner, bruttó összeg), partnerre (név, e-mail, adószám számjegyei), naplótételre (szám, szöveg) és gépkocsira (rendszám, alváz, típus).
+  - Az összes elérhető cégben keres. A bizonylatfeltöltő szerep, az archivált cég és a felhasználó elől elrejtett gépkocsi-modul kimarad.
+  - Típusonként legfeljebb 20 találatot ad.
+- **PDF-kimutatások** (`/c/:cid/reports/pdf?type=tb|pnl|bs|open`): főkönyvi kivonat, eredménykimutatás, mérleg (nyitó és záró), nyitott tételek.
+  - Beágyazott DejaVu Sans betűkészlettel (magyar ékezetek), automatikus oldaltöréssel és ismétlődő fejléccel.
+  - Minden oldalon Mogyorosi Holding™ · verzió · cég · időpont · oldalszám lábléc.
+  - Új függőségek: `@pdf-lib/fontkit`, `dejavu-fonts-ttf`.
+
 ## v7.3.0 – Fizetési emlékeztető és banki szabályok
 
 - **Fizetési emlékeztető** (Nyitott tételek):

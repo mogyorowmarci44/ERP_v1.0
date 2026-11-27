@@ -102,6 +102,9 @@ export default async function StatementsPage({ params, searchParams }: { params:
         <div>
           <h1>Kimutatások</h1>
           <span className="muted">{company.name}, {fmtDate(from)} – {fmtDate(to)}</span>
+          {(type === "pnl" || type === "bs") && (
+            <a className="btn no-print" style={{ marginLeft: 10 }} href={`/c/${cid}/reports/pdf?type=${type}&from=${from}&to=${to}`} target="_blank" rel="noreferrer">PDF ({type === "pnl" ? "a teljes időszak" : "nyitó és záró"})</a>
+          )}
         </div>
         <div className="segmented no-print" role="tablist" aria-label="Bontás">
           {GRANS.map((g) => (

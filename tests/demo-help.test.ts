@@ -100,3 +100,22 @@ describe("v7.3.0 – fizetési emlékeztető és banki szabályok", () => {
     expect(matchBankRule(undefined, "NAV", -1)).toBeNull();
   });
 });
+
+describe("v7.4.0 – kereső és PDF", () => {
+  it("keresőkifejezés értelmezése", async () => {
+    const { parseQuery } = await import("@/lib/search-calc");
+    expect(parseQuery("  127 000 ")).toMatchObject({ s: "127 000", amount: 127000, digits: "127000" });
+    expect(parseQuery("1.270,50").amount).toBe(1270.5);
+    expect(parseQuery("50").amount).toBeNull();
+    expect(parseQuery("Kovács 100%_").like).toBe("%Kovács 100\\%\\_%");
+  });
+  it("PDF: magyar ékezetek, több oldal, védjegy a láblécben", async () => {
+    const { renderPdfReport } = await import("@/lib/pdf-report");
+    const { PDFDocument } = await import("pdf-lib");
+    const bytes = await renderPdfReport({ title: "Főkönyvi kivonat", company: "Árvíztűrő Tükörfúrógép Kft.", columns: [{ label: "Számla", width: 80 }, { label: "Összeg", width: 100, align: "right" }],
+      rows: Array.from({ length: 120 }, (_, i) => ({ cells: [`őű-${i}`, `${i * 1000}`] })) });
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBeGreaterThan(1);
+    expect(doc.getCreator()).toContain("Mogyorosi Holding™");
+  });
+});

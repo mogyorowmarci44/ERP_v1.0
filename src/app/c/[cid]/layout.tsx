@@ -80,6 +80,11 @@ export default async function CompanyLayout({ children, params }: { children: Re
           </div>
         </div>
 
+        {/* v7.4.0 – globális kereső */}
+        <form action="/kereses" className="side-search" role="search">
+          <input type="hidden" name="from" value={b} />
+          <input name="q" placeholder="Keresés (számla, partner, összeg…)" aria-label="Keresés" />
+        </form>
         <input type="checkbox" id="navtoggle" className="navtoggle" />
         <label htmlFor="navtoggle" className="menu-btn">Menü</label>
         <div className="navlinks">

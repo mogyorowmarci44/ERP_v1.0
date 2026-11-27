@@ -68,6 +68,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           {/* v6.12.0 */}
           <Link href="/ujdonsagok">Újdonságok{seenNews !== LATEST && <span className="news-dot" aria-label="új" />}</Link>
           <Link href="/sugo">Súgó</Link>
+          <form action="/kereses" role="search" style={{ display: "inline-flex" }}><input name="q" placeholder="Keresés minden cégben…" aria-label="Keresés" style={{ width: 200 }} /></form>
         </div>
         <form action={logoutAction} className="row">
           {list.filter((x) => x.role !== "uploader").length > 1 && <Link href="/iroda">Iroda – összes cég</Link>}
