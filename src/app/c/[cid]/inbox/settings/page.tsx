@@ -6,7 +6,8 @@ import { getInboxSettings } from "@/lib/inbox/service";
 import { extractionAvailable, EXTRACT_MODEL } from "@/lib/inbox/extract";
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
-import { saveSettingsAction, newSecretAction, testConnectionAction, connectBankAction, bankSyncNowAction, saveBankAction, disconnectBankAction } from "../actions";
+import { saveSettingsAction, newSecretAction, testConnectionAction, connectBankAction, bankSyncNowAction, saveBankAction, disconnectBankAction, saveInvoicingAction, removeInvoicingAction, invoicingSyncNowAction } from "../actions";
+import type { InvoicingLink } from "@/db/schema";
 import { ebConfigured } from "@/lib/bank/enable-banking";
 import { consentWarning } from "@/lib/bank/sync";
 import { today } from "@/lib/dates";
@@ -136,6 +137,69 @@ export default async function InboxSettingsPage({ params, searchParams }: { para
             <div style={{ alignSelf: "end" }}><button className="primary">Összekapcsolás a bankkal →</button></div>
           </form>
         ) : <p className="muted">Nincs banki kapcsolat.</p>}
+      </div>
+
+      <h2 id="szamlazo">Számlázóprogram – kiállított számlák automatikusan</h2>
+      <div className="card" style={{ marginBottom: 14 }}>
+        <p className="muted" style={{ marginTop: 0 }}>
+          A számlázz.hu-ban vagy a Billingóban kiállított számlák a „Beolvasás és könyvelés” gombra (vagy itt a „Letöltés most”-ra) maguktól bejönnek a Beérkező bizonylatok közé,
+          a PDF-fel és a pontos tételadatokkal együtt – szövegfelismerés nélkül. Az egyértelműeket a rendszer lekönyveli (vevő, ÁFA-kód, árbevétel-számla a korábbi könyvelések alapján), a többi jóváhagyásra vár.
+        </p>
+        {(["szamlazz", "billingo"] as const).map((p) => {
+          const l: InvoicingLink | undefined = (s.invoicing ?? []).find((x) => x.provider === p);
+          return (
+            <div key={p} style={{ borderTop: "1px solid var(--border, #ddd)", paddingTop: 10, marginTop: 10 }}>
+              <strong>{p === "szamlazz" ? "számlázz.hu" : "Billingo"}</strong>{" "}
+              {l ? <span className="pos">összekapcsolva</span> : <span className="muted">nincs összekapcsolva</span>}
+              {l && (
+                <p className="muted" style={{ margin: "4px 0" }}>
+                  {p === "szamlazz" ? <>következő lekérdezett sorszám: <strong>{l.prefix}{l.nextSeq}</strong></> : <>kiállítás dátuma ettől: <strong>{l.since}</strong></>}
+                  {l.lastRunAt && <> · utolsó letöltés: {l.lastRunAt.slice(0, 16).replace("T", " ")} – {l.lastResult}</>}
+                </p>
+              )}
+              {l?.lastError && <p className="neg" style={{ margin: "4px 0" }}>{l.lastError}</p>}
+              {canWrite && (
+                <form action={saveInvoicingAction} className="form-grid" style={{ marginTop: 6 }}>
+                  <input type="hidden" name="cid" value={cid} />
+                  <input type="hidden" name="provider" value={p} />
+                  <label>{p === "szamlazz" ? "Számla Agent kulcs" : "API-kulcs"} {l && <small className="muted">(beállítva – üresen hagyva nem változik)</small>}
+                    <input name="key" type="password" autoComplete="off" placeholder={l ? "••••••••" : ""} />
+                  </label>
+                  {p === "szamlazz" ? (
+                    <label>Utolsó kiállított számla sorszáma {l && <small className="muted">(csak ha újra kell kezdeni)</small>}
+                      <input name="lastNumber" placeholder="pl. E-MMCT-2026-41" />
+                    </label>
+                  ) : (
+                    <label>Ettől a kiállítási dátumtól
+                      <input type="date" name="since" defaultValue={l?.since ?? today()} />
+                    </label>
+                  )}
+                  <div style={{ alignSelf: "end" }}><SubmitButton pendingText="Ellenőrzés…">{l ? "Mentés" : "Összekapcsolás"}</SubmitButton></div>
+                </form>
+              )}
+              {canWrite && l && (
+                <form action={removeInvoicingAction} style={{ marginTop: 6 }}>
+                  <input type="hidden" name="cid" value={cid} /><input type="hidden" name="provider" value={p} />
+                  <button className="danger">Leválasztás</button>
+                </form>
+              )}
+            </div>
+          );
+        })}
+        {canWrite && (s.invoicing ?? []).length > 0 && (
+          <form action={invoicingSyncNowAction} style={{ marginTop: 12 }}>
+            <input type="hidden" name="cid" value={cid} />
+            <SubmitButton pendingText="Letöltés…">Letöltés most</SubmitButton>
+          </form>
+        )}
+        <details className="fc-more" style={{ marginTop: 10 }}>
+          <summary>Hol találom a kulcsot?</summary>
+          <ul>
+            <li><strong>számlázz.hu:</strong> Beállítások → Számla Agent kulcsok → Új kulcs. A rendszer az utolsó megadott sorszámtól kezdve egymás után kérdezi le a számlákat (pl. E-MMCT-2026-42, -43 …); ha a számlázz.hu-ban új évben új előtag indul, magától átvált rá.</li>
+            <li><strong>Billingo:</strong> Beállítások → API → Új API-kulcs (a Billingo API csak bizonyos csomagokban érhető el). A rendszer a megadott dátumtól tölti le a számlákat, sztornókat és előlegszámlákat; díjbekérőt nem.</li>
+          </ul>
+          <p className="muted">A kulcs titkosítva tárolódik, és csak olvasásra használjuk – az ERP nem állít ki és nem módosít számlát a számlázóprogramban.</p>
+        </details>
       </div>
 
       <h2>Telepítés a Google-fiókba (egyszer, cégenként)</h2>

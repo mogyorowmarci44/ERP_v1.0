@@ -384,3 +384,97 @@ async function disconnectBankActionImpl(fd: FormData) {
     return `${base(cid)}/settings?ok=${encodeURIComponent("Banki kapcsolat leválasztva.")}#bank`;
   });
 }
+
+// ---------------------------------------------------------------------------
+// v6.10.0 – Számlázóprogram-kapcsolat (számlázz.hu / Billingo)
+// ---------------------------------------------------------------------------
+
+/** Kapcsolat mentése: a kulcsot kipróbálja, csak érvényes kulcs kerül (titkosítva) a beállításokba. */
+export async function saveInvoicingAction(fd: FormData) {
+  return withAudit("saveInvoicingAction", fd, () => saveInvoicingActionImpl(fd));
+}
+
+async function saveInvoicingActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`${base(cid)}/settings`, async () => {
+    const provider = str(fd, "provider") === "billingo" ? "billingo" : "szamlazz";
+    const { settings } = await getInboxSettings(cid);
+    const links = [...(settings.invoicing ?? [])];
+    const old = links.find((l) => l.provider === provider);
+    const keyIn = optStr(fd, "key");
+    if (!keyIn && !old) throw new Error(provider === "billingo" ? "Add meg a Billingo API-kulcsot." : "Add meg a Számla Agent kulcsot.");
+    const { decryptSecret } = await import("@/lib/inbox/secret");
+    const key = keyIn ?? decryptSecret(old!.keyEnc);
+    const { testInvoicingKey } = await import("@/lib/invoicing-sync");
+    const { splitInvoiceNumber } = await import("@/lib/invoicing-sync-calc");
+    let link: (typeof links)[number];
+    let msg: string;
+    if (provider === "szamlazz") {
+      const last = optStr(fd, "lastNumber");
+      let prefix = old?.prefix ?? null, nextSeq = old?.nextSeq ?? null;
+      if (last) {
+        const sp = splitInvoiceNumber(last);
+        if (!sp) throw new Error("A sorszám végén számnak kell állnia (pl. E-MMCT-2026-41).");
+        prefix = sp.prefix; nextSeq = sp.seq + 1;
+        msg = await testInvoicingKey("szamlazz", key, last);
+      } else {
+        if (!prefix || !nextSeq) throw new Error("Add meg az utolsó kiállított számla sorszámát.");
+        msg = "számlázz.hu: beállítás mentve.";
+      }
+      link = { ...(old ?? {}), provider, keyEnc: encryptSecret(key), prefix, nextSeq, lastError: null };
+    } else {
+      const since = optStr(fd, "since") ?? old?.since ?? null;
+      if (since && !isDate(since)) throw new Error("Hibás dátum.");
+      msg = await testInvoicingKey("billingo", key);
+      link = { ...(old ?? {}), provider, keyEnc: encryptSecret(key), since: since ?? new Date().toISOString().slice(0, 10), lastError: null };
+    }
+    const next = links.filter((l) => l.provider !== provider).concat(link);
+    await saveInboxSettings(cid, { ...settings, invoicing: next });
+    refresh(cid);
+    return `${base(cid)}/settings?ok=${encodeURIComponent(msg)}#szamlazo`;
+  });
+}
+
+export async function removeInvoicingAction(fd: FormData) {
+  return withAudit("removeInvoicingAction", fd, () => removeInvoicingActionImpl(fd));
+}
+
+async function removeInvoicingActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`${base(cid)}/settings`, async () => {
+    const provider = str(fd, "provider");
+    const { settings } = await getInboxSettings(cid);
+    await saveInboxSettings(cid, { ...settings, invoicing: (settings.invoicing ?? []).filter((l) => l.provider !== provider) });
+    refresh(cid);
+    return `${base(cid)}/settings?ok=${encodeURIComponent("A számlázóprogram leválasztva.")}#szamlazo`;
+  });
+}
+
+/** „Letöltés most” – csak a számlázóprogramokból hoz, és a behozottakat rögtön feldolgozza. */
+export async function invoicingSyncNowAction(fd: FormData) {
+  return withAudit("invoicingSyncNowAction", fd, () => invoicingSyncNowActionImpl(fd));
+}
+
+async function invoicingSyncNowActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  const { user } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`${base(cid)}/settings`, async () => {
+    const { syncInvoicing } = await import("@/lib/invoicing-sync");
+    const r = await syncInvoicing(cid);
+    if (r.fetched) {
+      const { settings } = await getInboxSettings(cid);
+      const docs = await db.select({ id: inboxDocuments.id }).from(inboxDocuments)
+        .where(and(eq(inboxDocuments.companyId, cid), eq(inboxDocuments.status, "extracted")));
+      for (const d of docs.slice(0, 40)) {
+        await processDocument(cid, d.id, user.id, { autoPost: settings.autoPost !== false }).catch((e) =>
+          db.update(inboxDocuments).set({ status: "error", error: (e as Error).message }).where(eq(inboxDocuments.id, d.id)));
+      }
+    }
+    refresh(cid);
+    if (r.errors.length && !r.fetched) throw new Error(r.errors.join(" | "));
+    const msg = `${r.fetched} új kiállított számla behozva${r.errors.length ? ` (${r.errors.join(" | ")})` : ""}.`;
+    return `${base(cid)}/settings?ok=${encodeURIComponent(msg)}#szamlazo`;
+  });
+}
