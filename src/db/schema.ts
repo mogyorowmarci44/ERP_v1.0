@@ -15,6 +15,7 @@ import {
   primaryKey,
   bigserial,
   customType,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { decryptField, encryptField } from "../lib/field-crypto";
 
@@ -652,6 +653,8 @@ export const invoiceLines = pgTable(
     /** Ellenszámla: bevétel (9) vevőszámlán, költség/készlet/eszköz szállítói számlán. */
     accountId: integer("account_id").notNull().references(() => accounts.id),
     vehicleId: integer("vehicle_id").references(() => vehicles.id),
+    /** v6.3.0 – cikk (készletnyilvántartás): szállítói számlán bevételezés, vevőszámlán kiadás. */
+    itemId: integer("item_id").references((): AnyPgColumn => items.id, { onDelete: "restrict" }),
     // Számított értékek (HUF)
     netHuf: money("net_huf").notNull().default(0),
     vatHuf: money("vat_huf").notNull().default(0),
@@ -1310,4 +1313,62 @@ export const supportGrants = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("support_grants_user_company_idx").on(t.userId, t.companyId)],
+);
+
+// ---------------------------------------------------------------------------
+// v6.3.0 – Általános készletnyilvántartás (cikkek, csúsztatott átlagár)
+// ---------------------------------------------------------------------------
+
+export const items = pgTable(
+  "items",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    sku: varchar("sku", { length: 64 }),
+    name: varchar("name", { length: 255 }).notNull(),
+    unit: varchar("unit", { length: 16 }).notNull().default("db"),
+    /** Készletszámla (pl. 261 / 262) és az eladott áruk beszerzési értéke (pl. 814 / 811). */
+    stockAccount: varchar("stock_account", { length: 16 }).notNull(),
+    cogsAccount: varchar("cogs_account", { length: 16 }).notNull(),
+    minQty: numeric("min_qty", { precision: 18, scale: 4, mode: "number" }),
+    isActive: boolean("is_active").notNull().default(true),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("items_company_idx").on(t.companyId)],
+);
+
+/** Számlán kívüli készletmozgás: nyitó készlet, leltári többlet / hiány. */
+export const stockMoves = pgTable(
+  "stock_moves",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    itemId: integer("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    kind: varchar("kind", { length: 16 }).$type<"opening" | "adjust">().notNull(),
+    quantity: numeric("quantity", { precision: 18, scale: 4, mode: "number" }).notNull(),
+    unitCost: numeric("unit_cost", { precision: 18, scale: 4, mode: "number" }),
+    journalEntryId: integer("journal_entry_id").references(() => journalEntries.id, { onDelete: "set null" }),
+    note: text("note"),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("stock_moves_company_item_idx").on(t.companyId, t.itemId, t.date)],
+);
+
+/** Havi ELÁBÉ-könyvelések (a számított és a lekönyvelt érték különbözete könyvelhető). */
+export const stockCogs = pgTable(
+  "stock_cogs",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    period: varchar("period", { length: 7 }).notNull(),
+    stockAccount: varchar("stock_account", { length: 16 }).notNull(),
+    cogsAccount: varchar("cogs_account", { length: 16 }).notNull(),
+    amount: money("amount").notNull(),
+    journalEntryId: integer("journal_entry_id").references(() => journalEntries.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("stock_cogs_company_period_idx").on(t.companyId, t.period)],
 );

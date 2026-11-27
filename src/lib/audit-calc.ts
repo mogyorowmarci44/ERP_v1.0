@@ -87,6 +87,10 @@ export const ACTION_LABEL: Record<string, string> = {
   saveVehicleAction: "Gépkocsi mentése",
   saveAccountAction: "Főkönyvi számla mentése",
   saveModulesAction: "Modulok kapcsolása",
+  saveItemAction: "Cikk mentése",
+  stockMoveAction: "Kézi készletmozgás",
+  deleteStockMoveAction: "Készletmozgás törlése",
+  postCogsAction: "ELÁBÉ könyvelése",
 };
 
 /** Megnevezés: a táblából, különben a függvénynévből („saveThemeAction” → „save theme”). */

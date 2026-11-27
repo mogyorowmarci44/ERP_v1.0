@@ -39,6 +39,28 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.3.0 – Általános készletnyilvántartás (cikkek)
+
+A *Készlet (cikkek)* modul alapból a *Kereskedelem* profilnál van bekapcsolva; bármelyik cégnél bekapcsolható a *Beállítások › Modulok* résznél.
+
+**Cikktörzs:** megnevezés, cikkszám, mennyiségi egység, minimum készlet, készletszámla és ELÁBÉ-számla. Az alapértelmezés 261 / 814; ha a cégnél a gépkocsi-modul is be van kapcsolva, akkor alkatrészként 262 / 811.
+
+**Mozgások:**
+- A szállítói és vevőszámla soránál a *Cikk* oszlopban választható ki a cikk. A szállítói számla bevételez, a vevőszámla kiad; a negatív mennyiség visszárut jelent.
+- A helyesbítő számla nem mozgat készletet, mert az árkorrekció. A sztornózott számla kiesik a nyilvántartásból.
+- Kézi mozgás:
+  - *nyitó készlet*: nem könyvel, a főkönyvi nyitó egyenleggel kell egyeztetni;
+  - *leltári eltérés*: azonnal könyvel – hiánynál T 869 / K készlet az átlagáron, többletnél T készlet / K 969.
+
+**Értékelés:** csúsztatott (folyamatosan súlyozott) átlagár. Mindig a teljes mozgástörténetből számolódik dátumsorrendben, így a visszadátumozott számla is helyesen kerül be. A készletkarton soronként mutatja a mozgást, az egységárat, az értéket és a halmozott egyenleget.
+
+**Havi ELÁBÉ:**
+- Egy gombnyomásra könyvelhető, számlapáronként, a hónap utolsó napjára.
+- Mindig csak a számított és a lekönyvelt érték különbözete könyvelődik. Ha utólag sztornózol vagy visszadátumozott számlát rögzítesz, a hónap egyszerűen újra könyvelhető.
+- Egyeztető tábla mutatja, egyezik-e a nyilvántartás szerinti érték a készletszámlák főkönyvi egyenlegével.
+
+Migráció: `0035_v6_3_inventory.sql` (`items`, `stock_moves`, `stock_cogs`, `invoice_lines.item_id`). Integrációs teszt: bevételezés → átlagár → kiadás → ELÁBÉ → sztornó → különbözet-könyvelés → a főkönyv visszaáll.
+
 ## v6.2.0 – Semleges felület, modulkapcsolók cégenként
 
 **Modulok** (*Beállítások › Modulok*). Cégenként be- és kikapcsolható:

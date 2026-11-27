@@ -297,4 +297,40 @@ describe.skipIf(!URL)("könyvelési folyamat (integráció)", () => {
     expect(p2.id).toBeGreaterThan(Math.max(...b.tables.partners.map((p) => Number(p.id))));
     delete process.env.DATA_ENCRYPTION_KEY;
   }, 120_000);
+  it("v6.3.0 – cikkes készlet: bevételezés szállítói számláról, kiadás vevőszámlán, havi ELÁBÉ a különbözettel", async () => {
+    const I = await import("@/lib/inventory");
+    const s = m.db.schema;
+    const [it] = await m.db.db.insert(s.items).values({ companyId: cid, name: "Csavar", unit: "db", stockAccount: "262", cogsAccount: "811" }).returning();
+    const sup = await partner("Szállító Bt"), cust = await partner("Vásárló Kft");
+    const vatId = await vat("27");
+    const mk = async (direction: "in" | "out", pid: number, no: string, date: string, qty: number, price: number, acc: string) => {
+      const id = await m.L.saveInvoiceDraft(cid, { direction, partnerId: pid, invoiceNumber: no, issueDate: date, fulfillmentDate: date, dueDate: date, paymentMethod: "transfer", currency: "HUF", exchangeRate: 1,
+        lines: [{ description: "Csavar", quantity: qty, unitPrice: price, vatCodeId: vatId, accountId: await acc_(acc), itemId: it.id }] } as never);
+      await m.L.postInvoice(cid, id, userId);
+      return id;
+    };
+    const acc_ = (c: string) => acc(c);
+    await mk("in", sup, "SZ-CS-1", "2026-11-03", 100, 50, "262");
+    await mk("in", sup, "SZ-CS-2", "2026-11-05", 100, 70, "262");
+    const sale = await mk("out", cust, "V-CS-1", "2026-11-10", 30, 150, "911");
+    let [row] = (await I.itemsWithBalance(cid)).filter((x) => x.id === it.id);
+    expect(row).toMatchObject({ qty: 170, avg: 60, value: 10_200 });
+    let nov = (await I.monthlyCogs(cid, 2026)).find((x) => x.period === "2026-11")!;
+    expect(nov).toMatchObject({ computed: 1_800, booked: 0, diff: 1_800 });
+    await I.postMonthlyCogs(cid, "2026-11", userId);
+    let t = await tb();
+    expect(bal(t, "262")).toBe(10_200);
+    expect(bal(t, "811")).toBe(1_800);
+    // utólagos sztornó → a hónap különbözete negatív, újra könyvelve a főkönyv visszaáll
+    await m.L.cancelInvoice(cid, sale, "2026-11-20", userId);
+    nov = (await I.monthlyCogs(cid, 2026)).find((x) => x.period === "2026-11")!;
+    expect(nov).toMatchObject({ computed: 0, booked: 1_800, diff: -1_800 });
+    await I.postMonthlyCogs(cid, "2026-11", userId);
+    t = await tb();
+    expect(bal(t, "262")).toBe(12_000);
+    expect(bal(t, "811")).toBe(0);
+    [row] = (await I.itemsWithBalance(cid)).filter((x) => x.id === it.id);
+    expect(row.value).toBe(12_000);
+    await expect(I.postMonthlyCogs(cid, "2026-11", userId)).rejects.toThrow(/Nincs könyvelendő/);
+  }, 120_000);
 });

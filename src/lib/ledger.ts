@@ -311,6 +311,8 @@ export type InvoiceLineInput = {
   vatCodeId: number;
   accountId: number;
   vehicleId?: number | null;
+  /** v6.3.0 – cikk (készletnyilvántartás) */
+  itemId?: number | null;
 };
 
 export type InvoiceInput = {
@@ -387,6 +389,13 @@ async function buildFromInput(tx: DbOrTx, companyId: number, input: InvoiceInput
   const codeMap = new Map(codes.map((c) => [c.id, c]));
   const rateInfo = await resolveInvoiceRate(tx, input, codes.map((c) => c.kind));
   const fxRate = rateInfo.rate;
+  // v6.3.0 – a cikkes sorok cikkje ehhez a céghez tartozzon, és a mennyiség ne legyen nulla
+  const itemIds = [...new Set(input.lines.map((l) => l.itemId).filter((x): x is number => !!x))];
+  if (itemIds.length) {
+    const own = await tx.select({ id: schema.items.id }).from(schema.items).where(and(eq(schema.items.companyId, companyId), inArray(schema.items.id, itemIds)));
+    if (own.length !== itemIds.length) throw new Error("Ismeretlen cikk a számlán.");
+    for (const l of input.lines) if (l.itemId && !l.quantity) throw new Error(`Cikkes sorban a mennyiség nem lehet nulla: „${l.description}”`);
+  }
 
   const lines = [];
   for (const l of input.lines) {
@@ -485,6 +494,7 @@ export async function saveInvoiceDraft(companyId: number, input: InvoiceInput, i
         vatCodeId: l.vatCodeId,
         accountId: l.accountId,
         vehicleId: l.vehicleId ?? null,
+        itemId: l.itemId ?? null,
         netHuf: posting.computed[i].netHuf,
         vatHuf: posting.computed[i].vatHuf,
         grossHuf: posting.computed[i].grossHuf,
@@ -521,6 +531,7 @@ async function loadInvoiceInput(tx: DbOrTx, companyId: number, invoiceId: number
       vatCodeId: l.vatCodeId,
       accountId: l.accountId,
       vehicleId: l.vehicleId,
+      itemId: l.itemId,
     })),
   };
   return { inv, input };

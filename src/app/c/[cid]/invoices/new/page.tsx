@@ -1,5 +1,6 @@
 import { requireCompany } from "@/lib/auth";
 import { formOptions } from "@/lib/options";
+import { moduleOn } from "@/lib/modules";
 import { InvoiceForm } from "@/components/InvoiceForm";
 import { today } from "@/lib/dates";
 import { lineDefaults } from "@/lib/entity";
@@ -28,6 +29,7 @@ export default async function NewInvoicePage({ params, searchParams }: { params:
         direction={dir}
         defaults={d}
         {...o}
+        items={moduleOn(company, "inventory") ? o.items : []}
         corrects={orig ? { id: orig.id, number: orig.invoiceNumber } : null}
         initial={orig ? {
           partnerId: orig.partnerId,
@@ -41,7 +43,7 @@ export default async function NewInvoicePage({ params, searchParams }: { params:
           rateManual: orig.currency !== "HUF",
           periodic: orig.periodic,
           note: `Helyesbítés: ${orig.invoiceNumber}`,
-          lines: origLines.map((l) => ({ description: `Helyesbítés: ${l.description}`, quantity: "1", unitPrice: String(-Number(l.unitPrice) * Number(l.quantity)), vatCodeId: l.vatCodeId, accountId: l.accountId, vehicleId: l.vehicleId })),
+          lines: origLines.map((l) => ({ description: `Helyesbítés: ${l.description}`, quantity: "1", unitPrice: String(-Number(l.unitPrice) * Number(l.quantity)), vatCodeId: l.vatCodeId, accountId: l.accountId, vehicleId: l.vehicleId, itemId: null })),
         } : {
           partnerId: null,
           invoiceNumber: "",
