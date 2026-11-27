@@ -2,6 +2,10 @@
 export type Release = { version: string; title: string; items: string[] };
 
 export const CHANGELOG: Release[] = [
+  { version: "7.0.0", title: "Adatbiztonság és nagy listák", items: [
+    "Az ügyfélfiókok adatai adatbázis-szinten is el vannak választva: egy cég könyvelése semmilyen módon nem hivatkozhat másik cég számlájára, partnerére vagy főkönyvi számlájára.",
+    "Keresés és lapozás a Beérkező bizonylatok és a Partnerek listájában – nagy adatmennyiségnél sem vágódik le semmi.",
+  ] },
   { version: "6.12.0", title: "Bemutató cég, súgó, újdonságok", items: [
     "Egy gombnyomással létrehozható bemutató cég valósághű mintaadatokkal – azonnal kipróbálható, és egy gombbal törölhető.",
     "Súgó: a menü „Súgó” gombja az éppen nyitott oldalhoz tartozó leírásra ugrik.",

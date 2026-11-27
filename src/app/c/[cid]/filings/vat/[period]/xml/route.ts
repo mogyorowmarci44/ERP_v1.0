@@ -15,7 +15,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ cid: str
   const sp = new URL(req.url).searchParams;
   const date = isDate(sp.get("date")) ? sp.get("date")! : today();
   const format = sp.get("format") === "enyk" ? "enyk" : "xml";
-  const { xml, row, company } = await vatXml(cid, p.period, date, sp.get("place"), format);
+  let r: Awaited<ReturnType<typeof vatXml>>;
+  try {
+    r = await vatXml(cid, p.period, date, sp.get("place"), format);
+  } catch (e) {
+    // v7.0.0 – nem létező / üres időszak: érthető 404 a nyers szerverhiba (500) helyett
+    return new Response((e as Error).message, { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  }
+  const { xml, row, company } = r;
   const body = new TextEncoder().encode(xml);
   return new Response(body, {
     headers: {

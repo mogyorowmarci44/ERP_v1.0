@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { Pager, pageOf } from "@/components/Pager";
 import { db, schema } from "@/db";
 import { requireCompany } from "@/lib/auth";
 import { Flash } from "@/components/Flash";
@@ -18,6 +19,7 @@ const TABS = [
   ["other", "Kihagyott / duplikált", ["ignored", "duplicate"]],
   ["paper", "Papír archívum", ["new", "extracted", "review", "booked", "duplicate", "ignored", "error"]],
 ] as const;
+const PAGE = 100;
 
 export default async function InboxPage({ params, searchParams }: { params: Promise<{ cid: string }>; searchParams: Promise<Record<string, string>> }) {
   const cid = Number((await params).cid);
@@ -27,21 +29,34 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   const tab = TABS.find((t) => t[0] === sp.tab) ?? TABS[0];
   const paperTab = tab[0] === "paper";
   const { settings, lastSyncAt } = await getInboxSettings(cid);
-  const rows = await db
-    .select({ id: schema.inboxDocuments.id, source: schema.inboxDocuments.source, kind: schema.inboxDocuments.kind, filename: schema.inboxDocuments.filename, status: schema.inboxDocuments.status,
-      emailFrom: schema.inboxDocuments.emailFrom, emailSubject: schema.inboxDocuments.emailSubject, emailDate: schema.inboxDocuments.emailDate, createdAt: schema.inboxDocuments.createdAt,
-      extracted: schema.inboxDocuments.extracted, proposal: schema.inboxDocuments.proposal, invoiceId: schema.inboxDocuments.invoiceId, error: schema.inboxDocuments.error, filingNo: schema.inboxDocuments.filingNo })
-    .from(schema.inboxDocuments)
-    .where(and(eq(schema.inboxDocuments.companyId, cid), inArray(schema.inboxDocuments.status, [...tab[2]]), paperTab ? isNotNull(schema.inboxDocuments.filingNo) : undefined))
-    .orderBy(paperTab ? desc(schema.inboxDocuments.filingNo) : desc(schema.inboxDocuments.createdAt), asc(schema.inboxDocuments.id))
-    .limit(paperTab ? 1000 : 300);
-  const counts = await db.select({ status: schema.inboxDocuments.status, filingNo: schema.inboxDocuments.filingNo }).from(schema.inboxDocuments).where(eq(schema.inboxDocuments.companyId, cid));
-  // papír archívum: a lefűző sorrendje (hónap csökkenő, azon belül a beszkennelés sorrendje)
+  // v7.0.0 – keresés és lapozás (korábban 300 / 1000 tételnél csendben levágott)
+  const q = (sp.q ?? "").trim();
+  const like = `%${q.replace(/[\\%_]/g, (m) => "\\" + m)}%`;
+  const D = schema.inboxDocuments;
+  const where = and(
+    eq(D.companyId, cid), inArray(D.status, [...tab[2]]), paperTab ? isNotNull(D.filingNo) : undefined,
+    q ? sql`(${D.filename} ilike ${like} or ${D.emailSubject} ilike ${like} or ${D.emailFrom} ilike ${like} or ${D.filingNo} ilike ${like}
+      or ${D.extracted}->>'invoiceNumber' ilike ${like} or ${D.extracted}->'seller'->>'name' ilike ${like} or ${D.extracted}->'buyer'->>'name' ilike ${like})` : undefined,
+  );
+  const cols = { id: D.id, source: D.source, kind: D.kind, filename: D.filename, status: D.status,
+      emailFrom: D.emailFrom, emailSubject: D.emailSubject, emailDate: D.emailDate, createdAt: D.createdAt,
+      extracted: D.extracted, proposal: D.proposal, invoiceId: D.invoiceId, error: D.error, filingNo: D.filingNo };
+  const [{ n: total }] = await db.select({ n: count() }).from(D).where(where);
+  const page = pageOf(sp.page, Number(total), PAGE);
+  // papír archívum: a lefűző sorrendje (hónap csökkenő, azon belül a beszkennelés sorrendje) – ehhez az egész kell, a lapozás utána
   const binder = paperTab ? await binderPositions(cid) : null;
-  if (binder) rows.sort((a, b) => {
-    const A = binder.get(a.id), B = binder.get(b.id);
-    return (B?.month ?? "").localeCompare(A?.month ?? "") || (A?.pos ?? 0) - (B?.pos ?? 0);
-  });
+  let rows;
+  if (binder) {
+    const all = await db.select(cols).from(D).where(where).orderBy(desc(D.filingNo), asc(D.id));
+    all.sort((a, b) => {
+      const A = binder.get(a.id), B = binder.get(b.id);
+      return (B?.month ?? "").localeCompare(A?.month ?? "") || (A?.pos ?? 0) - (B?.pos ?? 0);
+    });
+    rows = all.slice((page - 1) * PAGE, page * PAGE);
+  } else {
+    rows = await db.select(cols).from(D).where(where).orderBy(desc(D.createdAt), asc(D.id)).limit(PAGE).offset((page - 1) * PAGE);
+  }
+  const counts = await db.select({ status: D.status, filingNo: D.filingNo }).from(D).where(eq(D.companyId, cid));
   const cnt = (k: string, st: readonly string[]) => counts.filter((c) => st.includes(c.status) && (k !== "paper" || c.filingNo)).length;
   let sync: SyncSummary | null = null;
   try { sync = sp.sync ? (JSON.parse(sp.sync) as SyncSummary) : null; } catch { sync = null; }
@@ -104,6 +119,14 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
         </p>
       )}
 
+      <form className="row no-print" style={{ gap: 8, marginBottom: 10 }}>
+        <input type="hidden" name="tab" value={tab[0]} />
+        <input name="q" defaultValue={q} placeholder="Keresés: partner, számlaszám, fájlnév, iktatószám, feladó…" style={{ flex: 1, minWidth: 220 }} />
+        <button>Keresés</button>
+        {q && <Link className="btn" href={`/c/${cid}/inbox?tab=${tab[0]}`}>Szűrés törlése</Link>}
+      </form>
+      <Pager page={page} size={PAGE} total={Number(total)} query={{ tab: tab[0], q: q || undefined }} />
+
       <div className="table-wrap">
         <table>
           <thead><tr>{paperTab && <th>Lefűző</th>}<th>Érkezett</th><th>Forrás</th><th>Bizonylat</th><th>Partner</th><th className="num">Összeg</th><th>Állapot</th><th>Megjegyzés</th><th /></tr></thead>
@@ -137,10 +160,11 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                 </tr>
               );
             })}
-            {rows.length === 0 && <tr><td colSpan={paperTab ? 9 : 8} className="muted">Nincs ilyen tétel.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={paperTab ? 9 : 8} className="muted">{q ? "Nincs találat." : "Nincs ilyen tétel."}</td></tr>}
           </tbody>
         </table>
       </div>
+      <Pager page={page} size={PAGE} total={Number(total)} query={{ tab: tab[0], q: q || undefined }} />
     </>
   );
 }
