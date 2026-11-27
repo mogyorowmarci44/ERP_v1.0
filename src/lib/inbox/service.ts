@@ -30,15 +30,18 @@ export async function saveInboxSettings(companyId: number, s: InboxSettings) {
 
 /** Új bizonylat felvétele a gyűjtőbe (feltöltés vagy Google-forrás). Ugyanaz a fájl (sha256) nem kerül be kétszer. */
 export async function addDocument(companyId: number, d: {
-  source: "gmail" | "drive" | "upload"; sourceRef: string; sourceUrl?: string | null; kind: "invoice" | "statement";
+  source: "gmail" | "drive" | "upload" | "szamlazz" | "billingo"; sourceRef: string; sourceUrl?: string | null; kind: "invoice" | "statement";
   filename: string; mime: string; data: string; emailFrom?: string | null; emailSubject?: string | null; emailDate?: string | null;
+  /** v6.10.0: már kiolvasott adat (számlázóprogramból) – így nem kell szövegfelismerés. */
+  extracted?: ExtractedDoc | null;
 }) {
   const hash = sha256(d.data);
   const [dupe] = await db.select({ id: inboxDocuments.id }).from(inboxDocuments).where(and(eq(inboxDocuments.companyId, companyId), eq(inboxDocuments.sha256, hash)));
   const [row] = await db.insert(inboxDocuments).values({
     companyId, source: d.source, sourceRef: d.sourceRef, sourceUrl: d.sourceUrl ?? null, kind: d.kind, filename: d.filename.slice(0, 255), mime: d.mime || "application/octet-stream",
     sha256: hash, data: d.data, emailFrom: d.emailFrom ?? null, emailSubject: d.emailSubject ?? null, emailDate: d.emailDate ? new Date(d.emailDate) : null,
-    status: dupe ? "duplicate" : "new", error: dupe ? `Ugyanez a fájl már bent van (#${dupe.id}).` : null,
+    status: dupe ? "duplicate" : d.extracted ? "extracted" : "new", error: dupe ? `Ugyanez a fájl már bent van (#${dupe.id}).` : null,
+    extracted: d.extracted ?? null,
   }).onConflictDoNothing().returning({ id: inboxDocuments.id });
   // v6.7.0 – a nagy fájl a fájltárolóba kerül (hiba esetén az adatbázisban marad)
   if (row?.id) await offloadDoc(row.id).catch((e) => console.error("[file-store] feltöltési hiba:", e));
@@ -278,6 +281,13 @@ export async function runSync(companyId: number, userId: number | undefined): Pr
       if (items.length > 60) sum.errors.push(`Még ${items.length - 60} tétel vár – nyomd meg újra a gombot.`);
       await db.update(inboxSettings).set({ lastSyncAt: new Date() }).where(eq(inboxSettings.companyId, companyId));
     } catch (e) { sum.errors.push((e as Error).message); }
+  }
+  // v6.10.0 – kiállított számlák a számlázóprogramból (számlázz.hu / Billingo)
+  if (settings.invoicing?.length) {
+    const { syncInvoicing } = await import("@/lib/invoicing-sync");
+    const r = await syncInvoicing(companyId);
+    sum.fetched += r.fetched;
+    sum.errors.push(...r.errors);
   }
   const todo = await db.select({ id: inboxDocuments.id, kind: inboxDocuments.kind }).from(inboxDocuments)
     .where(and(eq(inboxDocuments.companyId, companyId), inArray(inboxDocuments.status, ["new", "extracted"])))

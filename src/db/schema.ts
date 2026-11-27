@@ -917,6 +917,22 @@ export type InboxSettings = {
   autoPost?: boolean;
   /** v3.10.0: közvetlen banki kapcsolat (Enable Banking / PSD2) – napi automatikus tranzakció-letöltés. */
   bank?: BankLink | null;
+  /** v6.10.0: számlázóprogram-kapcsolatok (számlázz.hu, Billingo) – a kiállított számlák automatikus behúzása. */
+  invoicing?: InvoicingLink[] | null;
+};
+
+export type InvoicingLink = {
+  provider: "szamlazz" | "billingo";
+  /** AES-GCM-mel titkosított Számla Agent kulcs / Billingo API-kulcs. */
+  keyEnc: string;
+  /** számlázz.hu: a következő lekérdezendő számla előtagja és sorszáma. */
+  prefix?: string | null;
+  nextSeq?: number | null;
+  /** Billingo: ettől a kelttől tölt le (YYYY-MM-DD). */
+  since?: string | null;
+  lastRunAt?: string | null;
+  lastResult?: string | null;
+  lastError?: string | null;
 };
 
 export type BankLink = {

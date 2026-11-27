@@ -39,6 +39,17 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.10.0 – Számlázóprogram-integráció (számlázz.hu, Billingo)
+
+A számlázóprogramban kiállított számlák maguktól bejönnek a Beérkező bizonylatok közé, a PDF-fel és a pontos tételadatokkal (vevő, adószám, tételek, ÁFA-kulcs, fizetési mód, sztornó-hivatkozás). Nincs szövegfelismerés, ezért nincs kiolvasási hiba. A meglévő javaslat- és könyvelési logika dolgozza fel őket: az egyértelműeket lekönyveli, a többi jóváhagyásra vár.
+
+- **Beállítás:** Beérkező bizonylatok → Beállítások → *Számlázóprogram*.
+  - **számlázz.hu:** Számla Agent kulcs és az utolsó kiállított számla sorszáma. A számlázz.hu-nak nincs listázó végpontja, ezért a rendszer sorszámonként kérdez le (pl. E-MMCT-2026-42, -43 …). Három egymás utáni hiány után megáll, és ott folytatja. Új évben átvált az új évszámos előtagra.
+  - **Billingo:** API-kulcs és egy kezdő dátum. A számlák, sztornók és előlegszámlák jönnek be, a díjbekérők és piszkozatok nem.
+- **Mentéskor kipróbálja a kulcsot,** és csak érvényes kulcsot tárol (titkosítva). Csak olvas: számlát nem állít ki és nem módosít.
+- **Csak gombnyomásra fut** („Beolvasás és könyvelés”, vagy a beállításoknál „Letöltés most”). Időzítő nincs. Egy futás legfeljebb 40 számlát hoz be.
+- Nincs új környezeti változó. A teszteléshez a `SZAMLAZZ_URL` / `BILLINGO_URL` átirányítható.
+
 ## v6.9.0 – Könyvelőirodai nézet
 
 Az **Iroda – összes cég** oldal (`/iroda`) a Cégeim oldalról érhető el, ha legalább két céged van. Egy táblázatban mutatja az összes (nem archivált) céget, a legsürgősebbel elöl.

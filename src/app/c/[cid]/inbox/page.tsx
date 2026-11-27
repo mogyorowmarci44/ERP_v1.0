@@ -60,6 +60,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
           <strong>Beolvasás és könyvelés</strong>
           <p className="muted" style={{ margin: "4px 0 0" }}>
             {connected ? "Forrás: Gmail + Drive (" + [settings.invoiceFolderId ? "Bejövő számlák" : null, settings.statementFolderId ? "Kivonatok" : null].filter(Boolean).join(", ") + ") és a feltöltött fájlok" : "A Google-kapcsolat még nincs beállítva – most csak a feltöltött fájlokat dolgozza fel"}
+            {(settings.invoicing ?? []).length > 0 && ` · kiállított számlák: ${(settings.invoicing ?? []).map((l) => (l.provider === "szamlazz" ? "számlázz.hu" : "Billingo")).join(", ")}`}
             {". "}{settings.autoPost !== false ? "Az egyértelműeket magától lekönyveli." : "Minden a jóváhagyási listába kerül."}
             {lastSyncAt && <> · utoljára: {lastSyncAt.toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</>}
           </p>
@@ -115,7 +116,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                 <tr key={r.id}>
                   {paperTab && <td className="nowrap">{binder?.get(r.id) ? <><strong>{binder.get(r.id)!.month}</strong> · {binder.get(r.id)!.pos}.</> : "–"}</td>}
                   <td className="nowrap">{fmtDate((r.emailDate ?? r.createdAt).toISOString().slice(0, 10))}</td>
-                  <td>{r.source === "gmail" ? "Gmail" : r.source === "drive" ? "Drive" : r.source === "bank" ? "Bank (API)" : "feltöltés"}{r.kind === "statement" ? " · kivonat" : ""}</td>
+                  <td>{r.source === "gmail" ? "Gmail" : r.source === "drive" ? "Drive" : r.source === "bank" ? "Bank (API)" : r.source === "szamlazz" ? "számlázz.hu" : r.source === "billingo" ? "Billingo" : "feltöltés"}{r.kind === "statement" ? " · kivonat" : ""}</td>
                   <td>
                     {r.filingNo && <span className="badge filing">{r.filingNo}</span>}{" "}
                     <Link href={`/c/${cid}/inbox/${r.id}`}>{x?.invoiceNumber ?? x?.statement?.number ?? r.filename}</Link>
