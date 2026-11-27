@@ -54,7 +54,8 @@ export async function createCompany(userId: number, data: NewCompany, outerTx?: 
     const [u] = await tx.select({ orgId: schema.users.organizationId, name: schema.users.name }).from(schema.users).where(eq(schema.users.id, userId));
     let organizationId = u?.orgId ?? null;
     if (!organizationId) {
-      const [o] = await tx.insert(schema.organizations).values({ name: u?.name || data.name }).returning();
+      // v6.8.0 – új ügyfélfiók 14 napos próbaidővel
+      const [o] = await tx.insert(schema.organizations).values({ name: u?.name || data.name, subStatus: "trialing", trialEndsAt: new Date(Date.now() + 14 * 86_400_000) }).returning();
       organizationId = o.id;
       await tx.update(schema.users).set({ organizationId }).where(eq(schema.users.id, userId));
     }

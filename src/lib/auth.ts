@@ -148,6 +148,11 @@ export async function requireCompany(companyId: number, opts: { write?: boolean 
   const r = await companyMembership(companyId);
   if (opts.write && r.role === "viewer") throw new Error(r.support ? "Támogatói hozzáféréssel csak olvasni lehet." : "Nincs írási jogosultságod ehhez a céghez.");
   if (opts.write && r.company.archivedAt) throw new Error("A cég archivált – csak olvasható. Módosításhoz előbb állítsd vissza a Cégeim oldalon.");
+  // v6.8.0 – lejárt próbaidő / előfizetés: az ügyfélfiók csak olvasható (az adatok megmaradnak, letölthetők)
+  if (opts.write) {
+    const a = await (await import("./billing")).orgAccess(r.company.organizationId);
+    if (!a.writable) throw new Error(`${a.reason} Az ügyfélfiók csak olvasható – előfizetés: Admin › Előfizetés.`);
+  }
   return r;
 }
 

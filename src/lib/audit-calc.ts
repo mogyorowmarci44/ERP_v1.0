@@ -96,6 +96,10 @@ export const ACTION_LABEL: Record<string, string> = {
   postCogsAction: "ELÁBÉ könyvelése",
   "onboarding.opening": "Nyitómérleg betöltése",
   openYearAction: "Évnyitás",
+  "billing.checkout": "Előfizetés indítása",
+  "billing.update": "Előfizetés állapota (Stripe)",
+  "billing.override": "Előfizetés kézi módosítása",
+  "plan.save": "Csomag mentése",
   "onboarding.partners": "Partnerek importja",
   "onboarding.accounts": "Számlatükör importja",
 };

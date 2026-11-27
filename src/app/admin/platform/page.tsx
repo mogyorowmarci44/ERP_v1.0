@@ -2,7 +2,8 @@ import Link from "next/link";
 import { and, asc, count, desc, eq, gt, max } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requirePlatformAdmin } from "@/lib/auth";
-import { createOrganizationAction, grantSupportAccessAction, saveVendorAction } from "../actions";
+import { createOrganizationAction, grantSupportAccessAction, saveVendorAction, setOrgBillingAction } from "../actions";
+import { accessOf, STATUS_LABEL } from "@/lib/billing-calc";
 import { getVendor, vendorMissing } from "@/lib/vendor";
 import { encryptionKey } from "@/lib/field-crypto";
 import { actionLabel } from "@/lib/audit-calc";
@@ -31,6 +32,8 @@ export default async function PlatformPage({ searchParams }: { searchParams: Pro
     db.select().from(auditLog).where(eq(auditLog.action, "support.grant")).orderBy(desc(auditLog.id)).limit(20),
   ]);
   const vendor = await getVendor();
+  const plansAll = await db.select().from(schema.plans).orderBy(asc(schema.plans.sortOrder));
+  const now = new Date();
   const vMissing = vendorMissing(vendor);
   let keyOk = false;
   let keyErr = "";
@@ -47,7 +50,7 @@ export default async function PlatformPage({ searchParams }: { searchParams: Pro
           <h1>Üzemeltetés – ügyfélfiókok</h1>
           <span className="version-tag">v{APP_VERSION}</span>
         </div>
-        <div className="row"><Link href="/admin">← Admin</Link><Link href="/admin/params">Jogszabályi paraméterek</Link><Link href="/admin/errors">Hibanapló</Link><Link href="/">Cégeim</Link></div>
+        <div className="row"><Link href="/admin">← Admin</Link><Link href="/admin/params">Jogszabályi paraméterek</Link><Link href="/admin/errors">Hibanapló</Link><Link href="/admin/plans">Csomagok</Link><Link href="/">Cégeim</Link></div>
       </div>
       <Flash error={sp.error} ok={sp.ok} />
       <p className="muted" style={{ marginTop: -4 }}>
@@ -58,7 +61,7 @@ export default async function PlatformPage({ searchParams }: { searchParams: Pro
       <h2>Ügyfélfiókok</h2>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Ügyfélfiók</th><th className="num">Felhasználó</th><th>Utolsó belépés</th><th>Cégek</th><th>2FA</th><th>Létrehozva</th></tr></thead>
+          <thead><tr><th>Ügyfélfiók</th><th className="num">Felhasználó</th><th>Utolsó belépés</th><th>Cégek</th><th>2FA</th><th>Előfizetés</th><th>Létrehozva</th></tr></thead>
           <tbody>
             {orgs.map((o) => {
               const cs = companyRows.filter((c) => c.org === o.id);
@@ -85,6 +88,19 @@ export default async function PlatformPage({ searchParams }: { searchParams: Pro
                     ))}
                   </td>
                   <td>{o.mfaRequired ? <span className="badge posted">kötelező</span> : <span className="badge draft">nem kötelező</span>}</td>
+                  <td style={{ fontSize: 12 }}>
+                    <div><span className={`badge ${accessOf(o, now).writable ? "posted" : "overdue"}`}>{STATUS_LABEL[o.subStatus]}</span> {plansAll.find((p) => p.id === o.planId)?.name ?? ""}</div>
+                    <div className="muted">{o.subStatus === "trialing" ? `próbaidő: ${dt(o.trialEndsAt)}` : o.subStatus === "active" ? `eddig: ${dt(o.currentPeriodEnd)}` : ""}{o.stripeSubscriptionId ? " · Stripe" : ""}</div>
+                    <details><summary className="muted">kézi módosítás</summary>
+                      <form action={setOrgBillingAction} className="row" style={{ gap: 4, flexWrap: "wrap" }}>
+                        <input type="hidden" name="orgId" value={o.id} />
+                        <select name="subStatus" defaultValue={o.subStatus}>{Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+                        <input type="date" name="until" title="próbaidő / időszak vége" />
+                        <select name="planId" defaultValue={o.planId ?? ""}><option value="">– csomag –</option>{plansAll.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                        <button className="link">mentés</button>
+                      </form>
+                    </details>
+                  </td>
                   <td>{dt(o.createdAt)}</td>
                 </tr>
               );
@@ -98,6 +114,7 @@ export default async function PlatformPage({ searchParams }: { searchParams: Pro
         <label>Ügyfélfiók neve<input name="orgName" required placeholder="pl. Minta Kft. / Minta Könyvelőiroda" /></label>
         <label>Admin neve<input name="adminName" required /></label>
         <label>Admin e-mail címe<input name="email" type="email" required /></label>
+        <label>Próbaidő (nap)<input name="trialDays" inputMode="numeric" defaultValue={14} /></label>
         <div style={{ alignSelf: "end" }}><button className="primary">Létrehozás és meghívó</button></div>
       </form>
       <p className="muted" style={{ fontSize: 13 }}>Az admin meghívó linket kap (7 nap), azzal állítja be a jelszavát; utána ő hozza létre a cégeit és hívja meg a kollégáit.</p>
