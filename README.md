@@ -39,6 +39,26 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.6.0 – Évnyitás egy gombbal
+
+Helye: *Évzárás › Évnyitás*. A program eddig is így kezelte az évfordulót:
+- a mérlegszámlák egyenlege automatikusan nyit;
+- az eredményszámlák üzleti évenként nulláról indulnak;
+- az át nem vezetett korábbi eredmény a mérlegben „virtuálisan” az eredménytartalék sorában jelent meg.
+
+**Mit csinál az évnyitás:** a lezárt üzleti év adózott eredményét tényleges tételként átvezeti az eredménytartalékba, a következő üzleti év első napjára.
+- Nyereségnél T 493 / K 414, veszteségnél fordítva.
+- Kérésre az év hónapjait is zárolja.
+
+**Ellenőrzőlista minden évhez:** ÁFA-időszakok lezárva, értékcsökkenés elszámolva, társasági adó lekönyvelve, hónapok zárolva. A hiányzó pont figyelmeztetés, a nyitást nem akadályozza.
+
+**Biztosítékok:**
+- Évenként csak egyszer futtatható, és csak időrendben (előbb a korábbi évek).
+- Csak lezárt üzleti évre fut.
+- Nem naptári üzleti évet is kezel.
+
+**Mérleg:** a 493 egyenlege az eredménytartalék sorába került, így az átvezetés előtt és után a mérleg ugyanazt mutatja, nem duplázódik (integrációs teszt ellenőrzi). Az osztalékot a döntés után külön vegyes tételként kell könyvelni.
+
 ## v6.5.0 – Első lépések új cégnél
 
 Az **Első lépések** oldalon (`/c/[cid]/start`, a menü *Rendszer* csoportjában) a 6 lépés állapota látható. Új cég nyitóoldalán egy sáv is ide vezet, amíg nincs könyvelés.

@@ -76,6 +76,7 @@ export default async function ClosingPage({ params }: { params: Promise<{ cid: s
         </div>
         <div className="row">
           <Link className="btn primary" href={`/c/${cid}/closing/taxes`}>TAO és HIPA</Link>
+          <Link className="btn" href={`/c/${cid}/closing/open`}>Évnyitás (eredmény átvezetése)</Link>
           <Link className="btn" href={`/c/${cid}/reports/vat/closing`}>ÁFA-zárás</Link>
           <Link className="btn" href={`/c/${cid}/closing/accruals`}>Időbeli elhatárolások</Link>
           <Link className="btn" href={`/c/${cid}/settings`}>Időszakok lezárása (Beállítások)</Link>

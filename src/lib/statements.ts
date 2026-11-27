@@ -242,10 +242,12 @@ export function buildBalanceSheet(rows: DailyRow[], cols: Bucket[], fiscalStartM
   const DI = liab(pre("411"));
   const DII = liab(pre("412"));
   const DIII = liab(pre("413"));
-  const DIV = sum(liab(pre("414")), priorResult);
+  // v6.6.0 – az évnyitás T 493 / K 414 tétellel vezeti át az előző évek eredményét; a 493 egyenlege a még csak „virtuálisan”
+  // kimutatott korábbi eredményt csökkenti, így az átvezetés után sem duplázódik
+  const DIV = sum(liab(pre("414")), priorResult, liab(pre("493")));
   const DV = liab(pre("417"));
   const DVI = liab(pre("418"));
-  const DVII = sum(liab(pre("419", "493")), curResult);
+  const DVII = sum(liab(pre("419")), curResult);
   const D = sum(DI, DII, DIII, DIV, DV, DVI, DVII);
   const E = liab(pre("42"));
   const FI = liab(pre("43"));
