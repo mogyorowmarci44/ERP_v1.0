@@ -1,4 +1,5 @@
 import { redirect, unstable_rethrow } from "next/navigation";
+import { isSystemError } from "./error-log-calc";
 
 export function errMsg(e: unknown): string {
   if (e instanceof Error) {
@@ -17,6 +18,8 @@ export async function runOrRedirect(backTo: string, fn: () => Promise<void | str
     target = await fn();
   } catch (e) {
     unstable_rethrow(e);
+    // v6.7.0 – a programhibák (nem a felhasználói ellenőrzési üzenetek) a hibanaplóba is bekerülnek
+    if (isSystemError(e)) await (await import("./error-log")).recordError(e, { path: backTo, kind: "action" });
     const sep = backTo.includes("?") ? "&" : "?";
     redirect(`${backTo}${sep}error=${encodeURIComponent(errMsg(e))}`);
   }

@@ -6,6 +6,7 @@ import { db, schema } from "@/db";
 import { ENCRYPTED_COLUMNS, decryptField, encryptField } from "@/lib/field-crypto";
 import journal from "../../drizzle/meta/_journal.json";
 import { APP_VERSION } from "@/lib/version";
+import { inlineStoredFiles, offloadAll } from "@/lib/file-store";
 
 /**
  * v6.1.0 – Teljes cégmentés és visszaállítás.
@@ -89,6 +90,8 @@ export async function buildBackup(cid: number): Promise<BackupFile> {
     const [r] = (await db.execute(sql`select coalesce(json_agg(x order by ${sql.raw(t.serialPk ? "x.id" : "1")}), '[]'::json) as rows from ${sql.identifier(t.name)} x where ${whereFor(t, cid)}`)) as unknown as Array<{ rows: Record<string, unknown>[] }>;
     const rows = r.rows;
     for (const col of ENCRYPTED_COLUMNS[t.name] ?? []) for (const row of rows) if (typeof row[col] === "string") row[col] = decryptField(row[col] as string);
+    // v6.7.0 – a fájltárolóban lévő bizonylatok tartalma is a mentésbe kerül (a mentés önálló)
+    if (t.name === "inbox_documents") await inlineStoredFiles(rows);
     if (t.name === "companies") name = String(rows[0]?.name ?? "");
     tables[t.name] = rows;
   }
@@ -161,5 +164,9 @@ export async function restoreBackup(b: BackupFile, opts: { organizationId: numbe
     }
     await tx.insert(schema.memberships).values({ userId: opts.userId, companyId: cid, role: "owner" }).onConflictDoNothing();
     return { companyId: cid, name: String(b.tables.companies[0].name ?? b.company.name), rows: total, tables: used };
+  }).then(async (r) => {
+    // v6.7.0 – a visszaállított bizonylatfájlok a fájltárolóba (ha be van állítva)
+    await offloadAll().catch((e) => console.error("[backup] fájlok tárolóba költöztetése:", e));
+    return r;
   });
 }

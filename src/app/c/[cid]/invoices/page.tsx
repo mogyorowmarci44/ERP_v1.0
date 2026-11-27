@@ -8,6 +8,7 @@ import { fmtDate, isDate, yearStart, monthEnd, today } from "@/lib/dates";
 import { invoiceAudit } from "@/lib/invoice-audit";
 import { toggleInvoiceCheckAction } from "../actions";
 import { PeriodPicker } from "@/components/PeriodPicker";
+import { Pager, pageOf } from "@/components/Pager";
 
 const statusHu = { draft: "piszkozat", posted: "könyvelt", cancelled: "sztornózott" } as const;
 
@@ -28,8 +29,8 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
     .from(schema.invoices)
     .innerJoin(schema.partners, eq(schema.partners.id, schema.invoices.partnerId))
     .where(and(...conds))
-    .orderBy(desc(schema.invoices.fulfillmentDate), desc(schema.invoices.id))
-    .limit(1000);
+    .orderBy(desc(schema.invoices.fulfillmentDate), desc(schema.invoices.id));
+  // v6.7.0 – nincs többé 1000 tételes levágás: a szűrt lista lapozva jelenik meg, az összesítő a teljes szűrésre szól
   const audit = new Map((await invoiceAudit(cid, { ids: list.map((x) => x.i.id) })).map((a) => [a.inv.id, a]));
   const shown = list.filter(({ i }) => {
     const a = audit.get(i.id);
@@ -38,10 +39,13 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
     return true;
   });
   const posted = shown.filter((x) => x.i.status === "posted");
+  const PAGE = 100;
+  const page = pageOf(sp.page, shown.length, PAGE);
+  const pageRows = shown.slice((page - 1) * PAGE, page * PAGE);
   const nUnchecked = list.filter(({ i }) => i.status !== "cancelled" && !audit.get(i.id)?.check.checked).length;
   const nFlagged = list.filter(({ i }) => audit.get(i.id)?.flags.some((f) => f.level === "warn")).length;
   const qs = (o: Record<string, string>) => new URLSearchParams({ dir, from, to, ...(q ? { q } : {}), check: chk, ...o }).toString();
-  const back = `/c/${cid}/invoices?${qs({})}`;
+  const back = `/c/${cid}/invoices?${qs(sp.page ? { page: sp.page } : {})}`;
   return (
     <>
       <div className="topbar">
@@ -68,7 +72,7 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
       <table>
         <thead><tr><th>Számlaszám</th><th>Partner</th><th>Kelte</th><th>Teljesítés</th><th>Határidő</th><th className="num">Nettó Ft</th><th className="num">ÁFA Ft</th><th className="num">Végösszeg</th><th>Állapot</th><th>Jelzés</th><th className="no-print">Ellenőrizve</th></tr></thead>
         <tbody>
-          {shown.map(({ i, partner }) => { const a = audit.get(i.id); const warns = a?.flags.filter((f) => f.level === "warn") ?? []; return (
+          {pageRows.map(({ i, partner }) => { const a = audit.get(i.id); const warns = a?.flags.filter((f) => f.level === "warn") ?? []; return (
             <tr key={i.id}>
               <td><Link href={`/c/${cid}/invoices/${i.id}`}>{i.invoiceNumber}</Link></td>
               <td>{partner}</td>
@@ -105,6 +109,7 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
           </tr>
         </tfoot>
       </table>
+      <Pager page={page} size={PAGE} total={shown.length} query={{ dir, from, to, q: q || undefined, check: chk }} />
     </>
   );
 }

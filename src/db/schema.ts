@@ -1001,8 +1001,10 @@ export const inboxDocuments = pgTable(
     filename: varchar("filename", { length: 255 }).notNull(),
     mime: varchar("mime", { length: 100 }).notNull(),
     sha256: varchar("sha256", { length: 64 }).notNull(),
-    /** A fájl base64-ben (a Neon ingyenes keretén belül; a bizonylatok jellemzően 50–500 kB). */
-    data: text("data").notNull(),
+    /** A fájl base64-ben – v6.7.0: csak ha nincs fájltároló, illetve a kis fájloknál; különben üres, és a storageKey mutat rá. */
+    data: text("data"),
+    /** v6.7.0 – a fájl helye a fájltárolóban (Neon Object Storage). */
+    storageKey: varchar("storage_key", { length: 255 }),
     emailFrom: varchar("email_from", { length: 255 }),
     emailSubject: text("email_subject"),
     emailDate: timestamp("email_date", { withTimezone: true }),
@@ -1388,3 +1390,21 @@ export const legalParams = pgTable(
   },
   (t) => [primaryKey({ name: "legal_params_pk", columns: [t.key, t.validFrom] })],
 );
+
+/** v6.7.0 – Hibanapló: a szerveroldali hibák csoportosítva (azonos hiba egy sor, számlálóval). */
+export const errorLog = pgTable("error_log", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+  message: text("message").notNull(),
+  stack: text("stack"),
+  path: varchar("path", { length: 500 }),
+  method: varchar("method", { length: 10 }),
+  kind: varchar("kind", { length: 32 }),
+  digest: varchar("digest", { length: 64 }),
+  userId: integer("user_id"),
+  companyId: integer("company_id"),
+  count: integer("count").notNull().default(1),
+  lastAt: timestamp("last_at", { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+});

@@ -15,6 +15,9 @@ async function main() {
   // v6.1.0 – érzékeny személyes adatok titkosítása (csak ha van DATA_ENCRYPTION_KEY)
   const { encryptPersonalFields } = await import("./encrypt-personal");
   await encryptPersonalFields();
+  // v6.7.0 – a nagy bizonylatfájlok a fájltárolóba (csak ha be van állítva)
+  const { offloadAll, fileStoreConfigured } = await import("../src/lib/file-store");
+  if (fileStoreConfigured()) console.log(`Bizonylatfájlok a fájltárolóba: ${await offloadAll()} db átköltöztetve.`);
   process.exit(0);
 }
 

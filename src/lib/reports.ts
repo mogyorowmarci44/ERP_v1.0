@@ -108,16 +108,18 @@ export async function accountLedger(companyId: number, accountId: number, from: 
 }
 
 /** Napló: tételek időszakra, soraikkal. */
-export async function journalList(companyId: number, from: string, to: string, journalCode?: string) {
+export async function journalList(companyId: number, from: string, to: string, journalCode?: string, pg: { page: number; size: number } = { page: 1, size: 100_000 }) {
   const conds = [eq(journalEntries.companyId, companyId), gte(journalEntries.date, from), lte(journalEntries.date, to)];
   if (journalCode) conds.push(eq(journals.code, journalCode));
+  // v6.7.0 – lapozás (korábban 500 tételnél levágott)
   const entries = await db
     .select({ e: journalEntries, journalCode: journals.code })
     .from(journalEntries)
     .innerJoin(journals, eq(journals.id, journalEntries.journalId))
     .where(and(...conds))
     .orderBy(desc(journalEntries.date), desc(journalEntries.number))
-    .limit(500);
+    .limit(pg.size)
+    .offset((pg.page - 1) * pg.size);
   const ids = entries.map((x) => x.e.id);
   const lines = ids.length
     ? await db
@@ -129,6 +131,14 @@ export async function journalList(companyId: number, from: string, to: string, j
         .orderBy(asc(journalLines.id))
     : [];
   return entries.map((x) => ({ ...x.e, journalCode: x.journalCode, lines: lines.filter((l) => l.l.entryId === x.e.id) }));
+}
+
+/** v6.7.0 – a napló tételeinek száma (lapozáshoz). */
+export async function journalCount(companyId: number, from: string, to: string, journalCode?: string) {
+  const conds = [eq(journalEntries.companyId, companyId), gte(journalEntries.date, from), lte(journalEntries.date, to)];
+  if (journalCode) conds.push(eq(journals.code, journalCode));
+  const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(journalEntries).innerJoin(journals, eq(journals.id, journalEntries.journalId)).where(and(...conds));
+  return Number(r?.n ?? 0);
 }
 
 /** ÁFA analitika: könyvelt számlák tételei teljesítési dátum szerint, ÁFA-kódonként összesítve. */

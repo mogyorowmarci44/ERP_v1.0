@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Fragment } from "react";
 import { requireCompany } from "@/lib/auth";
-import { journalList } from "@/lib/reports";
+import { journalCount, journalList } from "@/lib/reports";
+import { Pager, pageOf } from "@/components/Pager";
 import { reverseEntryAction, toggleEntryCheckAction } from "../actions";
 import { canEditMeta } from "@/lib/journal-edit";
 import { Flash } from "@/components/Flash";
@@ -16,7 +17,10 @@ export default async function JournalPage({ params, searchParams }: { params: Pr
   const from = isDate(sp.from) ? sp.from : monthStart(today());
   const to = isDate(sp.to) ? sp.to : monthEnd(today());
   const j = sp.j || "";
-  const entries = await journalList(cid, from, to, j || undefined);
+  const PAGE = 100;
+  const total = await journalCount(cid, from, to, j || undefined);
+  const page = pageOf(sp.page, total, PAGE);
+  const entries = await journalList(cid, from, to, j || undefined, { page, size: PAGE });
   return (
     <>
       <div className="topbar">
@@ -76,6 +80,7 @@ export default async function JournalPage({ params, searchParams }: { params: Pr
           {entries.length === 0 && <tr><td colSpan={7} className="muted">Nincs tétel az időszakban.</td></tr>}
         </tbody>
       </table>
+      <Pager page={page} size={PAGE} total={total} query={{ from, to, j: j || undefined }} />
     </>
   );
 }

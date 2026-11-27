@@ -14,6 +14,7 @@ import { listRemote, fetchRemote } from "./connector";
 import { readDocument } from "./read";
 import { proposeInvoice, proposeStatement, type ProposeCtx } from "./propose";
 import { isPaperDoc, nextFilingNo } from "./validate";
+import { docData, offloadDoc } from "@/lib/file-store";
 
 const { inboxDocuments, inboxSettings, companies, partners, invoices, invoiceLines, accounts, vatCodes, vehicles, invoiceChecks, periodLocks, vatClosings } = schema;
 
@@ -39,6 +40,8 @@ export async function addDocument(companyId: number, d: {
     sha256: hash, data: d.data, emailFrom: d.emailFrom ?? null, emailSubject: d.emailSubject ?? null, emailDate: d.emailDate ? new Date(d.emailDate) : null,
     status: dupe ? "duplicate" : "new", error: dupe ? `Ugyanez a fájl már bent van (#${dupe.id}).` : null,
   }).onConflictDoNothing().returning({ id: inboxDocuments.id });
+  // v6.7.0 – a nagy fájl a fájltárolóba kerül (hiba esetén az adatbázisban marad)
+  if (row?.id) await offloadDoc(row.id).catch((e) => console.error("[file-store] feltöltési hiba:", e));
   return row?.id ?? null;
 }
 
@@ -193,7 +196,7 @@ export async function processDocument(companyId: number, docId: number, userId: 
   let x = doc.extracted;
   if (!x) {
     const { settings } = await getInboxSettings(companyId);
-    x = await readDocument({ data: doc.data, mime: doc.mime, filename: doc.filename }, { name: company.name, taxNumber: company.taxNumber }, { kind: doc.kind, subject: doc.emailSubject, from: doc.emailFrom }, settings);
+    x = await readDocument({ data: await docData(doc), mime: doc.mime, filename: doc.filename }, { name: company.name, taxNumber: company.taxNumber }, { kind: doc.kind, subject: doc.emailSubject, from: doc.emailFrom }, settings);
     await db.update(inboxDocuments).set({ extracted: x, status: "extracted" }).where(eq(inboxDocuments.id, docId));
   }
   if (!doc.filingNo && doc.kind === "invoice" && isPaperDoc(doc.mime, x)) await assignFilingNo(companyId, docId);

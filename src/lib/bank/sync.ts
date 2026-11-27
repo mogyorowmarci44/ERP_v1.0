@@ -32,6 +32,7 @@ async function knownKeys(companyId: number, uid: string, from: string): Promise<
     const date = r.ref.slice(refPrefix(uid).length, refPrefix(uid).length + 10);
     if (date < addDaysIso(from, -1)) continue;
     try {
+      if (!r.data) continue; // (a banki JSON-ok az adatbázisban maradnak)
       const j = JSON.parse(Buffer.from(r.data, "base64").toString("utf8")) as { keys?: string[] };
       for (const k of j.keys ?? []) keys.add(k);
     } catch { /* régi / sérült – kihagyjuk */ }
