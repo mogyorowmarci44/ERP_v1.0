@@ -58,3 +58,16 @@ describe("v7.1.0 – feltöltött fájlok kiszolgálása", () => {
     expect(servedAs("").inline).toBe(false);
   });
 });
+
+describe("v7.2.0 – tárolóbeli mentések kulcsai", () => {
+  it("kulcs, visszafejtés, régiek törlése", async () => {
+    const C = await import("@/lib/cloud-backup-calc");
+    const k = C.backupKey(3, 17, new Date("2026-11-27T14:05:09Z"));
+    expect(k).toBe("backups/o3/c17/2026-11-27_140509.json.gz");
+    expect(C.parseBackupKey(k)).toEqual({ companyId: 17, at: "2026-11-27T14:05:09Z" });
+    expect(C.parseBackupKey("backups/o3/valami")).toEqual({ companyId: null, at: null });
+    const keys = ["a/2026-01-01_000000", "a/2026-03-01_000000", "a/2026-02-01_000000"];
+    expect(C.pruneList(keys, 2)).toEqual(["a/2026-01-01_000000"]);
+    expect(C.pruneList(keys, 5)).toEqual([]);
+  });
+});

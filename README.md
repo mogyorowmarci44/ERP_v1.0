@@ -39,6 +39,15 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v7.2.0 – Mentés gombbal a tárolóba, bővebb CI
+
+- **Admin › Mentés › Mentés a tárolóba:**
+  - A „Mentés most” gomb az ügyfélfiók összes nem archivált cégének teljes mentését (`.json.gz`) a Neon fájltárolóba teszi, ide: `backups/o{org}/c{cid}/…`.
+  - Cégenként a legutóbbi 12 mentés marad meg.
+  - A mentések listázhatók, letölthetők (csak a saját ügyfélfiókét), és a meglévő visszaállítással visszatölthetők.
+  - Időzítő nincs.
+- **CI:** a GitHub Actions már eddig is futtatta a típusellenőrzést, az egység- és az integrációs teszteket. Most egy S3-emulátort (moto) is indít, így a fájltároló és a tárolóbeli mentés tesztjei is lefutnak minden PR-nél.
+
 ## v7.1.0 – Átvilágítás: sebesség, biztonság, mobil
 
 Teljes átvilágítás után:
