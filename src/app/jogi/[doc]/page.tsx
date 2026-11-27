@@ -159,7 +159,9 @@ function Adatkezeles(v: Vendor) {
         az üzemeltetői hozzáférés naplózása.</p>
       <h2>5. Az érintett jogai</h2>
       <p>Kérelmezhető a hozzáférés, helyesbítés, törlés, a kezelés korlátozása, adathordozhatóság, valamint tiltakozás a jogos érdeken alapuló adatkezelés ellen
-        – a fenti e-mail címen. A Szolgáltató a kérelmet legfeljebb egy hónapon belül teljesíti. Panasz a Nemzeti Adatvédelmi és Információszabadság Hatóságnál
+        – a fenti e-mail címen, vagy önkiszolgáló módon a programban (Fiókom és adataim: saját adatok letöltése JSON-ban, a fiók törlése; az ügyfélfiók adminjának az ügyfélfiók
+        megszüntetése). Fióktörléskor a név, az e-mail cím, a jelszó és a kétlépcsős azonosítás törlődik; a számviteli megőrzési kötelezettség alá eső könyvelési tételeknél a
+        felhasználó helyén „Törölt felhasználó” marad (álnevesítés). A Szolgáltató a kérelmet legfeljebb egy hónapon belül teljesíti. Panasz a Nemzeti Adatvédelmi és Információszabadság Hatóságnál
         (NAIH, 1055 Budapest, Falk Miksa utca 9–11., ugyfelszolgalat@naih.hu) tehető, illetve bírósághoz lehet fordulni.</p>
     </>
   );

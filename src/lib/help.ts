@@ -67,6 +67,10 @@ export const HELP: HelpSection[] = [
     "Az új ügyfélfiók 14 napos próbaidővel indul. Előfizetni az Admin › Előfizetés oldalon lehet (bankkártya, Stripe). Lejárt előfizetésnél az adatok megmaradnak és letölthetők, de csak olvashatók.",
     "A bemutató cég és a bizonylatfeltöltő felhasználók nem számítanak a csomag keretébe.",
   ] },
+  { id: "fiok", title: "Fiókom és adataim", paths: [], body: [
+    "A Cégeim oldalon a „Fiókom és adataim” linken letöltheted a saját személyes adataidat (JSON), törölheted a fiókodat, adminként pedig megszüntetheted az ügyfélfiókot.",
+    "Fióktörléskor a neved, e-mail címed, jelszavad és a 2FA törlődik; a könyvelési tételeknél „Törölt felhasználó” marad, mert azokat a számviteli törvény szerint meg kell őrizni.",
+  ] },
   { id: "iroda", title: "Könyvelőirodai nézet", paths: [], body: [
     "Ha több céged van, az Iroda oldalon egy helyen látod az összes cég határidejét, nyitott ÁFA-időszakát, jóváhagyásra váró bizonylatát és lejárt kintlévőségét.",
   ] },
