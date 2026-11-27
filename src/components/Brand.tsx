@@ -79,7 +79,7 @@ export function DocMark() {
   return (
     <div className="doc-mark">
       <ErpMark size={12} />
-      Mogyorosi Holding™ · mogyorosi.erp
+      készült a mogyorosi.erp rendszerben · Mogyorosi Holding™
     </div>
   );
 }

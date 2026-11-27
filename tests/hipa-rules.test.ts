@@ -17,8 +17,8 @@ describe("HIPA-szabályok – település és irányítószám", () => {
     expect(citiesForZip("1051")).toEqual(["Budapest"]);
     expect(zipFromAddress("8060 Mór, Deák Ferenc u. 1.")).toBe("8060");
   });
-  it("beépített szabály Mórra; cím alapján székhely", () => {
-    expect(ruleFor("Mór", null)).toMatchObject({ rate: 0.02, exemptBelow: 2_500_000 });
+  it("letöltés előtt nincs szabály (v6.2.0: nincs beépített település); cím alapján székhely", () => {
+    expect(ruleFor("Mór", null)).toBeNull();
     expect(companyHipaSites({ address: "8060 Mór, Fő u. 2.", settings: {} })).toEqual({ sites: [{ zip: "8060", city: "Mór", role: "seat", share: 1 }], fromAddress: true });
   });
 });

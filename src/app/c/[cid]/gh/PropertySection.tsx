@@ -139,7 +139,7 @@ export function PropertySection({ cid, view, pr, base, t0, asOf }: { cid: number
           <div className="row" style={{ marginTop: 12 }}><button className="primary">Mentés</button><span className="muted" style={{ fontSize: 12.5 }}>Magánértékesítés nélkül közvetítő: írd a díjat 0-ra.</span></div>
         </form>
         <p className="muted" style={{ fontSize: 12.5 }}>
-          A {fmtHuf(PROPERTY_DEFAULTS.priceM2)} Ft/m²-es alapérték szigetvári kínálati árakból becsült (felújított téglaépítésű zártkerti házak kb. 220–250 ezer, belvárosi felújított családi házak 380–575 ezer Ft/m²);
+          A {fmtHuf(PROPERTY_DEFAULTS.priceM2)} Ft/m²-es alapérték egy kisvárosi piac kínálati áraiból becsült – állítsd át a saját településed hasonló ingatlanjainak kínálati árára;
           a 9%-os tőkésítési ráta egy kisvárosi, egyszobás, rövid távú kiadású ingatlan kockázatát tükrözi. Az SZJA a Szja tv. 62. §-a szerint: lakóingatlannál a szerzés évét követő 5. évtől adómentes,
           egyéb ingatlannál a 6. évtől évente 10 százalékponttal csökken. Hogy az ingatlan lakóingatlannak minősül-e, a tulajdoni lap szerinti művelési ág / megnevezés dönti el (pl. „kivett lakóház, udvar”).
           A becslés tájékoztató jellegű, nem helyettesíti az értékbecslő és az adótanácsadó véleményét.

@@ -56,7 +56,7 @@ export function sheet(wb: ExcelJS.Workbook, name: string, title: string, cols: C
 }
 const esc = (s: string) => s.replace(/&/g, "&&");
 /** Védjegy minden exportált lap láblécében és a fájl tulajdonságaiban. */
-export const TRADEMARK = "Mogyorosi Holding™ · mogyorosi.erp";
+export const TRADEMARK = "készült a mogyorosi.erp rendszerben · Mogyorosi Holding™";
 export function brandWorkbook(wb: ExcelJS.Workbook) {
   wb.creator = "mogyorosi.erp";
   wb.lastModifiedBy = "mogyorosi.erp";

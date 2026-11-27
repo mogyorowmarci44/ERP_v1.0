@@ -86,6 +86,7 @@ export const ACTION_LABEL: Record<string, string> = {
   savePartnerAction: "Partner mentése",
   saveVehicleAction: "Gépkocsi mentése",
   saveAccountAction: "Főkönyvi számla mentése",
+  saveModulesAction: "Modulok kapcsolása",
 };
 
 /** Megnevezés: a táblából, különben a függvénynévből („saveThemeAction” → „save theme”). */

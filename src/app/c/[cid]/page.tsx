@@ -8,7 +8,7 @@ import { requireCompany } from "@/lib/auth";
 import { trialBalance, openItems, vehicleStock, vatAnalytics } from "@/lib/reports";
 import { fmtDate, monthEnd, monthStart, today, yearStart } from "@/lib/dates";
 import { isPrivate } from "@/lib/entity";
-import { isCarDealer } from "@/lib/activity";
+import { moduleOn, type ModuleKey } from "@/lib/modules";
 import { nextVatDeadline } from "@/lib/vat-deadline";
 import { GhOverview } from "./gh/Overview";
 import { cashSplit } from "@/lib/cash-split";
@@ -81,13 +81,15 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   const vatDue = nextVatDeadline(company.vatPeriod, t);
   const vatDays = daysBetween(t, vatDue);
   const b = `/c/${cid}`;
-  // v5.0.1 – autókereskedés-specifikus elemek csak autókereskedés profilnál
-  const car = isCarDealer(company);
+  // v6.2.0 – csak a bekapcsolt modulok elemei
+  const on = (k: ModuleKey) => moduleOn(company, k);
+  const car = on("vehicles");
   const carLinks = (...l: [string, string][]): [string, string][] => (car ? l : []);
+  const mod = (k: ModuleKey, ...l: [string, string][]): [string, string][] => (on(k) ? l : []);
 
   type Todo = { icon: React.ReactNode; text: string; href: string; tag: string; warn?: boolean };
   const todos: Todo[] = [];
-  if (inbox.n) todos.push({ icon: <Inbox />, text: `${inbox.n} beérkező bizonylat könyvelésre vár`, href: `${b}/inbox`, tag: "Megnyitás" });
+  if (inbox.n && on("inbox")) todos.push({ icon: <Inbox />, text: `${inbox.n} beérkező bizonylat könyvelésre vár`, href: `${b}/inbox`, tag: "Megnyitás" });
   if (drafts.total) todos.push({ icon: <FilePlus2 />, text: draftText(drafts), href: drafts.href, tag: "Piszkozat" });
   if (recvLate.length) todos.push({ icon: <Clock />, text: `${recvLate.length} lejárt vevőszámla · ${eFt(recvLate.reduce((s, r) => s + toHuf(r), 0))}`, href: `${b}/reports/open-items`, tag: "Lejárt", warn: true });
   if (payLate.length) todos.push({ icon: <Clock />, text: `${payLate.length} lejárt szállítói számla · ${eFt(payLate.reduce((s, r) => s + toHuf(r), 0))}`, href: `${b}/reports/open-items`, tag: "Fizetendő", warn: true });
@@ -101,12 +103,12 @@ export default async function Dashboard({ params, searchParams }: { params: Prom
   const open = todos.length - (vatDays <= 5 ? 0 : 1);
 
   const tiles: { title: string; icon: React.ReactNode; badge?: string; links: [string, string][] }[] = [
-    { title: "Bizonylatok", icon: <Files />, badge: inbox.n ? `${inbox.n} új` : undefined, links: [["Beérkező bizonylatok", `${b}/inbox`], ["Vevőszámlák", `${b}/invoices?dir=out`], ["Szállítói számlák", `${b}/invoices?dir=in`], ["Vegyes / bank tétel", `${b}/journal/new`]] },
-    { title: "Pénzügy", icon: <PiggyBank />, links: [["Pénztár és bank", `${b}/money`], ["Tagi kölcsön", `${b}/member-loans`], ["Bérszámfejtés", `${b}/payroll`]] },
+    { title: "Bizonylatok", icon: <Files />, badge: inbox.n ? `${inbox.n} új` : undefined, links: [...mod("inbox", ["Beérkező bizonylatok", `${b}/inbox`]), ["Vevőszámlák", `${b}/invoices?dir=out`], ["Szállítói számlák", `${b}/invoices?dir=in`], ["Vegyes / bank tétel", `${b}/journal/new`]] },
+    { title: "Pénzügy", icon: <PiggyBank />, links: [["Pénztár és bank", `${b}/money`], ...mod("memberLoans", ["Tagi kölcsön", `${b}/member-loans`]), ...mod("payroll", ["Bérszámfejtés", `${b}/payroll`]), ...mod("filings", ["NAV-bevallások", `${b}/filings`])] },
     { title: "Kimutatások", icon: <ChartNoAxesCombined />, links: [["KPI-Dashboard", `${b}/reports/kpi`], ["P&L, cash-flow, mérleg", `${b}/reports/statements`], ["ÁFA", `${b}/reports/vat`], ...carLinks(["KészletMérleg", `${b}/vehicles/merleg`], ["EPR összesítő", `${b}/vehicles/epr`]), ["Nyitott tételek", `${b}/reports/open-items`], ["Egyezőség", `${b}/reports/consistency`]] },
-    { title: "Főkönyv", icon: <Library />, links: [["Napló", `${b}/journal`], ["Számlakarton", `${b}/reports/ledger`], ["Tárgyi eszközök", `${b}/assets`], ["Évzárás", `${b}/closing`]] },
-    { title: "Törzsadatok", icon: <Database />, badge: car ? `${inStock.length} autó` : undefined, links: [...carLinks(["Gépkocsi készlet", `${b}/vehicles`], ["KészletMérleg", `${b}/vehicles/merleg`]), ["Partnerek", `${b}/partners`], ["Számlatükör", `${b}/accounts`], ["Árfolyamok (MNB)", `${b}/fx`]] },
-    { title: "Tervezés és rendszer", icon: <Cog />, links: [["Forecast", `${b}/forecast`], ...carLinks(["ÁrSugó", `${b}/arsugo`]), ["Megjelenés", `${b}/appearance`], ["Beállítások", `${b}/settings`], ["Adatimport / export", `${b}/import`]] },
+    { title: "Főkönyv", icon: <Library />, links: [["Napló", `${b}/journal`], ["Számlakarton", `${b}/reports/ledger`], ...mod("assets", ["Tárgyi eszközök", `${b}/assets`]), ["Évzárás", `${b}/closing`]] },
+    { title: "Törzsadatok", icon: <Database />, badge: car ? `${inStock.length} autó` : undefined, links: [...carLinks(["Gépkocsi készlet", `${b}/vehicles`], ["KészletMérleg", `${b}/vehicles/merleg`]), ["Partnerek", `${b}/partners`], ["Számlatükör", `${b}/accounts`], ...mod("fx", ["Árfolyamok (MNB)", `${b}/fx`])] },
+    { title: "Tervezés és rendszer", icon: <Cog />, links: [...mod("forecast", ["Forecast", `${b}/forecast`]), ...carLinks(["ÁrSugó", `${b}/arsugo`]), ["Megjelenés", `${b}/appearance`], ["Beállítások", `${b}/settings`], ["Adatimport / export", `${b}/import`]] },
   ];
 
   return (

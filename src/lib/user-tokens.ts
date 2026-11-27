@@ -81,8 +81,8 @@ export async function mailTokenLink(to: string, name: string, link: string, purp
 <p>Kedves ${esc(name)}!</p><p>${esc(intro)}</p>
 <p><a href="${esc(link)}" style="display:inline-block;background:#1f3a5f;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">${button}</a></p>
 <p style="font-size:12px;color:#6b7280">Ha a gomb nem működik, másold a böngészőbe: ${esc(link)}</p>
-<p style="font-size:12px;color:#6b7280">Mogyorosi Holding™ · mogyorosi.erp</p></div>`;
-  const text = `Kedves ${name}!\n\n${intro}\n\n${button}: ${link}\n\nMogyorosi Holding™ · mogyorosi.erp`;
+<p style="font-size:12px;color:#6b7280">mogyorosi.erp · Mogyorosi Holding™</p></div>`;
+  const text = `Kedves ${name}!\n\n${intro}\n\n${button}: ${link}\n\nmogyorosi.erp · Mogyorosi Holding™`;
   try {
     await deliver(to, { subject, html, text });
     return true;

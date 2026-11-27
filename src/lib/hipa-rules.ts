@@ -42,14 +42,11 @@ export function normName(s: string): string {
     .join(" ");
 }
 
-/** Beépített szabályok – a Kincstár letöltéséig (forrás: önkormányzati rendeletek). */
-export const BUILTIN_HIPA_RULES: Record<string, HipaRule> = {
-  [normName("Mór")]: {
-    name: "Mór", rate: 0.02, exemptBelow: 2_500_000, exemptInclusive: false,
-    notes: ["27/2018. (XI.30.) önkormányzati rendelet: mentes, akinek a vállalkozási szintű adóalapja nem éri el a 2 500 000 Ft-ot"],
-    source: "beépített (Mór, 27/2018. rendelet)",
-  },
-};
+/**
+ * Beépített szabályok – a Kincstár letöltéséig. v6.2.0: üres – minden település szabálya a Kincstár-letöltésből jön
+ * (az *Évzárás › TAO és HIPA* oldalon), így egyik település sem élvez előnyt.
+ */
+export const BUILTIN_HIPA_RULES: Record<string, HipaRule> = {};
 
 const ZIPS = (postal as { source: string; zips: Record<string, string[]> }).zips;
 export const POSTAL_SOURCE = (postal as { source: string }).source;

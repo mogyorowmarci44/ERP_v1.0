@@ -64,7 +64,7 @@ export const vehicleVatEnum = pgEnum("vehicle_vat", ["margin", "normal"]);
 /** v2.0 – Az entitás jogi formája: társaság (Bt/Kft/Zrt) vagy adószámos magánszemély. */
 export const entityTypeEnum = pgEnum("entity_type", ["company", "private_taxpayer"]);
 /** v5.0.0 – Tevékenységprofil: autókereskedés vagy általános (a tevékenységi kör még nem ismert). */
-export const activityProfileEnum = pgEnum("activity_profile", ["car_dealer", "general"]);
+export const activityProfileEnum = pgEnum("activity_profile", ["car_dealer", "general", "services", "trade"]);
 
 // ---------------------------------------------------------------------------
 // Felhasználók, cégek
@@ -303,6 +303,8 @@ export type CompanySettings = {
   summaryExcludeVehicles?: number[] | null;
   /** v3.3.3 – Az ERP előtti évek elhatárolt vesztesége (keletkezés éve, összeg). */
   openingLosses?: { year: string; amount: number }[] | null;
+  /** v6.2.0 – modulkapcsolók: csak a profil alapértelmezésétől eltérő értékek (ld. lib/modules.ts). */
+  modules?: Partial<Record<import("../lib/modules").ModuleKey, boolean>> | null;
 };
 
 /** v2.0 – Adószámos magánszemély (pl. szálláshely-szolgáltatás) adózási profilja. */

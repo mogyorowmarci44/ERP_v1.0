@@ -158,7 +158,7 @@ export function AutoMerlegView({ input, meta, cid, canWrite, saveHolding, sugges
       {meta.checks.some((c) => !c.ok) && (
         <div className="card am-checks"><h2>Ellenőrzés (karton)</h2><ul>{meta.checks.filter((c) => !c.ok).map((c, i) => <li key={i} className="neg">{c.text}</li>)}</ul></div>
       )}
-      <p className="muted am-foot">Mogyorosi Holding™ · AutóMérleg · {sold ? "lezárt elszámolás" : `élő számok, ${hu(input.today)}`} · célfedezet {r.targetFromHistory ? `${ft(r.target)} (eladott autók mediánja)` : `${ft(r.target)} (bekerülés 10%-a)`}</p>
+      <p className="muted am-foot">mogyorosi.erp · AutóMérleg · {sold ? "lezárt elszámolás" : `élő számok, ${hu(input.today)}`} · célfedezet {r.targetFromHistory ? `${ft(r.target)} (eladott autók mediánja)` : `${ft(r.target)} (bekerülés 10%-a)`}</p>
     </div>
   );
 }

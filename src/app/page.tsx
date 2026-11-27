@@ -7,7 +7,7 @@ import { TERMS_VERSION } from "@/lib/vendor";
 import { canPurge, daysUntilPurge, exportFresh, PURGE_GRACE_DAYS, EXPORT_MAX_AGE_HOURS } from "@/lib/archive-calc";
 import { TaxProfileFields } from "@/components/TaxProfileFields";
 import { ENTITY_LABEL } from "@/lib/entity";
-import { ACTIVITY_SHORT } from "@/lib/activity";
+import { ACTIVITY_LABEL, ACTIVITY_PROFILES, ACTIVITY_SHORT } from "@/lib/activity";
 import { APP_VERSION } from "@/lib/version";
 import { Flash } from "@/components/Flash";
 import { CompanyMark, ErpLogo, AppFooter } from "@/components/Brand";
@@ -97,8 +97,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       <form action={createCompanyAction} className="card form-grid">
         <label>Sablon
           <select name="activityProfile" defaultValue="general">
-            <option value="general">Általános Kft – tevékenységi kör még nem ismert</option>
-            <option value="car_dealer">Autókereskedés</option>
+            {ACTIVITY_PROFILES.map((p) => <option key={p} value={p}>{ACTIVITY_LABEL[p]}</option>)}
           </select>
         </label>
         <label>Cégnév<input name="name" required placeholder="Új Kft" /></label>

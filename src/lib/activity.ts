@@ -1,32 +1,37 @@
 /**
- * v5.0.0 – Tevékenységprofil (cégenként).
+ * v5.0.0 – Tevékenységprofil (cégenként). v6.2.0: a profil a modulok kiinduló beállítása (lib/modules.ts);
+ * a modulok a cég Beállítások oldalán egyenként is kapcsolhatók.
  *
- * - car_dealer: autókereskedés (PezCar, MM Car Trade) – ÁrSugó, AutóMérleg, KészletMérleg, jármű-EPR,
- *   különbözeti ÁFA, autónkénti Forecast.
+ * - car_dealer: gépkocsi-kereskedés – gépkocsi készlet, különbözeti ÁFA, ÁrSugó, AutóMérleg, KészletMérleg, jármű-EPR.
  * - general: általános társaság, a tevékenységi kör még nem ismert.
- *
- * v5.0.0-ban a profil még csak címke: az „általános” Kft sablon ugyanazt a számlatükröt, ÁFA-kódokat,
- * naplókat és felületet kapja, mint az autókereskedés. A profil szerinti modulkapcsolás a következő lépés
- * (lásd `isCarDealer`).
+ * - services: szolgáltató cég (készlet nélkül).
+ * - trade: kereskedelmi cég – cikkenkénti készletnyilvántartással.
  */
-export type ActivityProfile = "car_dealer" | "general";
+export type ActivityProfile = "car_dealer" | "general" | "services" | "trade";
 
-export const ACTIVITY_PROFILES: ActivityProfile[] = ["car_dealer", "general"];
+export const ACTIVITY_PROFILES: ActivityProfile[] = ["general", "services", "trade", "car_dealer"];
 
 export const ACTIVITY_LABEL: Record<ActivityProfile, string> = {
-  car_dealer: "Autókereskedés",
+  car_dealer: "Gépkocsi-kereskedés",
   general: "Általános (tevékenységi kör még nem ismert)",
+  services: "Szolgáltatás",
+  trade: "Kereskedelem (cikkenkénti készlettel)",
 };
 
 /** Rövid címke a cégkártyákra. */
 export const ACTIVITY_SHORT: Record<ActivityProfile, string> = {
-  car_dealer: "Autókereskedés",
+  car_dealer: "Gépkocsi-kereskedés",
   general: "Általános",
+  services: "Szolgáltatás",
+  trade: "Kereskedelem",
 };
 
 export function parseActivityProfile(v: unknown, fallback: ActivityProfile = "general"): ActivityProfile {
   return ACTIVITY_PROFILES.includes(v as ActivityProfile) ? (v as ActivityProfile) : fallback;
 }
 
-/** Autókereskedés-specifikus modulok ennél a cégnél (a következő verziótól ez kapcsolja a menüt és a nyitóoldalt). */
-export const isCarDealer = (c: { activityProfile?: string | null }) => c.activityProfile === "car_dealer";
+/** Gépkocsi-kereskedés modul ennél a cégnél (v6.2.0: a modulkapcsoló szerint, ld. lib/modules.ts). */
+export const isCarDealer = (c: { activityProfile?: string | null; settings?: unknown }) => {
+  const o = (c.settings as { modules?: { vehicles?: boolean } } | null | undefined)?.modules?.vehicles;
+  return typeof o === "boolean" ? o : c.activityProfile === "car_dealer";
+};

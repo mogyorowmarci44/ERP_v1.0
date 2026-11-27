@@ -39,6 +39,28 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.2.0 – Semleges felület, modulkapcsolók cégenként
+
+**Modulok** (*Beállítások › Modulok*). Cégenként be- és kikapcsolható:
+- gépkocsi-kereskedés (készlet, kartonok, ÁrSugó, AutóMérleg, KészletMérleg, EPR)
+- cikkenkénti készlet
+- beérkező bizonylatok
+- bérszámfejtés
+- tagi kölcsön
+- tárgyi eszközök
+- Forecast
+- NAV-bevallások
+- napi összefoglaló
+- devizás tételek
+
+A kikapcsolt modul eltűnik a menüből és a nyitóoldalról, az oldalai nem nyílnak meg, de az adatai megmaradnak. Az alap könyvelés mindig elérhető. A tevékenységprofil adja az alapbeállítást; új profilok: *Szolgáltatás*, *Kereskedelem*. Csak a profiltól eltérő kapcsolók tárolódnak, és van „Vissza a profil alapbeállítására” gomb.
+
+**Saját nevek kivezetése:**
+- Mintaszövegek és helyőrzők: cégnevek, személynevek, települések, irányítószám.
+- A beépített móri HIPA-szabály megszűnt. Minden település szabálya a Kincstár-letöltésből jön.
+- A vendégház-értékelés alapértéke nem egy konkrét városra hivatkozik.
+- Nyomtatott dokumentumokon és exportokon a jelölés: „készült a mogyorosi.erp rendszerben · Mogyorosi Holding™”. A Mogyorosi Holding™ védjegy így mindenhol megmarad, de egyértelmű, hogy a dokumentumot az ügyfél készítette, a rendszerrel.
+
 ## v6.1.0 – Jogi háttér, adattitkosítás, teljes mentés
 
 **Jogi dokumentumok** (nyilvánosak: `/jogi/aszf`, `/jogi/adatkezeles`, `/jogi/adatfeldolgozas`, és minden oldal láblécéből elérhetők):
