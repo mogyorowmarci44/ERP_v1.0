@@ -56,6 +56,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           <a className="btn" href="/terkep">ERP-térkép</a>
         </div>
         <form action={logoutAction} className="row">
+          {list.length > 1 && <Link href="/iroda">Iroda – összes cég</Link>}
           {user.isAdmin && <Link href="/admin">Admin – hozzáférések</Link>}
           {user.isPlatformAdmin && <Link href="/admin/platform">Ügyfélfiókok</Link>}
           <span className="muted">{user.name}</span>
