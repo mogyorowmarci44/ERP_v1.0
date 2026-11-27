@@ -28,7 +28,6 @@ const BLOCKS: Record<Variant, { cars: boolean; finance: boolean }> = { ceo: { ca
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const HU_M = ["jan.", "febr.", "márc.", "ápr.", "máj.", "jún.", "júl.", "aug.", "szept.", "okt.", "nov.", "dec."];
 const shortD = (d: string) => `${HU_M[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}.`;
-const qLabel = (d: string) => `${["I.", "II.", "III.", "IV."][Math.floor((Number(d.slice(5, 7)) - 1) / 3)]} negyedév`;
 const pct = (a: number, b: number | null) => (b && b > 0 ? Math.max(0, Math.min(100, Math.round((a / b) * 100))) : null);
 const href = (path: string) => (appUrl() ? appUrl() + path : "");
 const A = (path: string, inner: string, color: string) => {

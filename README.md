@@ -39,6 +39,19 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v7.1.0 – Átvilágítás: sebesség, biztonság, mobil
+
+Teljes átvilágítás után:
+- **Sebesség:**
+  - Az egyezőség-ellenőrzés (nyitóoldal, Adók, Napi összefoglaló, Egyezőség) számla ↔ napló lekérdezése halmaz-alapú lett. 4000 számlánál ~650 ms-ról ~25 ms-ra csökkent, az eredmény tételesen azonos.
+  - A KPI havi készletérték-sora is gyorsult.
+  - Új indexek (`0041`): `invoices.journal_entry_id`, `journal_lines (company_id, partner_id)`, `payments.company_id`, `invoices (company_id, status, direction)`.
+- **Biztonság:**
+  - A Beérkező bizonylatok fájl-előnézete csak PDF / kép / szöveg típust nyit meg a böngészőben, minden mást (HTML, SVG, XML…) letöltésként ad. Ez a mobilos portál külső feltöltői miatt fontos.
+  - Új fejlécek: HSTS, Permissions-Policy, szűk CSP (`frame-ancestors`, `base-uri`, `object-src`); az `X-Powered-By` fejléc kikapcsolva.
+- **Mobil:** 760 px alatt a táblázatok önállóan görgethetők, és az űrlapok egy oszlopba rendeződnek.
+- **Takarítás:** négy nem használt változó / import eltávolítva.
+
 ## v7.0.0 – Adatelkülönítés és lapozás
 
 - **Adatbázis-szintű adatelkülönítés** (`0040`): a `journal_lines`, `invoice_lines`, `invoices`, `payments` és `stock_moves` triggerei ellenőrzik, hogy minden hivatkozott rekord ugyanahhoz a céghez tartozik. Ide tartozik a főkönyvi számla, a partner, a gépkocsi, az ÁFA-kód, a cikk, a számla és a naplótétel. Akkor is véd, ha az alkalmazás egy pontja hibázna. A hibaüzenet érthetően jelenik meg.

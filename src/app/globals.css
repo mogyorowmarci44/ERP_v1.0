@@ -1205,3 +1205,11 @@ table.fc-plan tr.total td { border-top: 1px solid var(--line, currentColor); }
 .help-section h2 { margin-top: 0; font-size: 18px; }
 .demo-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: #eef5ff; border-color: #b9d3f5; color: inherit; }
 .news-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d33; margin-left: 4px; vertical-align: middle; }
+
+/* v7.1.0 – telefonon a széles táblázatok önmagukban görgethetők, ne az egész oldal lógjon ki */
+@media (max-width: 760px) {
+  table, .table-wrap { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .form-grid { grid-template-columns: 1fr !important; }
+  input, select, textarea { max-width: 100%; }
+  .topbar { flex-wrap: wrap; gap: 8px; }
+}

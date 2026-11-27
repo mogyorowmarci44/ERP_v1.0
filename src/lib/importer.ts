@@ -4,7 +4,7 @@
  * A könyvelés a normál szolgáltatásokon keresztül történik, így minden szabály (egyensúly, ÁFA, ELÁBÉ) érvényes.
  */
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { db, schema, type Tx, type DbOrTx } from "@/db";
+import { db, schema, type DbOrTx } from "@/db";
 import { addDaysIso } from "./dates";
 import { saveInvoiceDraft, postInvoice, payInvoice, manualEntry, invoiceOpenAmount, type InvoiceInput } from "./ledger";
 import { round2 } from "./money";

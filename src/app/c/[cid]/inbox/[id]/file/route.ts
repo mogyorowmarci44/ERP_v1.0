@@ -4,6 +4,7 @@ import { requireCompany } from "@/lib/auth";
 import { binderPositions } from "@/lib/inbox/service";
 import { stampDocument } from "@/lib/inbox/stamp";
 import { docData } from "@/lib/file-store";
+import { servedAs } from "@/lib/file-serve";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +32,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ cid: str
       name = `${d.filingNo} ${d.filename.replace(/\.[^.]+$/, "")}.pdf`;
     }
   }
+  const s = servedAs(mime);
   return new Response(body as unknown as BodyInit, {
     headers: {
-      "Content-Type": mime,
-      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(name)}`,
+      "Content-Type": s.type,
+      "Content-Disposition": `${s.inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(name)}`,
       "Cache-Control": "private, no-cache",
       "X-Content-Type-Options": "nosniff",
+      // a fájl semmilyen szkriptet / külső tartalmat ne tölthessen be, ha mégis megnyílna
+      ...(s.inline && !s.type.startsWith("application/pdf") ? { "Content-Security-Policy": "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox" } : {}),
     },
   });
 }

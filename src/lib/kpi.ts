@@ -133,9 +133,11 @@ export async function companyKpis(companyId: number, asOf = today()) {
 
   // havi zárókészlet (26x) az elmúlt 12 hónap végén – a lekötött tőke átlagához
   const stockRows = (await db.execute(sql`
-    with m as (select (date_trunc('month', d) + interval '1 month - 1 day')::date me from generate_series(${from}::date, ${t}::date, interval '1 month') d)
-    select m.me::text me, coalesce((select sum(jl.debit - jl.credit) from journal_lines jl join accounts a on a.id = jl.account_id join journal_entries e on e.id = jl.entry_id
-      where jl.company_id = ${companyId} and a.code like '26%' and e.date <= least(m.me, ${t}::date)), 0)::float8 v from m order by m.me`)) as unknown as Array<{ me: string; v: number }>;
+    with m as (select (date_trunc('month', d) + interval '1 month - 1 day')::date me from generate_series(${from}::date, ${t}::date, interval '1 month') d),
+    -- v7.1.0: a 26-os forgalom egyszer, naponként összesítve (nem hónaponként újra a teljes naplóból)
+    s as (select e.date, sum(jl.debit - jl.credit) amt from journal_lines jl join accounts a on a.id = jl.account_id join journal_entries e on e.id = jl.entry_id
+      where jl.company_id = ${companyId} and a.code like '26%' and e.date <= ${t}::date group by e.date)
+    select m.me::text me, coalesce((select sum(s.amt) from s where s.date <= least(m.me, ${t}::date)), 0)::float8 v from m order by m.me`)) as unknown as Array<{ me: string; v: number }>;
   const avgCapital = avg(stockRows.map((r) => Number(r.v)));
 
   // --- Készlet és forgás ---------------------------------------------------------------
