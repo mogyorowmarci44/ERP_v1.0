@@ -478,3 +478,45 @@ async function invoicingSyncNowActionImpl(fd: FormData) {
     return `${base(cid)}/settings?ok=${encodeURIComponent(msg)}#szamlazo`;
   });
 }
+
+// ---------------------------------------------------------------------------
+// v7.3.0 – Banki párosítási szabályok
+// ---------------------------------------------------------------------------
+
+export async function saveBankRuleAction(fd: FormData) {
+  return withAudit("saveBankRuleAction", fd, () => saveBankRuleActionImpl(fd));
+}
+
+async function saveBankRuleActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true, module: "inbox" });
+  await runOrRedirect(`${base(cid)}/settings`, async () => {
+    const pattern = str(fd, "pattern").trim();
+    const accountCode = str(fd, "accountCode").trim();
+    const direction = ["in", "out", "any"].includes(str(fd, "direction")) ? str(fd, "direction") : "any";
+    if (pattern.length < 2) throw new Error("A keresett szöveg legalább 2 karakter legyen.");
+    const [acc] = await db.select().from(schema.accounts).where(and(eq(schema.accounts.companyId, cid), eq(schema.accounts.code, accountCode)));
+    if (!acc) throw new Error(`Nincs ilyen főkönyvi számla: ${accountCode}`);
+    if (acc.code.startsWith("38")) throw new Error("Pénzeszköz-számlára (38x) nem lehet szabályt tenni – arra a pénztár / átvezetés való.");
+    await db.insert(schema.bankRules).values({ companyId: cid, pattern: pattern.slice(0, 120), direction, accountCode, label: optStr(fd, "label")?.slice(0, 120) ?? null });
+    refresh(cid);
+    return `${base(cid)}/settings?ok=${encodeURIComponent(`Szabály mentve: „${pattern}” → ${accountCode} ${acc.name}. A következő beolvasástól érvényes; a már jóváhagyásra váró kivonatoknál az „Újrafeldolgozás” alkalmazza.`)}#szabalyok`;
+  });
+}
+
+export async function bankRuleToggleAction(fd: FormData) {
+  return withAudit("bankRuleToggleAction", fd, () => bankRuleToggleActionImpl(fd));
+}
+
+async function bankRuleToggleActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true, module: "inbox" });
+  await runOrRedirect(`${base(cid)}/settings`, async () => {
+    const id = Number(fd.get("id"));
+    const where = and(eq(schema.bankRules.id, id), eq(schema.bankRules.companyId, cid));
+    if (fd.get("op") === "delete") await db.delete(schema.bankRules).where(where);
+    else await db.update(schema.bankRules).set({ active: fd.get("op") === "on" }).where(where);
+    refresh(cid);
+    return `${base(cid)}/settings#szabalyok`;
+  });
+}

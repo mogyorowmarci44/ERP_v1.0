@@ -213,6 +213,7 @@ export async function openItems(companyId: number, direction: "out" | "in") {
     .select({
       id: invoices.id,
       invoiceNumber: invoices.invoiceNumber,
+      partnerId: invoices.partnerId,
       partnerName: partners.name,
       issueDate: invoices.issueDate,
       dueDate: invoices.dueDate,

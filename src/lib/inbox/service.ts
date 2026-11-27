@@ -95,6 +95,8 @@ export async function loadProposeCtx(companyId: number): Promise<ProposeCtx> {
     vehicles: vs.map((v) => ({ id: v.id, make: v.make, model: v.model, plate: v.plate, vin: v.vin, status: v.status })),
     existing, vatCodes: new Set(vc.map((v) => v.code)), open, moneyMoves,
     lockedMonths: new Set(locks.map((l) => `${l.y}-${String(l.m).padStart(2, "0")}`)), vatClosedUntil: vc0?.to ?? null, bankRows,
+    bankRules: (await db.select().from(schema.bankRules).where(and(eq(schema.bankRules.companyId, companyId), eq(schema.bankRules.active, true))).orderBy(schema.bankRules.id))
+      .map((r) => ({ id: r.id, pattern: r.pattern, direction: r.direction, accountCode: r.accountCode, label: r.label })),
   };
 }
 
@@ -167,6 +169,7 @@ export async function bookStatementRows(companyId: number, docId: number, prop: 
           const a = Math.abs(r.amount);
           const lines = r.amount < 0 ? [{ accountId: acc, debit: a, credit: 0 }, { accountId: moneyId, debit: 0, credit: a }] : [{ accountId: moneyId, debit: a, credit: 0 }, { accountId: acc, debit: 0, credit: a }];
           await manualEntry(companyId, { journalCode: "BA", date: r.date, description: r.text.slice(0, 200) || "Banki tétel", lines }, userId, tx);
+          if (r.ruleId) await tx.update(schema.bankRules).set({ hits: sql`${schema.bankRules.hits} + 1` }).where(and(eq(schema.bankRules.id, r.ruleId), eq(schema.bankRules.companyId, companyId)));
         } else if (r.action === "transfer" && r.accountCode) {
           const from = await accountIdByCode(tx, companyId, r.accountCode);
           const transit = await accountIdByCode(tx, companyId, "389");

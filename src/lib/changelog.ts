@@ -2,6 +2,10 @@
 export type Release = { version: string; title: string; items: string[] };
 
 export const CHANGELOG: Release[] = [
+  { version: "7.3.0", title: "Fizetési emlékeztető és banki szabályok", items: [
+    "Nyitott tételek: lejárt vevőszámlákra egy gombbal udvarias fizetési emlékeztető megy a partnernek (a számlák listájával, a nyitott összeggel és a bankszámlaszámmal).",
+    "Banki szabályok: „ha a kivonat szövegében X szerepel, könyveld Y-ra” – az ismétlődő, számla nélküli tételek (NAV, bankköltség, kamat) maguktól könyvelődnek.",
+  ] },
   { version: "7.2.0", title: "Mentés egy gombbal a tárolóba", items: [
     "Admin › Mentés: a „Mentés most” gomb az összes cég teljes mentését a fájltárolóba teszi; cégenként a legutóbbi 12 marad meg, bármelyik letölthető és visszatölthető.",
   ] },

@@ -25,7 +25,20 @@ export type ProposeCtx = {
   vatClosedUntil?: string | null;
   /** v3.1.0: még párosításra váró kivonatsorok – a bruttó összeg banki megerősítéséhez. */
   bankRows?: Array<{ date: string; amount: number; text: string }>;
+  /** v7.3.0: a cég banki párosítási szabályai (aktívak, sorrendben). */
+  bankRules?: BankRuleLite[];
 };
+
+export type BankRuleLite = { id: number; pattern: string; direction: string; accountCode: string; label: string | null };
+
+/** v7.3.0 – az első illeszkedő szabály: a minta (kis-/nagybetű és ékezet nélkül) szerepel a szövegben, és az irány stimmel. */
+export function matchBankRule(rules: BankRuleLite[] | undefined, text: string, amount: number): BankRuleLite | null {
+  if (!rules?.length) return null;
+  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const t = norm(text);
+  const dir = amount < 0 ? "in" : "out";
+  return rules.find((r) => (r.direction === "any" || r.direction === dir) && norm(r.pattern).length >= 2 && t.includes(norm(r.pattern))) ?? null;
+}
 
 const digits = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
 const tax8 = (s: string | null | undefined) => digits(s).slice(0, 8);
@@ -233,6 +246,9 @@ export function proposeStatement(ctx: ProposeCtx, x: ExtractedDoc): InboxProposa
       const full = amountOk(hit);
       return { ...base, action: full ? ("pay_invoice" as const) : ("review" as const), invoiceId: hit.id, invoiceLabel: `${hit.partnerName} ${hit.number}`, reason: full ? null : "részfizetés vagy eltérő összeg" };
     }
+    // v7.3.0 – saját szabály (pl. „NAV” → 463, „kamat” → 972): ha nincs nyitott számla hozzá
+    const rule = matchBankRule(ctx.bankRules, text, amt);
+    if (rule) return { ...base, action: "entry" as const, accountCode: rule.accountCode, ruleId: rule.id, reason: `szabály: ${rule.label || rule.pattern}` };
     return { ...base, action: "review" as const, reason: "nincs egyértelmű párosítás" };
   });
   const issues: string[] = [];

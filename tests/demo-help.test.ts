@@ -71,3 +71,32 @@ describe("v7.2.0 – tárolóbeli mentések kulcsai", () => {
     expect(C.pruneList(keys, 5)).toEqual([]);
   });
 });
+
+describe("v7.3.0 – fizetési emlékeztető és banki szabályok", () => {
+  it("emlékeztető levél: tételek, összesítés devizánként, védjegy, HTML-escape", async () => {
+    const { renderReminder } = await import("@/lib/payment-reminder-calc");
+    const m = renderReminder({ companyName: "Teszt Kft", partnerName: "Vevő <Bt>", today: "2026-11-27", bankAccount: "11111111-22222222", contactName: "Marci", contactEmail: "m@x.hu",
+      items: [{ invoiceNumber: "A-1", issueDate: "2026-10-01", dueDate: "2026-10-09", openFx: 127000, currency: "HUF" }, { invoiceNumber: "A-2", issueDate: "2026-11-01", dueDate: "2026-11-09", openFx: 100.5, currency: "EUR" }] });
+    expect(m.subject).toBe("Fizetési emlékeztető – 2 számla (Teszt Kft)");
+    m.text = m.text.replace(/[\u00a0\u202f]/g, " ");
+    expect(m.text).toContain("A-1: kelte 2026.10.01., esedékes 2026.10.09., nyitott 127 000 Ft (49 napja lejárt)");
+    expect(m.text).toContain("Összesen: 127 000 Ft + 100,50 EUR");
+    expect(m.text).toContain("11111111-22222222");
+    expect(m.text).toContain("Mogyorosi Holding™");
+    expect(m.html).toContain("Vevő &lt;Bt&gt;");
+    expect(() => renderReminder({ companyName: "x", partnerName: "y", today: "2026-01-01", items: [] })).toThrow();
+  });
+  it("banki szabály: ékezet/kisbetű független, irány, első találat", async () => {
+    const { matchBankRule } = await import("@/lib/inbox/propose");
+    const rules = [
+      { id: 1, pattern: "NAV", direction: "in", accountCode: "463", label: null },
+      { id: 2, pattern: "kamatjóváírás", direction: "out", accountCode: "972", label: null },
+      { id: 3, pattern: "nav", direction: "any", accountCode: "469", label: null },
+    ];
+    expect(matchBankRule(rules, "Átutalás · NAV ÁFA 2026/10", -50000)?.id).toBe(1);
+    expect(matchBankRule(rules, "NAV visszatérítés", 20000)?.id).toBe(3);
+    expect(matchBankRule(rules, "KAMATJOVAIRAS november", 120)?.accountCode).toBe("972");
+    expect(matchBankRule(rules, "Telekom", -1000)).toBeNull();
+    expect(matchBankRule(undefined, "NAV", -1)).toBeNull();
+  });
+});

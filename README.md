@@ -39,6 +39,20 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v7.3.0 – Fizetési emlékeztető és banki szabályok
+
+- **Fizetési emlékeztető** (Nyitott tételek):
+  - A lejárt vevőszámlák partnerenként csoportosítva jelennek meg.
+  - Egy gombbal udvarias levél megy a partner e-mail címére: a számlák listája, a nyitott összeg devizánként, a megadott bankszámlaszám, kapcsolattartóként a küldő neve és címe, a láblécben a védjegy.
+  - A kiküldés naplózva van (`payment_reminders`). Ugyanarra a számlára 3 napon belül csak megerősítéssel megy újra.
+  - A bankszámlaszám a cég beállításaiban megmarad.
+- **Banki szabályok** (Beérkező bizonylatok › Beállítások):
+  - Szöveg + irány → főkönyvi számla (`bank_rules`), például NAV-befizetés, kamat vagy hiteltörlesztés.
+  - Csak akkor lép életbe, ha a tételhez nincs nyitott számla. Kis- és nagybetű, valamint ékezet nem számít, és az első illeszkedő szabály érvényes.
+  - A szabályok használatszámlálót kapnak.
+  - A kivonat jóváhagyásra váró sorainál a „+ szabály ebből” link előtölti az űrlapot.
+- **Migráció:** `0042`.
+
 ## v7.2.0 – Mentés gombbal a tárolóba, bővebb CI
 
 - **Admin › Mentés › Mentés a tárolóba:**
