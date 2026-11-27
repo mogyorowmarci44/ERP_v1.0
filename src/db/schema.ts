@@ -276,6 +276,8 @@ export const appSettings = pgTable("app_settings", {
 
 /** Cégszintű könyvelési beállítások (alapértelmezett főkönyvi számlák kódjai). */
 export type CompanySettings = {
+  /** v6.12.0 – bemutató cég (mintaadatok; nem számít a keretbe, azonnal törölhető). */
+  demo?: boolean;
   receivableDomestic: string; // 311
   receivableForeign: string; // 316
   payableDomestic: string; // 454

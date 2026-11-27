@@ -403,3 +403,39 @@ async function assertCanCreateCompany(organizationId: number | null) {
   if (!a.writable) throw new Error(`${a.reason} Új cég nem hozható létre – előfizetés: Admin › Előfizetés.`);
   await assertCompanyLimit(organizationId);
 }
+
+// ---------------------------------------------------------------------------
+// v6.12.0 – Bemutató cég
+// ---------------------------------------------------------------------------
+
+/** Bemutató cég mintaadatokkal (ügyfélfiókonként egy; nem számít a csomag keretébe). */
+export async function createDemoCompanyAction() {
+  const user = await requireUser();
+  await runOrRedirect("/", async () => {
+    const { createDemoCompany, demoCompanyOf } = await import("@/lib/demo");
+    const existing = await demoCompanyOf(user.organizationId);
+    if (existing) return `/c/${existing}`;
+    const { orgAccess } = await import("@/lib/billing");
+    const a = await orgAccess(user.organizationId);
+    if (!a.writable) throw new Error(`${a.reason} Bemutató cég nem hozható létre.`);
+    const c = await createDemoCompany(user.id);
+    await audit({ action: "company.demo.create", companyId: c.id, target: "bemutató cég" });
+    return `/c/${c.id}?ok=${encodeURIComponent("Kész a bemutató cég – nézz körül nyugodtan, bármit kipróbálhatsz rajta.")}`;
+  });
+}
+
+/** A bemutató cég azonnal (türelmi idő és jelszó nélkül) törölhető – csak a tulajdonosa, és csak ha valóban bemutató cég. */
+export async function deleteDemoCompanyAction(fd: FormData) {
+  const user = await requireUser();
+  await runOrRedirect("/", async () => {
+    const cid = Number(fd.get("companyId"));
+    const m = await ownedCompany(user.id, cid);
+    const [c] = await db.select({ settings: schema.companies.settings }).from(schema.companies).where(eq(schema.companies.id, cid));
+    const { isDemo } = await import("@/lib/demo");
+    if (!c || !isDemo(c)) throw new Error("Csak a bemutató cég törölhető így.");
+    await wipeCompanyData(cid);
+    await db.delete(schema.companies).where(eq(schema.companies.id, cid));
+    await audit({ action: "company.demo.delete", companyId: cid, target: m.name });
+    return `/?ok=${encodeURIComponent("A bemutató cég törölve.")}`;
+  });
+}

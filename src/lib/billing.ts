@@ -44,7 +44,8 @@ async function orgPlan(organizationId: number) {
 export async function assertCompanyLimit(organizationId: number | null | undefined) {
   if (!organizationId) return;
   const plan = await orgPlan(organizationId);
-  const [{ n }] = await db.select({ n: count() }).from(schema.companies).where(eq(schema.companies.organizationId, organizationId));
+  // v6.12.0 – a bemutató cég nem számít bele
+  const [{ n }] = await db.select({ n: count() }).from(schema.companies).where(and(eq(schema.companies.organizationId, organizationId), sql`coalesce((${schema.companies.settings}->>'demo')::boolean, false) = false`));
   const err = limitError("companies", Number(n), plan?.maxCompanies);
   if (err) throw new Error(err);
 }

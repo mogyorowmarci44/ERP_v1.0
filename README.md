@@ -39,6 +39,16 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v6.12.0 – Bemutató cég, súgó, Újdonságok
+
+- **Bemutató cég:**
+  - A Cégeim oldalon egy gombbal létrehozható egy autószerviz-kft. valósághű mintaadatokkal. Az adatok az elmúlt 3 hónapból valók, a mai naphoz igazítva: tőkebefizetés, 10 kimenő és 10 bejövő számla, kiegyenlítések, nyitott és lejárt kintlévőség.
+  - Ügyfélfiókonként egy lehet, és nem számít a csomag cégszám-keretébe.
+  - A sárga sávban egy gombbal azonnal törölhető (türelmi idő és jelszó nélkül, csak a tulajdonos).
+- **Súgó** (`/sugo`): modulonként rövid, gyakorlati leírás. A cég menüjében a „Súgó” gomb az éppen nyitott oldalhoz tartozó részre ugrik. Belépés nélkül is elérhető.
+- **Újdonságok** (`/ujdonsagok`): közérthető változásnapló. A Cégeim oldalon piros pötty jelzi, ha van még nem látott újdonság.
+- Nincs migráció és új környezeti változó.
+
 ## v6.11.0 – Modulonkénti jogosultság és mobilos bizonylatfeltöltő portál
 
 - **Modulonkénti jogosultság:**
