@@ -281,6 +281,13 @@
       "when": 1795880000000,
       "tag": "0039_v6_11_roles_portal",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795890000000,
+      "tag": "0040_v7_0_tenant_guard",
+      "breakpoints": true
     }
   ]
 }

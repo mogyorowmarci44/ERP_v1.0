@@ -4,8 +4,10 @@ import { isSystemError } from "./error-log-calc";
 export function errMsg(e: unknown): string {
   if (e instanceof Error) {
     // Postgres egyedi kulcs megsértése
-    const cause = (e as { cause?: { code?: string } }).cause;
+    const cause = (e as { cause?: { code?: string; message?: string } }).cause;
     if (cause?.code === "23505" || (e as { code?: string }).code === "23505") return "Ilyen azonosítóval már létezik rekord (duplikált).";
+    // v7.0.0 – az adatbázis saját (magyar nyelvű) védelmi üzenetei: adatelkülönítés, T = K egyezés
+    if ((cause?.code === "23514" || cause?.code === "P0001") && cause.message) return cause.message;
     return e.message;
   }
   return String(e);

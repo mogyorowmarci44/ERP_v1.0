@@ -398,6 +398,16 @@ async function buildFromInput(tx: DbOrTx, companyId: number, input: InvoiceInput
     for (const l of input.lines) if (l.itemId && !l.quantity) throw new Error(`Cikkes sorban a mennyiség nem lehet nulla: „${l.description}”`);
   }
 
+  // v7.0.0 – a sorok főkönyvi számlája és gépkocsija is ehhez a céghez tartozzon (adatelkülönítés)
+  const accIds = [...new Set(input.lines.map((l) => l.accountId))];
+  const ownAcc = await tx.select({ id: accounts.id }).from(accounts).where(and(eq(accounts.companyId, companyId), inArray(accounts.id, accIds)));
+  if (ownAcc.length !== accIds.length) throw new Error("Ismeretlen főkönyvi számla a számlán.");
+  const vehIds = [...new Set(input.lines.map((l) => l.vehicleId).filter((x): x is number => !!x))];
+  if (vehIds.length) {
+    const ownVeh = await tx.select({ id: schema.vehicles.id }).from(schema.vehicles).where(and(eq(schema.vehicles.companyId, companyId), inArray(schema.vehicles.id, vehIds)));
+    if (ownVeh.length !== vehIds.length) throw new Error("Ismeretlen gépkocsi a számlán.");
+  }
+
   const lines = [];
   for (const l of input.lines) {
     const vc = codeMap.get(l.vatCodeId);

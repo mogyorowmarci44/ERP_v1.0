@@ -39,6 +39,16 @@ Adózási profil (Beállítások): SZJA-mód, alanyi mentesség, szobák / fér�
 
 Következő lépések: foglalások / vendégéjszakák és IFA-összesítő, Airbnb-kifizetés import szabályok, saját weboldal foglalásainak fogadása.
 
+## v7.0.0 – Adatelkülönítés és lapozás
+
+- **Adatbázis-szintű adatelkülönítés** (`0040`): a `journal_lines`, `invoice_lines`, `invoices`, `payments` és `stock_moves` triggerei ellenőrzik, hogy minden hivatkozott rekord ugyanahhoz a céghez tartozik. Ide tartozik a főkönyvi számla, a partner, a gépkocsi, az ÁFA-kód, a cikk, a számla és a naplótétel. Akkor is véd, ha az alkalmazás egy pontja hibázna. A hibaüzenet érthetően jelenik meg.
+- A számla sorainak főkönyvi számláját és gépkocsiját az alkalmazás is ellenőrzi.
+- **Cégek közötti szivárgásteszt:**
+  - `tests/integration/tenant-isolation.test.ts`: alkalmazás- és adatbázis-szint.
+  - `tests/e2e/tenant_crawl.py`: egy másik ügyfélfiók felhasználója az összes oldalt és letöltést bejárja az első fiók azonosítóival. Eredmény: 0 szivárgás, minden idegen azonosító 404, és minden idegen cég oldala elirányít.
+- **Keresés és lapozás:** a Beérkező bizonylatoknál (a korábbi 300 / 1000 tételes levágás helyett) és a Partnereknél.
+- A nem létező ÁFA-időszak XML-je 500-as hiba helyett érthető 404-et ad.
+
 ## v6.12.0 – Bemutató cég, súgó, Újdonságok
 
 - **Bemutató cég:**

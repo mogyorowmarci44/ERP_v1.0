@@ -36,3 +36,12 @@ describe("v6.12.0 – súgó és újdonságok", () => {
     expect(CHANGELOG.every((r) => r.items.length > 0)).toBe(true);
   });
 });
+
+describe("v7.0.0 – adatbázis-védelmi üzenetek", () => {
+  it("a trigger (check_violation) üzenete jelenik meg a nyers lekérdezés helyett", async () => {
+    const { errMsg } = await import("@/lib/action-utils");
+    const e = Object.assign(new Error("Failed query: insert into journal_lines …"), { cause: { code: "23514", message: "Cégek közötti hivatkozás nem megengedett (accounts, #5)." } });
+    expect(errMsg(e)).toBe("Cégek közötti hivatkozás nem megengedett (accounts, #5).");
+    expect(errMsg(new Error("sima hiba"))).toBe("sima hiba");
+  });
+});
