@@ -280,6 +280,8 @@ export type CompanySettings = {
   demo?: boolean;
   /** v7.3.0 – a fizetési emlékeztetőben megadott bankszámlaszám. */
   reminderBankAccount?: string | null;
+  /** v7.5.0 – bejövő számla csak jóváhagyás után fizethető (e bruttó forintösszeg felett; 0 = mindegyik). */
+  approval?: { on: boolean; threshold: number } | null;
   receivableDomestic: string; // 311
   receivableForeign: string; // 316
   payableDomestic: string; // 454
@@ -578,6 +580,8 @@ export const journalLines = pgTable(
     partnerId: integer("partner_id").references(() => partners.id),
     vehicleId: integer("vehicle_id").references(() => vehicles.id),
     vatCodeId: integer("vat_code_id").references(() => vatCodes.id),
+    /** v7.5.0 – költséghely / projekt */
+    costCenterId: integer("cost_center_id").references(() => costCenters.id, { onDelete: "set null" }),
     currency: varchar("currency", { length: 3 }),
     amountFx: money("amount_fx"),
     fxRate: rate("fx_rate"),
@@ -646,6 +650,9 @@ export const invoices = pgTable(
     reuseEntryNumber: varchar("reuse_entry_number", { length: 32 }),
     /** v3.9.4 – rontott / érvénytelenített (papír) számla: piszkozatként, a sorszám miatt marad; nem könyvelhető, nem teendő. */
     voidedAt: timestamp("voided_at", { withTimezone: true }),
+    /** v7.5.0 – jóváhagyás kifizetés előtt (bejövő számla) */
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedBy: integer("approved_by").references(() => users.id, { onDelete: "set null" }),
     journalEntryId: integer("journal_entry_id").references(() => journalEntries.id),
     note: text("note"),
     /** v2.2 – helyesbítő számla: az eredeti (helyesbített) számla. */
@@ -674,6 +681,8 @@ export const invoiceLines = pgTable(
     vehicleId: integer("vehicle_id").references(() => vehicles.id),
     /** v6.3.0 – cikk (készletnyilvántartás): szállítói számlán bevételezés, vevőszámlán kiadás. */
     itemId: integer("item_id").references((): AnyPgColumn => items.id, { onDelete: "restrict" }),
+    /** v7.5.0 – költséghely / projekt */
+    costCenterId: integer("cost_center_id").references(() => costCenters.id, { onDelete: "set null" }),
     // Számított értékek (HUF)
     netHuf: money("net_huf").notNull().default(0),
     vatHuf: money("vat_huf").notNull().default(0),
@@ -1497,4 +1506,18 @@ export const paymentReminders = pgTable(
     userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [index("payment_reminders_invoice").on(t.invoiceId)],
+);
+
+/** v7.5.0 – Költséghelyek / projektek: címke a számlasorokon és a naplósorokon, eredménykimutatás címkénként. */
+export const costCenters = pgTable(
+  "cost_centers",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    code: varchar("code", { length: 20 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("cost_centers_company_code").on(t.companyId, t.code)],
 );

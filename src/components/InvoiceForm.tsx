@@ -13,7 +13,7 @@ import { cleanPartnerInput, findDuplicatePartner, type NewPartnerInput } from "@
 const NEW = "__new";
 const emptyPartner = (): NewPartnerInput => ({ name: "", taxNumber: "", euVatNumber: "", country: "HU", address: "", email: "", isPrivatePerson: false });
 
-type Line = { description: string; quantity: string; unitPrice: string; vatCodeId: number; accountId: number; vehicleId: number | null; itemId?: number | null };
+type Line = { description: string; quantity: string; unitPrice: string; vatCodeId: number; accountId: number; vehicleId: number | null; itemId?: number | null; costCenterId?: number | null };
 
 export type InvoiceFormInitial = {
   partnerId: number | null;
@@ -39,6 +39,8 @@ export function InvoiceForm(props: {
   vehicles: VehicleOpt[];
   /** v6.3.0 – cikkek (csak bekapcsolt készlet-modulnál) */
   items?: ItemOpt[];
+  /** v7.5.0 – költséghelyek (ha van) */
+  costCenters?: Array<{ id: number; label: string }>;
   initial: InvoiceFormInitial;
   invoiceId?: number;
   /** v2.0 – új sor alapértelmezései az entitás szerint (pl. magánszemélynél AAM / 27NL). */
@@ -188,6 +190,7 @@ export function InvoiceForm(props: {
               accountId: l.accountId,
               vehicleId: l.vehicleId,
               itemId: l.itemId ?? null,
+              costCenterId: l.costCenterId ?? null,
             })),
           },
           props.invoiceId,
@@ -338,6 +341,12 @@ export function InvoiceForm(props: {
                   <select value={l.accountId} onChange={(e) => setLine(i, { accountId: Number(e.target.value) })}>
                     {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
                   </select>
+                  {(props.costCenters?.length ?? 0) > 0 && (
+                    <select value={l.costCenterId ?? ""} onChange={(e) => setLine(i, { costCenterId: e.target.value ? Number(e.target.value) : null })} title="Költséghely / projekt" style={{ marginTop: 4 }}>
+                      <option value="">– költséghely –</option>
+                      {props.costCenters!.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    </select>
+                  )}
                 </td>
                 <td className="num">{p && "a" in p && p.a ? fmtHuf(p.a.netHuf) : <span className="muted">{p && "warn" in p ? p.warn : ""}</span>}</td>
                 <td className="num">

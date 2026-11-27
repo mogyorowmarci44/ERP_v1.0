@@ -119,6 +119,8 @@ export type DraftLine = {
   partnerId?: number | null;
   vehicleId?: number | null;
   vatCodeId?: number | null;
+  /** v7.5.0 – költséghely / projekt */
+  costCenterId?: number | null;
   currency?: string | null;
   amountFx?: number | null;
   fxRate?: number | null;
@@ -146,6 +148,7 @@ export type InvoiceForPosting = {
       accountId: number;
       vatCodeId: number;
       vehicleId?: number | null;
+      costCenterId?: number | null;
     }
   >;
 };
@@ -194,6 +197,7 @@ export function buildInvoicePosting(
       partnerId: inv.partnerId,
       vatCodeId: l.vatCodeId,
       vehicleId: l.vehicleId ?? null,
+      costCenterId: l.costCenterId ?? null,
     };
     const selfAssessed = SELF_ASSESSED.includes(l.vatKind);
 

@@ -1107,3 +1107,69 @@ async function sendReminderActionImpl(fd: FormData) {
     return `${back}?ok=${encodeURIComponent(`Emlékeztető elküldve: ${r.partner} (${r.to}), ${r.count} számla.`)}`;
   });
 }
+
+// ---------------------------------------------------------------------------
+// v7.5.0 – Jóváhagyás kifizetés előtt, költséghelyek
+// ---------------------------------------------------------------------------
+
+export async function approveInvoiceAction(fd: FormData) {
+  return withAudit("approveInvoiceAction", fd, () => approveInvoiceActionImpl(fd));
+}
+
+async function approveInvoiceActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  const { role, user, support } = await requireCompany(cid);
+  const id = Number(fd.get("id"));
+  const back = fd.get("back") === "open" ? `/c/${cid}/reports/open-items` : `/c/${cid}/invoices/${id}`;
+  await runOrRedirect(back, async () => {
+    const { canApprove } = await import("@/lib/approval-calc");
+    if (support || !canApprove(role)) throw new Error("Jóváhagyni a tulajdonos vagy az ügyvezető (CEO) tud.");
+    const { orgAccess } = await import("@/lib/billing");
+    const [co] = await db.select({ org: schema.companies.organizationId }).from(schema.companies).where(eq(schema.companies.id, cid));
+    if (!(await orgAccess(co?.org)).writable) throw new Error("Az ügyfélfiók csak olvasható.");
+    const [inv] = await db.select().from(schema.invoices).where(and(eq(schema.invoices.id, id), eq(schema.invoices.companyId, cid)));
+    if (!inv || inv.direction !== "in") throw new Error("Csak bejövő számla hagyható jóvá.");
+    const undo = fd.get("undo") === "1";
+    await db.update(schema.invoices).set(undo ? { approvedAt: null, approvedBy: null } : { approvedAt: new Date(), approvedBy: user.id }).where(eq(schema.invoices.id, id));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `${back}?ok=${encodeURIComponent(undo ? `Jóváhagyás visszavonva: ${inv.invoiceNumber}` : `Jóváhagyva fizetésre: ${inv.invoiceNumber}`)}`;
+  });
+}
+
+export async function saveApprovalSettingsAction(fd: FormData) {
+  return withAudit("saveApprovalSettingsAction", fd, () => saveApprovalSettingsActionImpl(fd));
+}
+
+async function saveApprovalSettingsActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  const { role, company } = await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/settings`, async () => {
+    if (role !== "owner") throw new Error("Csak tulajdonos állíthatja.");
+    const threshold = Math.max(0, Math.round(Number(String(fd.get("threshold") ?? "0").replace(/\s/g, "")) || 0));
+    await db.update(schema.companies).set({ settings: { ...company.settings, approval: { on: fd.get("on") === "on", threshold } } }).where(eq(schema.companies.id, cid));
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/settings?ok=${encodeURIComponent("Jóváhagyási beállítás mentve.")}#jovahagyas`;
+  });
+}
+
+export async function saveCostCenterAction(fd: FormData) {
+  return withAudit("saveCostCenterAction", fd, () => saveCostCenterActionImpl(fd));
+}
+
+async function saveCostCenterActionImpl(fd: FormData) {
+  const cid = cidOf(fd);
+  await requireCompany(cid, { write: true });
+  await runOrRedirect(`/c/${cid}/settings`, async () => {
+    const id = intOrNull(fd, "id");
+    if (id && fd.get("op")) {
+      await db.update(schema.costCenters).set({ active: fd.get("op") === "on" }).where(and(eq(schema.costCenters.id, id), eq(schema.costCenters.companyId, cid)));
+      return `/c/${cid}/settings#koltseghely`;
+    }
+    const code = str(fd, "code").trim().toUpperCase().slice(0, 20);
+    const name = str(fd, "name").trim().slice(0, 120);
+    if (!code || !name) throw new Error("A kód és a megnevezés kötelező.");
+    await db.insert(schema.costCenters).values({ companyId: cid, code, name });
+    revalidatePath(`/c/${cid}`, "layout");
+    return `/c/${cid}/settings?ok=${encodeURIComponent(`Költséghely felvéve: ${code} – ${name}`)}#koltseghely`;
+  });
+}

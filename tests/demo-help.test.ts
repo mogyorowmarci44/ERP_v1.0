@@ -119,3 +119,18 @@ describe("v7.4.0 – kereső és PDF", () => {
     expect(doc.getCreator()).toContain("Mogyorosi Holding™");
   });
 });
+
+describe("v7.5.0 – jóváhagyás", () => {
+  it("csak bekapcsolva, bejövő, könyvelt, jóvá nem hagyott, küszöb felett", async () => {
+    const { needsApproval, canApprove } = await import("@/lib/approval-calc");
+    const inv = { direction: "in", grossHuf: "150000", approvedAt: null, status: "posted" };
+    expect(needsApproval({ on: true, threshold: 100000 }, inv)).toBe(true);
+    expect(needsApproval({ on: true, threshold: 200000 }, inv)).toBe(false);
+    expect(needsApproval({ on: false, threshold: 0 }, inv)).toBe(false);
+    expect(needsApproval(null, inv)).toBe(false);
+    expect(needsApproval({ on: true, threshold: 0 }, { ...inv, direction: "out" })).toBe(false);
+    expect(needsApproval({ on: true, threshold: 0 }, { ...inv, approvedAt: new Date() })).toBe(false);
+    expect(needsApproval({ on: true, threshold: 0 }, { ...inv, status: "draft" })).toBe(false);
+    expect([canApprove("owner"), canApprove("viewer"), canApprove("accountant"), canApprove("uploader")]).toEqual([true, true, false, false]);
+  });
+});
